@@ -905,8 +905,7 @@ def _interactive_shortcut_prompt(chord: str) -> None:
 
 
 def _default_source(repo: Path) -> Path:
-    release = repo / "src-tauri" / "target" / "release" / "operator-key"
-    return release if release.exists() else repo / "src-tauri" / "target" / "debug" / "operator-key"
+    return repo / "src-tauri" / "target" / "release" / "operator-key"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

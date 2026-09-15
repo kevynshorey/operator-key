@@ -473,6 +473,18 @@ class InstallBindingTests(unittest.TestCase):
         plan = installer.create_uninstall_plan(target=self.target)
         self.assertEqual(plan.destination, self.destination)
 
+    def test_default_source_never_falls_back_to_a_dev_server_binary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            debug = repo / "src-tauri/target/debug/operator-key"
+            debug.parent.mkdir(parents=True)
+            debug.write_bytes(b"debug executable")
+
+            self.assertEqual(
+                installer._default_source(repo),
+                repo / "src-tauri/target/release/operator-key",
+            )
+
     def test_yes_option_is_removed(self):
         with self.assertRaises(SystemExit):
             installer.parse_args(["--yes"])

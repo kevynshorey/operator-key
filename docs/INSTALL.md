@@ -13,20 +13,20 @@ Run commands from the repository root.
 
 ## Build the launcher
 
-For a local development build:
+Build the standalone launcher that embeds the production web assets:
 
 ```sh
 npm ci
-npm run tauri build -- --debug --no-bundle
+npm run tauri -- build --no-bundle
 ```
 
-The default installer source is `src-tauri/target/release/operator-key` when it exists, otherwise `src-tauri/target/debug/operator-key`. Select a build explicitly with `--binary` when both exist or when reviewing a particular artifact.
+The installer defaults to `src-tauri/target/release/operator-key`. Do not install a binary produced by plain `cargo build`: a development Tauri binary loads `devUrl` and requires the Vite server, so it is not a standalone launcher. Use `npm run tauri -- dev` only for development, or pass `--binary` to review a particular standalone artifact.
 
 ## Preview (the default)
 
 ```sh
 python3 scripts/install-omarchy-binding.py \
-  --binary "$PWD/src-tauri/target/debug/operator-key"
+  --binary "$PWD/src-tauri/target/release/operator-key"
 ```
 
 Preview is read-only: it does **not** change `~/.config/hypr/bindings.lua`, install a binary, reload Hyprland, or launch Operator Key. It explicitly identifies the physical shortcut you must press during apply.
@@ -59,7 +59,7 @@ Review the complete preview, then run the same command with `--apply`:
 
 ```sh
 python3 scripts/install-omarchy-binding.py \
-  --binary "$PWD/src-tauri/target/debug/operator-key" \
+  --binary "$PWD/src-tauri/target/release/operator-key" \
   --apply
 ```
 
@@ -83,6 +83,8 @@ sha256sum "$HOME/.local/bin/operator-key"
 ```
 
 Confirm the selected chord has description `Operator Key`, the installed hash matches the preview, and pressing the chord opens the launcher. Escape and the close button should close the process rather than merely hide its window.
+
+On an Apple keyboard forwarded to Omarchy, `SUPER` is commonly the Command (⌘) key. Remote-desktop clients can intercept or remap multi-modifier chords, so follow the exact physical prompt and leave the Operator Key window open until verification completes.
 
 ## Uninstall
 
