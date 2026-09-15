@@ -43,54 +43,110 @@ function looksLikeChord(query: string): boolean {
   return parts.length > 1 && parts.some((part) => part in MODIFIER_ALIASES);
 }
 
+interface SearchRecord {
+  readonly entry: CatalogEntry;
+  readonly command: string;
+  readonly commandWords: ReadonlySet<string>;
+  readonly aliases: readonly string[];
+  readonly aliasWords: ReadonlySet<string>;
+  readonly task: string;
+  readonly taskWords: ReadonlySet<string>;
+  readonly description: string;
+  readonly descriptionWords: ReadonlySet<string>;
+  readonly product: string;
+  readonly productWords: ReadonlySet<string>;
+  readonly chord: string;
+}
+
+export interface SearchIndex {
+  readonly records: readonly SearchRecord[];
+  readonly termPostings: ReadonlyMap<string, readonly number[]>;
+  readonly chordPostings: ReadonlyMap<string, readonly number[]>;
+}
+
+function addPosting(postings: Map<string, number[]>, term: string, recordIndex: number): void {
+  const bucket = postings.get(term);
+  if (bucket) {
+    if (bucket[bucket.length - 1] !== recordIndex) bucket.push(recordIndex);
+  } else {
+    postings.set(term, [recordIndex]);
+  }
+}
+
+function indexTokenSubstrings(postings: Map<string, number[]>, token: string, recordIndex: number): void {
+  for (let start = 0; start < token.length; start += 1) {
+    for (let end = start + 1; end <= token.length; end += 1) {
+      addPosting(postings, token.slice(start, end), recordIndex);
+    }
+  }
+}
+
+/** Build normalized records and lookup postings once for repeated local queries. */
+export function createSearchIndex(entries: readonly CatalogEntry[]): SearchIndex {
+  const termPostings = new Map<string, number[]>();
+  const chordPostings = new Map<string, number[]>();
+  const records = entries.map((entry, recordIndex): SearchRecord => {
+    const aliasValues = entry.aliases;
+    const command = clean(entry.command);
+    const commandWords = new Set(words(entry.command));
+    const aliases = aliasValues.map(clean);
+    const aliasWords = new Set(aliasValues.flatMap(words));
+    const task = clean(entry.task_group).replaceAll("-", " ");
+    const taskWords = new Set(words(entry.task_group));
+    const description = clean(entry.description);
+    const descriptionWords = new Set(words(entry.description));
+    const product = clean(entry.product).replaceAll("-", " ");
+    const productWords = new Set(words(entry.product));
+    const chord = entry.canonical_chord ? normalizeChord(entry.canonical_chord) : "";
+
+    const indexedTokens = new Set([
+      ...commandWords, ...aliasWords, ...taskWords, ...descriptionWords, ...productWords,
+    ]);
+    for (const token of indexedTokens) indexTokenSubstrings(termPostings, token, recordIndex);
+    if (chord) addPosting(chordPostings, chord, recordIndex);
+
+    return {
+      entry, command, commandWords, aliases, aliasWords, task, taskWords,
+      description, descriptionWords, product, productWords, chord,
+    };
+  });
+
+  return { records, termPostings, chordPostings };
+}
+
 interface Match {
   score: number;
   matchedTerms: string[];
 }
 
-function scoreEntry(entry: CatalogEntry, query: string): Match | null {
-  const normalizedQuery = clean(query);
+function scoreRecord(record: SearchRecord, normalizedQuery: string, queryTerms: readonly string[], chordQuery: string): Match | null {
   if (!normalizedQuery) return { score: 0, matchedTerms: [] };
-
-  const chordQuery = looksLikeChord(query) ? normalizeChord(query) : "";
-  if (chordQuery && chordQuery === entry.canonical_chord) {
+  if (chordQuery && chordQuery === record.chord) {
     return { score: 1_000_000, matchedTerms: [chordQuery] };
   }
 
-  const queryTerms = words(query);
   if (queryTerms.length === 0) return null;
-  const command = clean(entry.command);
-  const commandWords = new Set(words(entry.command));
-  const aliases = entry.aliases.map(clean);
-  const aliasWords = new Set(entry.aliases.flatMap(words));
-  const task = clean(entry.task_group).replaceAll("-", " ");
-  const taskWords = new Set(words(entry.task_group));
-  const description = clean(entry.description);
-  const descriptionWords = new Set(words(entry.description));
-  const product = clean(entry.product).replaceAll("-", " ");
-  const productWords = new Set(words(entry.product));
-
-  let score = command === normalizedQuery ? 500_000 : 0;
-  if (aliases.includes(normalizedQuery)) score += 100_000;
-  if (task === normalizedQuery) score += 10_000;
-  if (description === normalizedQuery) score += 1_000;
-  if (product === normalizedQuery) score += 100;
+  let score = record.command === normalizedQuery ? 500_000 : 0;
+  if (record.aliases.includes(normalizedQuery)) score += 100_000;
+  if (record.task === normalizedQuery) score += 10_000;
+  if (record.description === normalizedQuery) score += 1_000;
+  if (record.product === normalizedQuery) score += 100;
 
   const matchedTerms: string[] = [];
   for (const term of queryTerms) {
-    if (commandWords.has(term)) score += 20_000;
-    else if (aliasWords.has(term) || aliases.some((alias) => alias.includes(term))) score += 4_000;
-    else if (taskWords.has(term) || task.includes(term)) score += 800;
-    else if (descriptionWords.has(term) || description.includes(term)) score += 120;
-    else if (productWords.has(term) || product.includes(term)) score += 20;
+    if (record.commandWords.has(term)) score += 20_000;
+    else if (record.aliasWords.has(term) || record.aliases.some((alias) => alias.includes(term))) score += 4_000;
+    else if (record.taskWords.has(term) || record.task.includes(term)) score += 800;
+    else if (record.descriptionWords.has(term) || record.description.includes(term)) score += 120;
+    else if (record.productWords.has(term) || record.product.includes(term)) score += 20;
     else return null;
     matchedTerms.push(term);
   }
 
-  if (aliases.some((alias) => alias.includes(normalizedQuery))) score += 20_000;
-  if (task.includes(normalizedQuery)) score += 2_000;
-  if (description.includes(normalizedQuery)) score += 300;
-  if (product.includes(normalizedQuery)) score += 40;
+  if (record.aliases.some((alias) => alias.includes(normalizedQuery))) score += 20_000;
+  if (record.task.includes(normalizedQuery)) score += 2_000;
+  if (record.description.includes(normalizedQuery)) score += 300;
+  if (record.product.includes(normalizedQuery)) score += 40;
   return { score, matchedTerms };
 }
 
@@ -101,18 +157,50 @@ function passesFilters(entry: CatalogEntry, filters: SearchFilters): boolean {
     && (!filters.safety || entry.safety_level === filters.safety);
 }
 
+function intersectSorted(left: readonly number[], right: readonly number[]): number[] {
+  const result: number[] = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    if (left[leftIndex] === right[rightIndex]) {
+      result.push(left[leftIndex]);
+      leftIndex += 1;
+      rightIndex += 1;
+    } else if (left[leftIndex] < right[rightIndex]) leftIndex += 1;
+    else rightIndex += 1;
+  }
+  return result;
+}
+
+function candidateIndexes(index: SearchIndex, queryTerms: readonly string[], chordQuery: string): readonly number[] {
+  const chordCandidates = chordQuery ? index.chordPostings.get(chordQuery) : undefined;
+  if (chordCandidates?.length) return chordCandidates;
+  if (queryTerms.length === 0) return index.records.map((_, recordIndex) => recordIndex);
+  let candidates = index.termPostings.get(queryTerms[0]) ?? [];
+  for (const term of queryTerms.slice(1)) {
+    candidates = intersectSorted(candidates, index.termPostings.get(term) ?? []);
+    if (candidates.length === 0) break;
+  }
+  return candidates;
+}
+
 export function searchCatalog(
-  entries: readonly CatalogEntry[],
+  index: SearchIndex,
   query: string,
   filters: SearchFilters = {},
   limit = 50,
 ): SearchResult[] {
+  const normalizedQuery = clean(query);
+  const queryTerms = words(query);
+  const chordQuery = looksLikeChord(query) ? normalizeChord(query) : "";
   const results: SearchResult[] = [];
-  for (const entry of entries) {
-    if (!passesFilters(entry, filters)) continue;
-    const match = scoreEntry(entry, query);
+
+  for (const recordIndex of candidateIndexes(index, queryTerms, chordQuery)) {
+    const record = index.records[recordIndex];
+    if (!passesFilters(record.entry, filters)) continue;
+    const match = scoreRecord(record, normalizedQuery, queryTerms, chordQuery);
     if (!match) continue;
-    results.push({ entry, score: match.score, matchedTerms: match.matchedTerms, unavailable: !entry.available });
+    results.push({ entry: record.entry, score: match.score, matchedTerms: match.matchedTerms, unavailable: !record.entry.available });
   }
   results.sort((left, right) => Number(left.unavailable) - Number(right.unavailable)
     || right.score - left.score

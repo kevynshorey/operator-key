@@ -13,7 +13,7 @@ import {
   type SafetyLevel,
   type TaskGroup,
 } from "./catalog";
-import { searchCatalog } from "./search";
+import { createSearchIndex, searchCatalog } from "./search";
 
 const PRODUCT_LABELS: Record<Product, string> = {
   omarchy: "Omarchy",
@@ -30,6 +30,12 @@ const PRODUCT_TABS: Array<{ value?: Product; label: string }> = [
   { label: "All systems" },
   ...PRODUCTS.map((product) => ({ value: product, label: PRODUCT_LABELS[product] })),
 ];
+
+const SAFETY_LABELS: Record<SafetyLevel, { icon: string; label: string }> = {
+  green: { icon: "✓", label: "Safe" },
+  amber: { icon: "▲", label: "Caution" },
+  red: { icon: "!", label: "Danger" },
+};
 
 interface AppProps {
   loading?: boolean;
@@ -62,6 +68,7 @@ function ResultRow({ entry, active, position, total, onSelect }: {
   total: number;
   onSelect: () => void;
 }) {
+  const safety = SAFETY_LABELS[entry.safety_level];
   return (
     <li
       id={`result-${entry.id}`}
@@ -77,10 +84,11 @@ function ResultRow({ entry, active, position, total, onSelect }: {
       <ProductMark product={entry.product} />
       <span className="result-copy">
         <strong>{entry.command}</strong>
-        <small>{entry.description}</small>
+        <small>{entry.description}{!entry.available && <span className="unavailable-label"> · unavailable</span>}</small>
       </span>
-      <span className={`safety-dot safety-${entry.safety_level}`}>
-        <span className="sr-only">{entry.safety_level} safety</span>
+      <span className={`safety-label safety-${entry.safety_level}`} aria-label={`${safety.label} safety`}>
+        <span className="safety-symbol" aria-hidden="true">{safety.icon}</span>
+        {safety.label}
       </span>
       <span className="result-chord">{entry.canonical_chord || entry.interface}</span>
     </li>
@@ -170,6 +178,10 @@ function DetailCard({ entry, catalog }: { entry: CatalogEntry; catalog: Catalog 
 
 export default function App({ loading = false, catalogData = catalogJson }: AppProps) {
   const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
+  const searchIndex = useMemo(
+    () => parsed.ok ? createSearchIndex(parsed.catalog.entries) : undefined,
+    [parsed],
+  );
   const [query, setQuery] = useState("");
   const [product, setProduct] = useState<Product>();
   const [interfaceType, setInterfaceType] = useState<InterfaceType>();
@@ -181,9 +193,9 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const results = useMemo(() => {
-    if (!parsed.ok) return [];
-    return searchCatalog(parsed.catalog.entries, query, { product, interface: interfaceType, task, safety }, 50);
-  }, [parsed, query, product, interfaceType, task, safety]);
+    if (!searchIndex) return [];
+    return searchCatalog(searchIndex, query, { product, interface: interfaceType, task, safety }, 50);
+  }, [searchIndex, query, product, interfaceType, task, safety]);
   const boundedIndex = Math.min(selectedIndex, Math.max(0, results.length - 1));
   const selected = results[boundedIndex]?.entry;
 
@@ -198,7 +210,7 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
 
   const invokePlaceholder = () => {
     if (!selected) return;
-    setActionStatus(`Copy action arrives in Task 6 — ${selected.command} remained idle.`);
+    setActionStatus(`Copy is not connected yet — ${selected.command} remained idle.`);
   };
 
   const handleSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -217,7 +229,7 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
     }
   };
 
-  const handleTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+  const handleProductKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let target: number;
     if (event.key === "ArrowRight") target = (index + 1) % PRODUCT_TABS.length;
     else if (event.key === "ArrowLeft") target = (index - 1 + PRODUCT_TABS.length) % PRODUCT_TABS.length;
@@ -254,21 +266,20 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
           <kbd className="escape-key">ESC</kbd>
         </label>
 
-        <div className="product-tabs" role="tablist" aria-label="Product lanes">
+        <div className="product-tabs" role="radiogroup" aria-label="Product lanes">
           {PRODUCT_TABS.map((tab, index) => {
             const active = product === tab.value;
             const count = tab.value ? parsed.catalog.counts[tab.value] : parsed.catalog.total;
             return (
               <button
                 type="button"
-                role="tab"
-                aria-selected={active}
-                aria-controls="result-list"
+                role="radio"
+                aria-checked={active}
                 tabIndex={active ? 0 : -1}
                 key={tab.label}
                 ref={(node) => { tabRefs.current[index] = node; }}
                 onClick={() => selectProduct(tab.value)}
-                onKeyDown={(event) => handleTabKey(event, index)}
+                onKeyDown={(event) => handleProductKey(event, index)}
               >
                 {tab.value && <ProductMark product={tab.value} />}
                 {tab.label}<span>{count}</span>
@@ -345,7 +356,7 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
         <span>{parsed.catalog.total.toLocaleString()} commands ready</span>
         <span><b>{results.length}</b> shown</span>
         <span><kbd>↑</kbd><kbd>↓</kbd> select</span>
-        <span><kbd>ENTER</kbd> copy placeholder</span>
+        <span><kbd>ENTER</kbd> · COPY (WIRING NEXT)</span>
         <span className="execution-lock">● EXECUTION DISABLED</span>
       </footer>
     </main>

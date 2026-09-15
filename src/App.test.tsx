@@ -7,7 +7,7 @@ describe("Operator Key overlay", () => {
   it("renders the keyboard-first search shell and catalog status", () => {
     render(<App />);
     expect(screen.getByRole("searchbox", { name: /operator intent/i })).toHaveFocus();
-    expect(screen.getByRole("tablist", { name: /product lanes/i })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: /product lanes/i })).toBeInTheDocument();
     expect(screen.getByText(/1,302 commands ready/i)).toBeInTheDocument();
     expect(screen.getByText(/active context/i)).toBeInTheDocument();
   });
@@ -35,18 +35,27 @@ describe("Operator Key overlay", () => {
     render(<App />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Ctrl+B");
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("status")).toHaveTextContent(/copy action arrives in task 6/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/copy is not connected/i);
     expect(screen.queryByText(/executed/i)).not.toBeInTheDocument();
   });
 
-  it("moves across product tabs with the keyboard and filters the result lane", async () => {
+  it("moves across the product single-select group with the keyboard and filters results", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const allTab = screen.getByRole("tab", { name: /^all/i });
-    allTab.focus();
+    const allProduct = screen.getByRole("radio", { name: /^all/i });
+    allProduct.focus();
     await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: /omarchy/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("radio", { name: /omarchy/i })).toHaveAttribute("aria-checked", "true");
     expect(screen.getAllByRole("option").every((option) => option.dataset.product === "omarchy")).toBe(true);
+  });
+
+  it("labels safety visibly in every result row instead of relying on color", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Ctrl+B");
+    for (const option of screen.getAllByRole("option")) {
+      expect(option).toHaveTextContent(/safe|caution|danger/i);
+    }
   });
 
   it("shows context, safety, version, provenance, alternatives, and chord conflicts", async () => {
@@ -65,6 +74,9 @@ describe("Operator Key overlay", () => {
     render(<App />);
     await user.click(screen.getByRole("button", { name: /large text/i }));
     expect(screen.getByTestId("operator-shell")).toHaveClass("large-text");
+    expect(screen.getByRole("radiogroup", { name: /product lanes/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/interface filter/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/safety filter/i)).toBeInTheDocument();
   });
 
   it("renders non-crashing loading and catalog-error states", () => {
