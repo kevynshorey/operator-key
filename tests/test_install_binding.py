@@ -651,6 +651,30 @@ class InstallBindingTests(unittest.TestCase):
         block = installer.make_block("SUPER + SHIFT + K", self.destination, b"\n")
         self.assertEqual(installer.replace_managed_block(content, block), content + block)
 
+    def test_preview_reports_append_for_marker_lookalikes_without_a_managed_block(self):
+        contents = (
+            b'local marker = "-- >>> Operator Key managed binding >>>"\n',
+            b"  -- >>> Operator Key managed binding >>>\n",
+            (
+                b"local text = [[\n-- >>> Operator Key managed binding >>>\n"
+                b"not executable\n-- <<< Operator Key managed binding <<<\n]]\n"
+            ),
+        )
+        for content in contents:
+            with self.subTest(content=content):
+                self.target.write_bytes(content)
+                plan = installer.create_plan(
+                    target=self.target,
+                    source=self.source,
+                    destination=self.destination,
+                    runner=FakeRunner(),
+                    candidates=["SUPER + SHIFT + K"],
+                )
+                preview = installer.render_preview(plan)
+                self.assertIn("Change: append one uniquely marked block", preview)
+                self.assertNotIn("replace the existing uniquely marked block", preview)
+                self.assertEqual(plan.proposed, content + plan.block)
+
     def test_strict_block_rejects_extra_content_and_multiple_exact_blocks(self):
         good = installer.make_block("SUPER + SHIFT + K", self.destination, b"\n")
         extra = good.replace(

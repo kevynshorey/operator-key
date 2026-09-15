@@ -483,7 +483,7 @@ def create_plan(
 
 
 def render_preview(plan: InstallPlan) -> str:
-    diff_action = "replace the existing uniquely marked block" if BEGIN_MARKER.encode() in plan.original else "append one uniquely marked block"
+    diff_action = "replace the existing uniquely marked block" if _managed_block(plan.original) is not None else "append one uniquely marked block"
     decisions = "\n".join(f"  - {item}" for item in plan.decisions)
     return (
         "Operator Key Omarchy install preview (no files changed)\n"
