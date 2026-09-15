@@ -139,6 +139,40 @@ describe("Operator Key overlay", () => {
     expect(screen.queryByText(/^copied/i)).not.toBeInTheDocument();
   });
 
+  it("locks query, filters, and selection while an action is pending", async () => {
+    const user = userEvent.setup();
+    let finishCopy: (() => void) | undefined;
+    const actions = {
+      copy: vi.fn(() => new Promise<void>((resolve) => { finishCopy = resolve; })),
+      insert: vi.fn(),
+    };
+    render(<App actions={actions} />);
+    const search = screen.getByRole("searchbox", { name: /operator intent/i });
+    await user.type(search, "hermes chat");
+    await user.keyboard("{Enter}");
+
+    expect(search).toBeDisabled();
+    expect(screen.getByLabelText(/interface filter/i)).toBeDisabled();
+    expect(screen.getByLabelText(/safety filter/i)).toBeDisabled();
+    expect(screen.getAllByRole("radio").every((control) => control.hasAttribute("disabled"))).toBe(true);
+    expect(screen.getAllByRole("option").every((option) => option.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(screen.getAllByRole("button", { name: /task/i }).every((control) => control.hasAttribute("disabled"))).toBe(true);
+
+    finishCopy?.();
+    expect(await screen.findByRole("status")).toHaveTextContent(/copied “hermes chat”/i);
+    await waitFor(() => expect(search).not.toBeDisabled());
+  });
+
+  it("associates the disabled insertion explanation with the control", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes logout");
+
+    const insert = screen.getByRole("button", { name: /insert into confirmed terminal/i });
+    expect(insert).toHaveAttribute("aria-describedby", "insert-disabled-reason");
+    expect(document.getElementById("insert-disabled-reason")).toHaveTextContent(/copy-only/i);
+  });
+
   it("moves across the product single-select group with the keyboard and filters results", async () => {
     const user = userEvent.setup();
     render(<App />);

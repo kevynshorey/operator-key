@@ -41,6 +41,11 @@ describe("responsive and accessible style contract", () => {
     expect(css).toMatch(/\.action-panel button:disabled\s*\{[^}]*cursor:\s*not-allowed/);
   });
 
+  it("gives action errors a high-contrast alert treatment", () => {
+    expect(css).toMatch(/\.action-alert\s*\{[^}]*border-color:\s*var\(--red\)/);
+    expect(css).toMatch(/\.action-alert\s*\{[^}]*color:\s*#fff/);
+  });
+
   it("reflows large text at narrow supported widths instead of squeezing content", () => {
     expect(css).toMatch(/@media \(max-width: 850px\)[\s\S]*\.large-text \.workspace-grid\s*\{[^}]*display:\s*block/);
     expect(css).toMatch(/\.large-text \.alternative-grid\s*\{[^}]*grid-template-columns:\s*1fr/);

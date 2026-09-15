@@ -213,6 +213,8 @@ select:focus-visible,
 .alternative-grid em { position: absolute; top: 7px; right: 8px; color: var(--muted); font-family: var(--mono); font-size: 11px; font-style: normal; }
 
 .action-status { position: absolute; right: 15px; bottom: 36px; z-index: 5; max-width: 520px; padding: 8px 11px; border: 1px solid var(--cyan); background: #101719; color: var(--white); font-family: var(--mono); font-size: 10px; box-shadow: 0 8px 30px #050708; }
+.action-alert { border-color: var(--red); color: #fff; background: #391813; }
+button:disabled, input:disabled, select:disabled, [role="option"][aria-disabled="true"] { opacity: .68; cursor: not-allowed; }
 .status-footer { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-height: 32px; padding: 5px 12px; border-top: 1px solid var(--graphite-600); background: var(--graphite-950); color: var(--muted); font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .02em; }
 .status-footer span:first-child { color: var(--white); }
 .status-footer b { color: var(--cyan); }

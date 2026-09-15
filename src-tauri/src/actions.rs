@@ -1,11 +1,14 @@
 use serde::Deserialize;
 use std::fmt;
-use std::io::Write;
-use std::process::{Command, Stdio};
+use std::io::{Read, Write};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 const CATALOG_JSON: &str = include_str!("../../data/catalog.json");
+const NATIVE_DEADLINE: Duration = Duration::from_secs(2);
+const POLL_INTERVAL: Duration = Duration::from_millis(5);
 const TERMINAL_CLASSES: &[&str] = &[
     "Alacritty",
     "alacritty",
@@ -29,8 +32,16 @@ struct CatalogEntry {
     id: String,
     interface: String,
     command: String,
-    safety_level: String,
+    safety_level: SafetyLevel,
     available: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum SafetyLevel {
+    Green,
+    Amber,
+    Red,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -44,8 +55,13 @@ enum ActionError {
     Overlay(String),
     TargetDetection(String),
     NonTerminal,
+    TargetChanged,
     Insertion(String),
     Clipboard(String),
+    Restoration {
+        primary: String,
+        restoration: String,
+    },
 }
 
 impl fmt::Display for ActionError {
@@ -66,8 +82,21 @@ impl fmt::Display for ActionError {
                 write!(formatter, "terminal target detection failed: {message}")
             }
             Self::NonTerminal => write!(formatter, "active target is not an allowlisted terminal"),
+            Self::TargetChanged => {
+                write!(
+                    formatter,
+                    "terminal target identity changed before insertion"
+                )
+            }
             Self::Insertion(message) => write!(formatter, "literal insertion failed: {message}"),
             Self::Clipboard(message) => write!(formatter, "clipboard copy failed: {message}"),
+            Self::Restoration {
+                primary,
+                restoration,
+            } => write!(
+                formatter,
+                "{primary}; overlay restoration also failed: {restoration}"
+            ),
         }
     }
 }
@@ -96,46 +125,190 @@ impl ProcessOutput {
 
 trait InsertionEnvironment {
     fn hide_overlay(&self) -> Result<(), String>;
-    fn restore_overlay(&self);
+    fn restore_overlay(&self) -> Result<(), String>;
     fn wait_for_focus_handoff(&self);
     fn output(&self, program: &str, args: &[&str]) -> Result<ProcessOutput, String>;
     fn input(&self, program: &str, args: &[&str], stdin: &[u8]) -> Result<ProcessOutput, String>;
 }
 
-fn process_output(program: &str, args: &[&str]) -> Result<ProcessOutput, String> {
-    let output = Command::new(program)
-        .args(args)
-        .output()
-        .map_err(|error| format!("could not start {program}: {error}"))?;
+fn terminate_and_reap(child: &mut Child, program: &str) -> Result<(), String> {
+    let kill_error = child.kill().err();
+    let wait_error = child.wait().err();
+    match (kill_error, wait_error) {
+        (_, None) => Ok(()),
+        (Some(kill), Some(wait)) => Err(format!(
+            "could not kill {program}: {kill}; could not reap {program}: {wait}"
+        )),
+        (None, Some(wait)) => Err(format!("could not reap {program}: {wait}")),
+    }
+}
+
+fn read_pipe<R: Read>(mut pipe: R) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    pipe.read_to_end(&mut bytes)
+        .map_err(|error| format!("could not read process output: {error}"))?;
+    Ok(bytes)
+}
+
+fn restore_window(
+    show: impl FnOnce() -> Result<(), String>,
+    focus: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    show()?;
+    focus()
+}
+
+fn run_spawned_child(
+    mut child: Child,
+    program: &str,
+    input: Option<Vec<u8>>,
+    timeout: Duration,
+) -> Result<ProcessOutput, String> {
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let primary = format!("{program} stdout was unavailable");
+            return match terminate_and_reap(&mut child, program) {
+                Ok(()) => Err(primary),
+                Err(cleanup) => Err(format!("{primary}; {cleanup}")),
+            };
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            let primary = format!("{program} stderr was unavailable");
+            return match terminate_and_reap(&mut child, program) {
+                Ok(()) => Err(primary),
+                Err(cleanup) => Err(format!("{primary}; {cleanup}")),
+            };
+        }
+    };
+    let stdout_reader = thread::spawn(move || read_pipe(stdout));
+    let stderr_reader = thread::spawn(move || read_pipe(stderr));
+
+    let mut writer = match input {
+        Some(bytes) => {
+            let mut stdin = match child.stdin.take() {
+                Some(stdin) => stdin,
+                None => {
+                    let primary = format!("{program} stdin was unavailable");
+                    let cleanup = terminate_and_reap(&mut child, program).err();
+                    let _ = stdout_reader.join();
+                    let _ = stderr_reader.join();
+                    return Err(
+                        cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}"))
+                    );
+                }
+            };
+            let program = program.to_owned();
+            Some(thread::spawn(move || {
+                stdin
+                    .write_all(&bytes)
+                    .map_err(|error| format!("could not write to {program}: {error}"))
+            }))
+        }
+        None => None,
+    };
+
+    let started = Instant::now();
+    let status: ExitStatus = loop {
+        if writer.as_ref().is_some_and(|handle| handle.is_finished()) {
+            let write_result = writer.take().expect("writer exists").join();
+            let write_result = match write_result {
+                Ok(result) => result,
+                Err(_) => {
+                    let primary = format!("{program} stdin writer panicked");
+                    let cleanup = terminate_and_reap(&mut child, program).err();
+                    let _ = stdout_reader.join();
+                    let _ = stderr_reader.join();
+                    return Err(
+                        cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}"))
+                    );
+                }
+            };
+            if let Err(primary) = write_result {
+                let cleanup = terminate_and_reap(&mut child, program).err();
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
+            }
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < timeout => {
+                thread::sleep(POLL_INTERVAL.min(timeout.saturating_sub(started.elapsed())));
+            }
+            Ok(None) => {
+                let primary = format!("{program} timed out after {} ms", timeout.as_millis());
+                let cleanup = terminate_and_reap(&mut child, program).err();
+                if let Some(writer) = writer.take() {
+                    let _ = writer.join();
+                }
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
+            }
+            Err(error) => {
+                let primary = format!("could not wait for {program}: {error}");
+                let cleanup = terminate_and_reap(&mut child, program).err();
+                if let Some(writer) = writer.take() {
+                    let _ = writer.join();
+                }
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
+            }
+        }
+    };
+
+    if let Some(writer) = writer {
+        writer
+            .join()
+            .map_err(|_| format!("{program} stdin writer panicked"))??;
+    }
+    let stdout = stdout_reader
+        .join()
+        .map_err(|_| format!("{program} stdout reader panicked"))??;
+    let stderr = stderr_reader
+        .join()
+        .map_err(|_| format!("{program} stderr reader panicked"))??;
     Ok(ProcessOutput {
-        success: output.status.success(),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        success: status.success(),
+        stdout: String::from_utf8_lossy(&stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&stderr).trim().to_owned(),
     })
 }
 
-fn process_input(program: &str, args: &[&str], input: &[u8]) -> Result<ProcessOutput, String> {
-    let mut child = Command::new(program)
+fn process_output(
+    program: &str,
+    args: &[&str],
+    timeout: Duration,
+) -> Result<ProcessOutput, String> {
+    let child = Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("could not start {program}: {error}"))?;
+    run_spawned_child(child, program, None, timeout)
+}
+
+fn process_input(
+    program: &str,
+    args: &[&str],
+    input: &[u8],
+    timeout: Duration,
+) -> Result<ProcessOutput, String> {
+    let child = Command::new(program)
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|error| format!("could not start {program}: {error}"))?;
-    child
-        .stdin
-        .take()
-        .ok_or_else(|| format!("{program} stdin was unavailable"))?
-        .write_all(input)
-        .map_err(|error| format!("could not write to {program}: {error}"))?;
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("could not wait for {program}: {error}"))?;
-    Ok(ProcessOutput {
-        success: output.status.success(),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
-    })
+    run_spawned_child(child, program, Some(input.to_vec()), timeout)
 }
 
 struct NativeClipboard;
@@ -146,6 +319,7 @@ impl ClipboardWriter for NativeClipboard {
             "wl-copy",
             &["--type", "text/plain;charset=utf-8"],
             text.as_bytes(),
+            NATIVE_DEADLINE,
         )?;
         if output.success {
             Ok(())
@@ -161,6 +335,16 @@ impl ClipboardWriter for NativeClipboard {
 
 struct NativeInsertionEnvironment {
     window: tauri::WebviewWindow,
+    deadline: Instant,
+}
+
+impl NativeInsertionEnvironment {
+    fn remaining(&self) -> Result<Duration, String> {
+        self.deadline
+            .checked_duration_since(Instant::now())
+            .filter(|duration| !duration.is_zero())
+            .ok_or_else(|| "insertion deadline elapsed".into())
+    }
 }
 
 impl InsertionEnvironment for NativeInsertionEnvironment {
@@ -168,21 +352,31 @@ impl InsertionEnvironment for NativeInsertionEnvironment {
         self.window.hide().map_err(|error| error.to_string())
     }
 
-    fn restore_overlay(&self) {
-        let _ = self.window.show();
-        let _ = self.window.set_focus();
+    fn restore_overlay(&self) -> Result<(), String> {
+        restore_window(
+            || {
+                self.window
+                    .show()
+                    .map_err(|error| format!("could not show overlay: {error}"))
+            },
+            || {
+                self.window
+                    .set_focus()
+                    .map_err(|error| format!("could not focus overlay: {error}"))
+            },
+        )
     }
 
     fn wait_for_focus_handoff(&self) {
-        std::thread::sleep(Duration::from_millis(175));
+        thread::sleep(Duration::from_millis(175));
     }
 
     fn output(&self, program: &str, args: &[&str]) -> Result<ProcessOutput, String> {
-        process_output(program, args)
+        process_output(program, args, self.remaining()?)
     }
 
     fn input(&self, program: &str, args: &[&str], stdin: &[u8]) -> Result<ProcessOutput, String> {
-        process_input(program, args, stdin)
+        process_input(program, args, stdin, self.remaining()?)
     }
 }
 
@@ -221,7 +415,7 @@ fn copy_catalog_command_with(
 }
 
 fn validate_insert(entry: &CatalogEntry) -> Result<(), ActionError> {
-    if entry.safety_level == "red" {
+    if !matches!(entry.safety_level, SafetyLevel::Green | SafetyLevel::Amber) {
         return Err(ActionError::RedAction);
     }
     if !entry.available {
@@ -236,13 +430,46 @@ fn validate_insert(entry: &CatalogEntry) -> Result<(), ActionError> {
     Ok(())
 }
 
+fn is_valid_hyprland_address(address: &str) -> bool {
+    (3..=18).contains(&address.len())
+        && address.starts_with("0x")
+        && address[2..].bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn is_allowlisted_terminal(window: &ActiveWindow) -> bool {
-    if window.address.trim().is_empty() {
-        return false;
+    is_valid_hyprland_address(&window.address)
+        && [&window.class, &window.initial_class]
+            .into_iter()
+            .any(|value| TERMINAL_CLASSES.contains(&value.as_str()))
+}
+
+fn successful_output(output: ProcessOutput, program: &str) -> Result<ProcessOutput, String> {
+    if output.success {
+        Ok(output)
+    } else if output.stderr.is_empty() {
+        Err(format!("{program} exited unsuccessfully"))
+    } else {
+        Err(output.stderr)
     }
-    [&window.class, &window.initial_class]
-        .into_iter()
-        .any(|value| TERMINAL_CLASSES.contains(&value.as_str()))
+}
+
+fn active_window(environment: &impl InsertionEnvironment) -> Result<ActiveWindow, ActionError> {
+    let output = environment
+        .output("hyprctl", &["-j", "activewindow"])
+        .map_err(ActionError::TargetDetection)?;
+    let output = successful_output(output, "hyprctl").map_err(ActionError::TargetDetection)?;
+    serde_json::from_str(&output.stdout)
+        .map_err(|error| ActionError::TargetDetection(error.to_string()))
+}
+
+fn restore_after(primary: ActionError, environment: &impl InsertionEnvironment) -> ActionError {
+    match environment.restore_overlay() {
+        Ok(()) => primary,
+        Err(restoration) => ActionError::Restoration {
+            primary: primary.to_string(),
+            restoration,
+        },
+    }
 }
 
 fn insert_catalog_command_with(
@@ -255,47 +482,36 @@ fn insert_catalog_command_with(
     validate_insert(entry)?;
 
     if let Err(error) = environment.hide_overlay() {
-        environment.restore_overlay();
-        return Err(ActionError::Overlay(error));
+        return Err(restore_after(ActionError::Overlay(error), environment));
     }
     environment.wait_for_focus_handoff();
 
     let result = (|| {
-        let active_output = environment
-            .output("hyprctl", &["-j", "activewindow"])
-            .map_err(ActionError::TargetDetection)?;
-        if !active_output.success {
-            return Err(ActionError::TargetDetection(
-                if active_output.stderr.is_empty() {
-                    "hyprctl exited unsuccessfully".into()
-                } else {
-                    active_output.stderr
-                },
-            ));
-        }
-        let active: ActiveWindow = serde_json::from_str(&active_output.stdout)
-            .map_err(|error| ActionError::TargetDetection(error.to_string()))?;
-        if !is_allowlisted_terminal(&active) {
+        let captured = active_window(environment)?;
+        if !is_allowlisted_terminal(&captured) {
             return Err(ActionError::NonTerminal);
+        }
+
+        let selector = format!("address:{}", captured.address);
+        let focus_output = environment
+            .output("hyprctl", &["dispatch", "focuswindow", &selector])
+            .map_err(ActionError::TargetDetection)?;
+        successful_output(focus_output, "hyprctl dispatch focuswindow")
+            .map_err(ActionError::TargetDetection)?;
+
+        let revalidated = active_window(environment)?;
+        if captured.address != revalidated.address || !is_allowlisted_terminal(&revalidated) {
+            return Err(ActionError::TargetChanged);
         }
 
         let insert_output = environment
             .input("wtype", &["-"], entry.command.as_bytes())
             .map_err(ActionError::Insertion)?;
-        if !insert_output.success {
-            return Err(ActionError::Insertion(if insert_output.stderr.is_empty() {
-                "wtype exited unsuccessfully".into()
-            } else {
-                insert_output.stderr
-            }));
-        }
+        successful_output(insert_output, "wtype").map_err(ActionError::Insertion)?;
         Ok(())
     })();
 
-    if result.is_err() {
-        environment.restore_overlay();
-    }
-    result
+    result.map_err(|error| restore_after(error, environment))
 }
 
 fn catalog() -> Result<&'static Catalog, ActionError> {
@@ -307,30 +523,41 @@ fn catalog() -> Result<&'static Catalog, ActionError> {
 }
 
 #[tauri::command]
-pub fn copy_catalog_command(entry_id: String, command: String) -> Result<(), String> {
-    copy_catalog_command_with(
-        catalog().map_err(|error| error.to_string())?,
-        &entry_id,
-        &command,
-        &NativeClipboard,
-    )
-    .map_err(|error| error.to_string())
+pub async fn copy_catalog_command(entry_id: String, command: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        copy_catalog_command_with(
+            catalog().map_err(|error| error.to_string())?,
+            &entry_id,
+            &command,
+            &NativeClipboard,
+        )
+        .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("native clipboard task failed: {error}"))?
 }
 
 #[tauri::command]
-pub fn insert_catalog_command(
+pub async fn insert_catalog_command(
     window: tauri::WebviewWindow,
     entry_id: String,
     command: String,
 ) -> Result<(), String> {
-    let environment = NativeInsertionEnvironment { window };
-    insert_catalog_command_with(
-        catalog().map_err(|error| error.to_string())?,
-        &entry_id,
-        &command,
-        &environment,
-    )
-    .map_err(|error| error.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        let environment = NativeInsertionEnvironment {
+            window,
+            deadline: Instant::now() + NATIVE_DEADLINE,
+        };
+        insert_catalog_command_with(
+            catalog().map_err(|error| error.to_string())?,
+            &entry_id,
+            &command,
+            &environment,
+        )
+        .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("native insertion task failed: {error}"))?
 }
 
 #[cfg(test)]
@@ -340,11 +567,17 @@ mod tests {
     use std::collections::VecDeque;
 
     fn entry(interface: &str, safety_level: &str, available: bool, command: &str) -> CatalogEntry {
+        let safety_level = match safety_level {
+            "green" => SafetyLevel::Green,
+            "amber" => SafetyLevel::Amber,
+            "red" => SafetyLevel::Red,
+            value => panic!("unsupported test safety level: {value}"),
+        };
         CatalogEntry {
             id: "entry-1".into(),
             interface: interface.into(),
             command: command.into(),
-            safety_level: safety_level.into(),
+            safety_level,
             available,
         }
     }
@@ -371,6 +604,7 @@ mod tests {
         output: RefCell<VecDeque<ProcessOutput>>,
         calls: RefCell<Vec<String>>,
         hide_error: Option<String>,
+        restore_error: Option<String>,
     }
 
     impl FakeEnvironment {
@@ -379,9 +613,14 @@ mod tests {
                 r#"{{"address":"0x123","class":"{class}","initialClass":"{class}","title":"shell"}}"#
             );
             Self {
-                output: RefCell::new(VecDeque::from([ProcessOutput::success(json)])),
+                output: RefCell::new(VecDeque::from([
+                    ProcessOutput::success(json.clone()),
+                    ProcessOutput::success(""),
+                    ProcessOutput::success(json),
+                ])),
                 calls: RefCell::new(Vec::new()),
                 hide_error: None,
+                restore_error: None,
             }
         }
 
@@ -390,6 +629,7 @@ mod tests {
                 output: RefCell::new(VecDeque::from([output])),
                 calls: RefCell::new(Vec::new()),
                 hide_error: None,
+                restore_error: None,
             }
         }
 
@@ -398,6 +638,7 @@ mod tests {
                 output: RefCell::new(VecDeque::new()),
                 calls: RefCell::new(Vec::new()),
                 hide_error: Some(message.into()),
+                restore_error: None,
             }
         }
     }
@@ -411,8 +652,9 @@ mod tests {
             }
         }
 
-        fn restore_overlay(&self) {
+        fn restore_overlay(&self) -> Result<(), String> {
             self.calls.borrow_mut().push("restore".into());
+            self.restore_error.clone().map_or(Ok(()), Err)
         }
 
         fn wait_for_focus_handoff(&self) {
@@ -478,6 +720,8 @@ mod tests {
             &[
                 "hide",
                 "wait",
+                "output:hyprctl:-j activewindow",
+                "output:hyprctl:dispatch focuswindow address:0x123",
                 "output:hyprctl:-j activewindow",
                 "input:wtype:-:hermes help",
             ]
@@ -546,6 +790,99 @@ mod tests {
     }
 
     #[test]
+    fn insertion_rejects_an_invalid_hyprland_address_before_refocus() {
+        for address in ["123", "0x", "0x12:34", "0x1234567890abcdef0"] {
+            let catalog = catalog(entry("shell-command", "green", true, "hermes help"));
+            let json =
+                format!(r#"{{"address":"{address}","class":"kitty","initialClass":"kitty"}}"#);
+            let environment = FakeEnvironment::with_output(ProcessOutput::success(json));
+
+            assert!(
+                insert_catalog_command_with(&catalog, "entry-1", "hermes help", &environment,)
+                    .is_err()
+            );
+            assert!(!environment
+                .calls
+                .borrow()
+                .iter()
+                .any(|call| call.contains("dispatch focuswindow")));
+        }
+    }
+
+    #[test]
+    fn insertion_aborts_when_refocusing_the_captured_address_fails() {
+        let catalog = catalog(entry("shell-command", "green", true, "hermes help"));
+        let environment = FakeEnvironment {
+            output: RefCell::new(VecDeque::from([
+                ProcessOutput::success(
+                    r#"{"address":"0x123","class":"kitty","initialClass":"kitty"}"#,
+                ),
+                ProcessOutput {
+                    success: false,
+                    stdout: String::new(),
+                    stderr: "dispatch failed".into(),
+                },
+            ])),
+            calls: RefCell::new(Vec::new()),
+            hide_error: None,
+            restore_error: None,
+        };
+
+        let error = insert_catalog_command_with(&catalog, "entry-1", "hermes help", &environment)
+            .unwrap_err();
+
+        assert!(error.to_string().contains("dispatch failed"));
+        assert_eq!(environment.calls.borrow().last().unwrap(), "restore");
+        assert!(!environment
+            .calls
+            .borrow()
+            .iter()
+            .any(|call| call.starts_with("input:wtype")));
+    }
+
+    #[test]
+    fn insertion_aborts_when_the_revalidated_target_changes_identity() {
+        for second_snapshot in [
+            r#"{"address":"0x456","class":"kitty","initialClass":"kitty"}"#,
+            r#"{"address":"0x123","class":"firefox","initialClass":"firefox"}"#,
+        ] {
+            let catalog = catalog(entry("shell-command", "green", true, "hermes help"));
+            let environment = FakeEnvironment {
+                output: RefCell::new(VecDeque::from([
+                    ProcessOutput::success(
+                        r#"{"address":"0x123","class":"kitty","initialClass":"kitty"}"#,
+                    ),
+                    ProcessOutput::success(""),
+                    ProcessOutput::success(second_snapshot),
+                ])),
+                calls: RefCell::new(Vec::new()),
+                hide_error: None,
+                restore_error: None,
+            };
+
+            assert!(
+                insert_catalog_command_with(&catalog, "entry-1", "hermes help", &environment,)
+                    .is_err()
+            );
+            assert_eq!(environment.calls.borrow().last().unwrap(), "restore");
+            assert!(!environment
+                .calls
+                .borrow()
+                .iter()
+                .any(|call| call.starts_with("input:wtype")));
+        }
+    }
+
+    #[test]
+    fn insertion_fails_closed_for_unknown_safety_levels() {
+        let json = r#"{"entries":[{"id":"entry-1","interface":"shell-command","command":"hermes help","safety_level":"blue","available":true}]}"#;
+
+        let error = serde_json::from_str::<Catalog>(json).unwrap_err();
+
+        assert!(error.to_string().contains("unknown variant"));
+    }
+
+    #[test]
     fn insertion_rejects_missing_or_malformed_active_window_data() {
         for json in ["{}", "not json"] {
             let catalog = catalog(entry("shell-command", "green", true, "hermes help"));
@@ -588,6 +925,56 @@ mod tests {
     }
 
     #[test]
+    fn restoration_checks_show_before_focus_and_surfaces_each_failure() {
+        let calls = RefCell::new(Vec::new());
+        let focus_error = restore_window(
+            || {
+                calls.borrow_mut().push("show");
+                Ok(())
+            },
+            || {
+                calls.borrow_mut().push("focus");
+                Err("focus failed".to_owned())
+            },
+        )
+        .unwrap_err();
+        assert_eq!(&*calls.borrow(), &["show", "focus"]);
+        assert!(focus_error.contains("focus failed"));
+
+        calls.borrow_mut().clear();
+        let show_error = restore_window(
+            || {
+                calls.borrow_mut().push("show");
+                Err("show failed".to_owned())
+            },
+            || {
+                calls.borrow_mut().push("focus");
+                Ok(())
+            },
+        )
+        .unwrap_err();
+        assert_eq!(&*calls.borrow(), &["show"]);
+        assert!(show_error.contains("show failed"));
+    }
+
+    #[test]
+    fn insertion_reports_primary_and_restoration_failures_together() {
+        let catalog = catalog(entry("shell-command", "green", true, "hermes help"));
+        let mut environment = FakeEnvironment::with_output(ProcessOutput::success(
+            r#"{"address":"0x123","class":"firefox","initialClass":"firefox"}"#,
+        ));
+        environment.restore_error = Some("could not show overlay".into());
+
+        let error = insert_catalog_command_with(&catalog, "entry-1", "hermes help", &environment)
+            .unwrap_err();
+        let message = error.to_string();
+
+        assert!(message.contains("not an allowlisted terminal"));
+        assert!(message.contains("restoration also failed"));
+        assert!(message.contains("could not show overlay"));
+    }
+
+    #[test]
     fn insertion_restores_the_overlay_when_hiding_reports_failure() {
         let catalog = catalog(entry("shell-command", "green", true, "hermes help"));
         let environment = FakeEnvironment::with_hide_error("hide failed");
@@ -597,5 +984,23 @@ mod tests {
 
         assert!(error.to_string().contains("overlay handoff failed"));
         assert_eq!(&*environment.calls.borrow(), &["hide", "restore"]);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn child_timeout_kills_and_reaps_the_process() {
+        let child = Command::new("sleep")
+            .arg("30")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+
+        let error = run_spawned_child(child, "sleep", None, Duration::from_millis(20)).unwrap_err();
+
+        assert!(error.contains("timed out"));
+        assert!(!std::path::Path::new(&format!("/proc/{pid}")).exists());
     }
 }

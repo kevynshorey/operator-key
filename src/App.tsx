@@ -75,11 +75,12 @@ function ProductMark({ product }: { product: Product }) {
   return <span className={`product-mark product-${product}`} aria-hidden="true" />;
 }
 
-function ResultRow({ entry, active, position, total, onSelect, setRowRef }: {
+function ResultRow({ entry, active, position, total, disabled, onSelect, setRowRef }: {
   entry: CatalogEntry;
   active: boolean;
   position: number;
   total: number;
+  disabled: boolean;
   onSelect: () => void;
   setRowRef: (entryId: string, node: HTMLLIElement | null) => void;
 }) {
@@ -94,12 +95,13 @@ function ResultRow({ entry, active, position, total, onSelect, setRowRef }: {
       id={`result-${entry.id}`}
       role="option"
       aria-selected={active}
+      aria-disabled={disabled}
       aria-posinset={position}
       aria-setsize={total}
       data-product={entry.product}
       className={`result-row${active ? " is-active" : ""}${entry.available ? "" : " is-unavailable"}`}
       onMouseDown={(event) => event.preventDefault()}
-      onClick={onSelect}
+      onClick={() => { if (!disabled) onSelect(); }}
     >
       <ProductMark product={entry.product} />
       <span className="result-copy">
@@ -222,12 +224,13 @@ function DetailCard({
         <button
           type="button"
           disabled={actionPending || !availability.insert}
+          aria-describedby={availability.insertReason ? "insert-disabled-reason" : undefined}
           title={availability.insertReason}
           onClick={onInsert}
         >
           Insert into confirmed terminal <kbd>Shift+Enter</kbd>
         </button>
-        {availability.insertReason && <p>{availability.insertReason}</p>}
+        {availability.insertReason && <p id="insert-disabled-reason">{availability.insertReason}</p>}
         <small>Insertion types literal text only. Operator Key never sends Enter or executes it.</small>
       </section>
     </article>
@@ -284,6 +287,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   if (!parsed.ok) return <ShellState kind="alert" message={parsed.error} onClose={() => { void dismissOverlay(); }} />;
 
   const selectProduct = (value?: Product) => {
+    if (actionPending) return;
     setProduct(value);
     setSelectedIndex(0);
     setActionStatus(undefined);
@@ -323,6 +327,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   };
 
   const handleSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (actionPending) return;
     if (event.key === "ArrowDown" && results.length) {
       event.preventDefault();
       setSelectedIndex((boundedIndex + 1) % results.length);
@@ -342,6 +347,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   };
 
   const handleProductKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (actionPending) return;
     let target: number;
     if (event.key === "ArrowRight") target = (index + 1) % PRODUCT_TABS.length;
     else if (event.key === "ArrowLeft") target = (index - 1 + PRODUCT_TABS.length) % PRODUCT_TABS.length;
@@ -371,8 +377,9 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
             aria-controls="result-list"
             aria-activedescendant={selected ? `result-${selected.id}` : undefined}
             value={query}
+            disabled={actionPending}
             placeholder="What do you need to do?"
-            onChange={(event) => { setQuery(event.target.value); setSelectedIndex(0); setActionStatus(undefined); }}
+            onChange={(event) => { if (!actionPending) { setQuery(event.target.value); setSelectedIndex(0); setActionStatus(undefined); } }}
             onKeyDown={handleSearchKey}
           />
           <kbd className="escape-key">ESC</kbd>
@@ -387,6 +394,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
                 type="button"
                 role="radio"
                 aria-checked={active}
+                disabled={actionPending}
                 tabIndex={active ? 0 : -1}
                 key={tab.label}
                 ref={(node) => { tabRefs.current[index] = node; }}
@@ -402,22 +410,22 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
 
         <div className="control-rail">
           <div className="task-chips" aria-label="Task filters">
-            <button type="button" className={!task ? "is-active" : ""} aria-pressed={!task} onClick={() => { setTask(undefined); setSelectedIndex(0); }}>Any task</button>
+            <button type="button" disabled={actionPending} className={!task ? "is-active" : ""} aria-pressed={!task} onClick={() => { if (!actionPending) { setTask(undefined); setSelectedIndex(0); } }}>Any task</button>
             {TASK_GROUPS.map((taskName) => (
-              <button type="button" key={taskName} className={task === taskName ? "is-active" : ""} aria-pressed={task === taskName} onClick={() => { setTask(task === taskName ? undefined : taskName); setSelectedIndex(0); }}>
+              <button type="button" disabled={actionPending} key={taskName} className={task === taskName ? "is-active" : ""} aria-pressed={task === taskName} onClick={() => { if (!actionPending) { setTask(task === taskName ? undefined : taskName); setSelectedIndex(0); } }}>
                 {TASK_LABELS[taskName]}
               </button>
             ))}
           </div>
           <div className="select-filters">
             <label>Interface
-              <select aria-label="Interface filter" value={interfaceType ?? ""} onChange={(event) => { setInterfaceType((event.target.value || undefined) as InterfaceType | undefined); setSelectedIndex(0); }}>
+              <select disabled={actionPending} aria-label="Interface filter" value={interfaceType ?? ""} onChange={(event) => { if (!actionPending) { setInterfaceType((event.target.value || undefined) as InterfaceType | undefined); setSelectedIndex(0); } }}>
                 <option role="presentation" value="">All</option>
                 {INTERFACES.map((item) => <option role="presentation" key={item} value={item}>{item.replaceAll("-", " ")}</option>)}
               </select>
             </label>
             <label>Safety
-              <select aria-label="Safety filter" value={safety ?? ""} onChange={(event) => { setSafety((event.target.value || undefined) as SafetyLevel | undefined); setSelectedIndex(0); }}>
+              <select disabled={actionPending} aria-label="Safety filter" value={safety ?? ""} onChange={(event) => { if (!actionPending) { setSafety((event.target.value || undefined) as SafetyLevel | undefined); setSelectedIndex(0); } }}>
                 <option role="presentation" value="">All</option>
                 {SAFETY_LEVELS.map((item) => <option role="presentation" key={item} value={item}>{item}</option>)}
               </select>
@@ -431,7 +439,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
           <span className="state-code">SEARCH / 000</span>
           <h2>No matching command</h2>
           <p>Every term must map to a command, alias, task, description, or product. Clear a filter or try fewer words.</p>
-          <button type="button" onClick={() => { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); }}>Reset search plane</button>
+          <button type="button" disabled={actionPending} onClick={() => { if (!actionPending) { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); } }}>Reset search plane</button>
         </section>
       ) : (
         <section className="workspace-grid">
@@ -445,7 +453,8 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
                   active={index === boundedIndex}
                   position={index + 1}
                   total={results.length}
-                  onSelect={() => setSelectedIndex(index)}
+                  disabled={actionPending}
+                  onSelect={() => { if (!actionPending) setSelectedIndex(index); }}
                   setRowRef={setResultRef}
                 />
               ))}
@@ -467,7 +476,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
               <div className="lane-heading"><span>ALTERNATIVES</span><strong>{alternatives.length.toString().padStart(2, "0")}</strong></div>
               <div className="alternative-grid">
                 {alternatives.map(({ entry }, index) => (
-                  <button type="button" key={entry.id} onClick={() => setSelectedIndex(results.findIndex((result) => result.entry.id === entry.id))}>
+                  <button type="button" disabled={actionPending} key={entry.id} onClick={() => { if (!actionPending) setSelectedIndex(results.findIndex((result) => result.entry.id === entry.id)); }}>
                     <span>{PRODUCT_LABELS[entry.product]}</span>
                     <strong>{entry.command}</strong>
                     <small>{entry.context}</small>

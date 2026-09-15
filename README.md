@@ -41,7 +41,7 @@ Run the desktop overlay in Tauri development mode:
 npm run tauri dev
 ```
 
-Native copy requires `wl-copy` from `wl-clipboard`. Guarded insertion additionally requires Hyprland's `hyprctl` and `wtype`; it is not supported on other desktops. The overlay hides before checking the newly active window, inserts only when its exact class or initial class is allowlisted as a terminal, and restores itself if target detection or insertion fails.
+Native copy requires `wl-copy` from `wl-clipboard`. Guarded insertion additionally requires Hyprland's `hyprctl` and `wtype`; it is not supported on other desktops. The overlay hides, captures an allowlisted terminal target, refocuses that exact Hyprland window address, and revalidates its identity before inserting. Native handoff work has a bounded deadline. The overlay is restored and refocused if target detection or insertion fails.
 
 ## Generate the catalog
 
