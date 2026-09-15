@@ -1,0 +1,9 @@
+Codex CLI
+
+Commands:
+  review    Run a code review
+  resume    Resume a session
+
+Options:
+  -m, --model <MODEL>    Model to use
+  --search               Enable web search

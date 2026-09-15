@@ -1,0 +1,7 @@
+model = "gpt-5.6"
+approval_policy = "on-request"
+api_key = "must-not-leak"
+
+[features]
+web_search = true
+experimental_mode = false

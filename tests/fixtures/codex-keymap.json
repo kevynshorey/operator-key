@@ -1,0 +1,6 @@
+{
+  "bindings": [
+    {"key": "ctrl+r", "action": "review", "context": "Codex interactive terminal"},
+    {"key": "ctrl+x", "action": "quit", "enabled": false}
+  ]
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "context": "Chat",
+    "bindings": {
+      "shift+ctrl+p": "commandPalette",
+      "ctrl+d": null
+    }
+  }
+]

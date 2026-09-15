@@ -1,0 +1,6 @@
+SUPER + K → Keybindings
+SUPER + SPACE → Omarchy menu
+F9 → Mute microphone on press
+F9 → Unmute microphone on release
+SUPER SHIFT CTRL + SPACE → Theme menu
+SUPER + V → Keep  **literal**  spacing

@@ -1,0 +1,10 @@
+usage: hermes [-h] {chat,status} ...
+
+positional arguments:
+  {chat,status}  Command to run
+    chat          Interactive chat
+    status        Show status
+
+options:
+  -h, --help      show this help message and exit
+  --safe-mode     Disable customizations

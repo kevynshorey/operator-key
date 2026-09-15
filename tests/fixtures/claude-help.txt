@@ -1,0 +1,8 @@
+Usage: claude [options] [command]
+
+Options:
+  --agent <agent>        Agent for current session
+  --safe-mode            Disable customizations
+
+Commands:
+  doctor                 Check installation

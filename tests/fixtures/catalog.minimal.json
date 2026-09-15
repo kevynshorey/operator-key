@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-09-15T12:00:00+00:00",
+  "host": "test-host",
+  "versions": {
+    "omarchy": "4.0.3-1",
+    "hermes": "0.21.3",
+    "claude-code": "2.1.272",
+    "codex": "0.154.0"
+  },
+  "counts": {
+    "omarchy": 1,
+    "hermes": 0,
+    "claude-code": 0,
+    "codex": 0
+  },
+  "total": 1,
+  "conflicts": [],
+  "entries": [
+    {
+      "id": "fixture-entry-1",
+      "product": "omarchy",
+      "product_version": "4.0.3-1",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "help-and-reference",
+      "command": "SUPER + K",
+      "canonical_chord": "super+k",
+      "aliases": [],
+      "description": "Keybindings",
+      "context": "Omarchy/Hyprland desktop",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: omarchy menu keybindings --print",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: omarchy menu keybindings --print",
+        "version": "4.0.3-1"
+      }
+    }
+  ]
+}
