@@ -139,6 +139,8 @@ Steps:
 
 Objective: Prove core flows on the installed Omarchy environment.
 
+Status: Complete. Exact evidence is recorded in `docs/VERIFICATION.md`; the installed standalone release is bound to `SUPER + U`.
+
 Files:
 - Create: `tests/e2e/operator-key.spec.ts`
 - Create: `docs/VERIFICATION.md`
