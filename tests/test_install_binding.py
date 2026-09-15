@@ -200,7 +200,7 @@ class InstallBindingTests(unittest.TestCase):
         self.assertIn("SUPER + K: rejected", preview)
         self.assertIn(f"SHA-256: {hashlib.sha256(self.source.read_bytes()).hexdigest()}", preview)
         self.assertIn("hyprctl reload", preview)
-        self.assertIn("physically press SUPER + SHIFT + K", preview)
+        self.assertIn("physically press SUPER + SHIFT + K within 120 seconds", preview)
         self.assertNotIn("wtype", preview)
         self.assertNotIn("dispatch __lua", preview)
         self.assertIn(expected_block.rstrip(), preview)
@@ -624,6 +624,18 @@ class InstallBindingTests(unittest.TestCase):
         self.assertTrue(client_timeouts)
         self.assertTrue(all(0 < timeout <= 1.0 for timeout in client_timeouts))
         self.assertTrue(all(0 < seconds <= 0.25 for seconds in sleeps))
+
+    def test_default_physical_verification_window_is_one_bounded_120_seconds(self):
+        self.assertEqual(installer.PHYSICAL_VERIFICATION_TIMEOUT, 120.0)
+
+        with mock.patch.object(sys.stdin, "isatty", return_value=True):
+            with mock.patch("builtins.print") as printed:
+                installer._interactive_shortcut_prompt("SUPER + SHIFT + K")
+
+        printed.assert_called_once_with(
+            "Press SUPER + SHIFT + K within 120 seconds to verify...",
+            flush=True,
+        )
 
     def test_launch_rejects_valid_client_when_query_crosses_deadline(self):
         clock = [0.0]

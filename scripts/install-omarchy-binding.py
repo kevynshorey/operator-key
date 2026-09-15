@@ -54,7 +54,7 @@ KEY_ALIASES = {
 }
 SAFE_PATH = re.compile(r"^/[A-Za-z0-9_./+-]+$")
 OPERATOR_KEY_CLASS = "operator-key"
-PHYSICAL_VERIFICATION_TIMEOUT = 25.0
+PHYSICAL_VERIFICATION_TIMEOUT = 120.0
 CLIENT_QUERY_TIMEOUT = 5.0
 CLIENT_POLL_INTERVAL = 0.25
 
@@ -505,7 +505,7 @@ def render_preview(plan: InstallPlan) -> str:
         "  1. Atomically copy the prebuilt binary and update bindings.lua\n"
         "  2. Run exact argv: hyprctl reload\n"
         "  3. Re-read hyprctl -j binds and require one exact Operator Key chord/description\n"
-        f"  4. You must physically press {plan.chord}; require a new exact-class client\n"
+        f"  4. You must physically press {plan.chord} within 120 seconds; require a new exact-class client\n"
         "  5. On any failure, restore exact prior bytes/modes and run hyprctl reload again\n"
     )
 
@@ -901,7 +901,7 @@ def _interactive_confirmation(expected: str) -> bool:
 def _interactive_shortcut_prompt(chord: str) -> None:
     if not sys.stdin.isatty():
         raise InstallError("Physical shortcut verification requires an interactive terminal")
-    print(f"Press {chord} now to verify...", flush=True)
+    print(f"Press {chord} within 120 seconds to verify...", flush=True)
 
 
 def _default_source(repo: Path) -> Path:
