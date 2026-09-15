@@ -85,6 +85,8 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
+See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for the exact installed artifact, catalog counts, browser coverage, and native copy/insertion evidence.
+
 ## Build
 
 Build the web UI:
