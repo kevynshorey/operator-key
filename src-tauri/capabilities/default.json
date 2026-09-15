@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimum desktop permissions for the Operator Key overlay",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:window:allow-hide"]
+}

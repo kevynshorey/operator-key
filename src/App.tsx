@@ -1,0 +1,353 @@
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import catalogJson from "../data/catalog.json";
+import {
+  INTERFACES,
+  PRODUCTS,
+  SAFETY_LEVELS,
+  TASK_GROUPS,
+  parseCatalog,
+  type Catalog,
+  type CatalogEntry,
+  type InterfaceType,
+  type Product,
+  type SafetyLevel,
+  type TaskGroup,
+} from "./catalog";
+import { searchCatalog } from "./search";
+
+const PRODUCT_LABELS: Record<Product, string> = {
+  omarchy: "Omarchy",
+  hermes: "Hermes",
+  "claude-code": "Claude Code",
+  codex: "Codex",
+};
+
+const TASK_LABELS: Record<TaskGroup, string> = Object.fromEntries(
+  TASK_GROUPS.map((task) => [task, task.replaceAll("-", " ")]),
+) as Record<TaskGroup, string>;
+
+const PRODUCT_TABS: Array<{ value?: Product; label: string }> = [
+  { label: "All systems" },
+  ...PRODUCTS.map((product) => ({ value: product, label: PRODUCT_LABELS[product] })),
+];
+
+interface AppProps {
+  loading?: boolean;
+  catalogData?: unknown;
+}
+
+function KeyChord({ entry }: { entry: CatalogEntry }) {
+  const display = entry.canonical_chord || entry.command;
+  const keys = entry.canonical_chord ? display.split("+") : [display];
+  return (
+    <div className="key-trace" aria-label={`Command chord ${display}`}>
+      {keys.map((key, index) => (
+        <span className="key-unit" key={`${key}-${index}`}>
+          <kbd>{key}</kbd>
+          {index < keys.length - 1 && <span className="trace" aria-hidden="true" />}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ProductMark({ product }: { product: Product }) {
+  return <span className={`product-mark product-${product}`} aria-hidden="true" />;
+}
+
+function ResultRow({ entry, active, position, total, onSelect }: {
+  entry: CatalogEntry;
+  active: boolean;
+  position: number;
+  total: number;
+  onSelect: () => void;
+}) {
+  return (
+    <li
+      id={`result-${entry.id}`}
+      role="option"
+      aria-selected={active}
+      aria-posinset={position}
+      aria-setsize={total}
+      data-product={entry.product}
+      className={`result-row${active ? " is-active" : ""}${entry.available ? "" : " is-unavailable"}`}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onSelect}
+    >
+      <ProductMark product={entry.product} />
+      <span className="result-copy">
+        <strong>{entry.command}</strong>
+        <small>{entry.description}</small>
+      </span>
+      <span className={`safety-dot safety-${entry.safety_level}`}>
+        <span className="sr-only">{entry.safety_level} safety</span>
+      </span>
+      <span className="result-chord">{entry.canonical_chord || entry.interface}</span>
+    </li>
+  );
+}
+
+function Header({ largeText, onLargeText }: { largeText: boolean; onLargeText: () => void }) {
+  return (
+    <header className="masthead">
+      <div className="wordmark" aria-label="Operator Key">
+        <span className="wordmark-index">OK—01</span>
+        <span>OPERATOR KEY</span>
+      </div>
+      <div className="system-readout">
+        <span><i className="signal-light" /> LOCAL CATALOG</span>
+        <span>NO EXECUTION PATH</span>
+        <button type="button" className="text-mode" aria-pressed={largeText} onClick={onLargeText}>
+          <span aria-hidden="true">Aa</span> Large text
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function ShellState({ kind, message }: { kind: "status" | "alert"; message: string }) {
+  return (
+    <main className="state-shell" data-testid="operator-shell">
+      <Header largeText={false} onLargeText={() => undefined} />
+      <section className="state-panel" role={kind}>
+        <span className="state-code">SYSTEM / CATALOG</span>
+        <h1>{message}</h1>
+        <p>The interface remains isolated. No command can execute from this state.</p>
+      </section>
+    </main>
+  );
+}
+
+function DetailCard({ entry, catalog }: { entry: CatalogEntry; catalog: Catalog }) {
+  const conflicts = catalog.conflicts.filter((conflict) => entry.conflict_ids.includes(conflict.id));
+  return (
+    <article className="detail-card" aria-labelledby="active-command-heading">
+      <div className="detail-header">
+        <span className="eyebrow">RECOMMENDED / {PRODUCT_LABELS[entry.product]}</span>
+        <span className={`safety-pill safety-${entry.safety_level}`}>{entry.safety_level} · safety level</span>
+      </div>
+      <h2 id="active-command-heading">{entry.command}</h2>
+      <p className="detail-description">{entry.description}</p>
+      <KeyChord entry={entry} />
+
+      <dl className="telemetry-grid">
+        <div>
+          <dt>Active context</dt>
+          <dd>{entry.context}</dd>
+        </div>
+        <div>
+          <dt>Interface</dt>
+          <dd>{entry.interface.replaceAll("-", " ")}</dd>
+        </div>
+        <div>
+          <dt>Version</dt>
+          <dd>{entry.product_version || catalog.versions[entry.product]}</dd>
+        </div>
+        <div>
+          <dt>Provenance</dt>
+          <dd>{entry.provenance.kind} · {entry.provenance.status} · {entry.provenance.source}</dd>
+        </div>
+      </dl>
+
+      {conflicts.length > 0 && (
+        <aside className="conflict-panel" aria-label="Binding conflict">
+          <span className="conflict-icon" aria-hidden="true">!</span>
+          <div>
+            <strong>Binding conflict</strong>
+            <p>{conflicts.map((conflict) => conflict.context).join(" · ")}</p>
+          </div>
+        </aside>
+      )}
+      {!entry.available && (
+        <aside className="availability-panel">
+          <strong>Unavailable in detected setup</strong>
+          <span>{entry.provenance.status}</span>
+        </aside>
+      )}
+    </article>
+  );
+}
+
+export default function App({ loading = false, catalogData = catalogJson }: AppProps) {
+  const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
+  const [query, setQuery] = useState("");
+  const [product, setProduct] = useState<Product>();
+  const [interfaceType, setInterfaceType] = useState<InterfaceType>();
+  const [task, setTask] = useState<TaskGroup>();
+  const [safety, setSafety] = useState<SafetyLevel>();
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [actionStatus, setActionStatus] = useState("");
+  const [largeText, setLargeText] = useState(false);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const results = useMemo(() => {
+    if (!parsed.ok) return [];
+    return searchCatalog(parsed.catalog.entries, query, { product, interface: interfaceType, task, safety }, 50);
+  }, [parsed, query, product, interfaceType, task, safety]);
+  const boundedIndex = Math.min(selectedIndex, Math.max(0, results.length - 1));
+  const selected = results[boundedIndex]?.entry;
+
+  if (loading) return <ShellState kind="status" message="Loading command catalog…" />;
+  if (!parsed.ok) return <ShellState kind="alert" message={parsed.error} />;
+
+  const selectProduct = (value?: Product) => {
+    setProduct(value);
+    setSelectedIndex(0);
+    setActionStatus("");
+  };
+
+  const invokePlaceholder = () => {
+    if (!selected) return;
+    setActionStatus(`Copy action arrives in Task 6 — ${selected.command} remained idle.`);
+  };
+
+  const handleSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown" && results.length) {
+      event.preventDefault();
+      setSelectedIndex((boundedIndex + 1) % results.length);
+    } else if (event.key === "ArrowUp" && results.length) {
+      event.preventDefault();
+      setSelectedIndex((boundedIndex - 1 + results.length) % results.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      invokePlaceholder();
+    } else if (event.key === "Escape" && "__TAURI_INTERNALS__" in window) {
+      event.preventDefault();
+      void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => getCurrentWindow().hide());
+    }
+  };
+
+  const handleTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let target: number;
+    if (event.key === "ArrowRight") target = (index + 1) % PRODUCT_TABS.length;
+    else if (event.key === "ArrowLeft") target = (index - 1 + PRODUCT_TABS.length) % PRODUCT_TABS.length;
+    else if (event.key === "Home") target = 0;
+    else if (event.key === "End") target = PRODUCT_TABS.length - 1;
+    else return;
+    event.preventDefault();
+    selectProduct(PRODUCT_TABS[target].value);
+    tabRefs.current[target]?.focus();
+  };
+
+  const alternatives = results.filter((_, index) => index !== boundedIndex).slice(0, 3);
+
+  return (
+    <main className={`operator-shell${largeText ? " large-text" : ""}`} data-testid="operator-shell">
+      <Header largeText={largeText} onLargeText={() => setLargeText((value) => !value)} />
+
+      <section className="search-deck" aria-label="Command search controls">
+        <label className="search-field">
+          <span className="search-index">INTENT /</span>
+          <span className="sr-only">Operator intent</span>
+          <input
+            autoFocus
+            type="search"
+            role="searchbox"
+            aria-label="Operator intent"
+            aria-controls="result-list"
+            aria-activedescendant={selected ? `result-${selected.id}` : undefined}
+            value={query}
+            placeholder="What do you need to do?"
+            onChange={(event) => { setQuery(event.target.value); setSelectedIndex(0); setActionStatus(""); }}
+            onKeyDown={handleSearchKey}
+          />
+          <kbd className="escape-key">ESC</kbd>
+        </label>
+
+        <div className="product-tabs" role="tablist" aria-label="Product lanes">
+          {PRODUCT_TABS.map((tab, index) => {
+            const active = product === tab.value;
+            const count = tab.value ? parsed.catalog.counts[tab.value] : parsed.catalog.total;
+            return (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-controls="result-list"
+                tabIndex={active ? 0 : -1}
+                key={tab.label}
+                ref={(node) => { tabRefs.current[index] = node; }}
+                onClick={() => selectProduct(tab.value)}
+                onKeyDown={(event) => handleTabKey(event, index)}
+              >
+                {tab.value && <ProductMark product={tab.value} />}
+                {tab.label}<span>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="control-rail">
+          <div className="task-chips" aria-label="Task filters">
+            <button type="button" className={!task ? "is-active" : ""} aria-pressed={!task} onClick={() => { setTask(undefined); setSelectedIndex(0); }}>Any task</button>
+            {TASK_GROUPS.map((taskName) => (
+              <button type="button" key={taskName} className={task === taskName ? "is-active" : ""} aria-pressed={task === taskName} onClick={() => { setTask(task === taskName ? undefined : taskName); setSelectedIndex(0); }}>
+                {TASK_LABELS[taskName]}
+              </button>
+            ))}
+          </div>
+          <div className="select-filters">
+            <label>Interface
+              <select aria-label="Interface filter" value={interfaceType ?? ""} onChange={(event) => { setInterfaceType((event.target.value || undefined) as InterfaceType | undefined); setSelectedIndex(0); }}>
+                <option role="presentation" value="">All</option>
+                {INTERFACES.map((item) => <option role="presentation" key={item} value={item}>{item.replaceAll("-", " ")}</option>)}
+              </select>
+            </label>
+            <label>Safety
+              <select aria-label="Safety filter" value={safety ?? ""} onChange={(event) => { setSafety((event.target.value || undefined) as SafetyLevel | undefined); setSelectedIndex(0); }}>
+                <option role="presentation" value="">All</option>
+                {SAFETY_LEVELS.map((item) => <option role="presentation" key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      {results.length === 0 ? (
+        <section className="empty-panel" role="status">
+          <span className="state-code">SEARCH / 000</span>
+          <h2>No matching command</h2>
+          <p>Every term must map to a command, alias, task, description, or product. Clear a filter or try fewer words.</p>
+          <button type="button" onClick={() => { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); }}>Reset search plane</button>
+        </section>
+      ) : (
+        <section className="workspace-grid">
+          <aside className="result-lane" aria-label="Search results">
+            <div className="lane-heading"><span>MATCHES</span><strong>{results.length.toString().padStart(2, "0")}</strong></div>
+            <ul id="result-list" role="listbox" aria-label="Command results">
+              {results.map(({ entry }, index) => (
+                <ResultRow key={entry.id} entry={entry} active={index === boundedIndex} position={index + 1} total={results.length} onSelect={() => setSelectedIndex(index)} />
+              ))}
+            </ul>
+          </aside>
+
+          <section className="command-stage">
+            {selected && <DetailCard entry={selected} catalog={parsed.catalog} />}
+            <section className="alternatives" aria-label="Alternatives">
+              <div className="lane-heading"><span>ALTERNATIVES</span><strong>{alternatives.length.toString().padStart(2, "0")}</strong></div>
+              <div className="alternative-grid">
+                {alternatives.map(({ entry }, index) => (
+                  <button type="button" key={entry.id} onClick={() => setSelectedIndex(results.findIndex((result) => result.entry.id === entry.id))}>
+                    <span>{PRODUCT_LABELS[entry.product]}</span>
+                    <strong>{entry.command}</strong>
+                    <small>{entry.context}</small>
+                    <em>{index + 1}</em>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </section>
+        </section>
+      )}
+
+      {actionStatus && <div className="action-status" role="status">{actionStatus}</div>}
+      <footer className="status-footer">
+        <span>{parsed.catalog.total.toLocaleString()} commands ready</span>
+        <span><b>{results.length}</b> shown</span>
+        <span><kbd>↑</kbd><kbd>↓</kbd> select</span>
+        <span><kbd>ENTER</kbd> copy placeholder</span>
+        <span className="execution-lock">● EXECUTION DISABLED</span>
+      </footer>
+    </main>
+  );
+}

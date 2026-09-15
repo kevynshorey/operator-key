@@ -3,5 +3,6 @@ __pycache__/
 .venv/
 dist/
 node_modules/
+*.tsbuildinfo
 src-tauri/target/
 .DS_Store
