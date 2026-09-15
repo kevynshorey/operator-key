@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import stat
 import subprocess
 import sys
@@ -318,7 +317,9 @@ def _advance_lua_long_state(body: bytes, long_end: bytes | None) -> bytes | None
             opener = re.match(rb"\[(=*)\[", body[index + 2 :])
             if opener:
                 long_end = b"]" + opener.group(1) + b"]"
-            return long_end
+                index += 2 + len(opener.group(0))
+                continue
+            return None
         if body[index:index + 1] in (b'"', b"'"):
             quote = body[index:index + 1]
             index += 1
@@ -536,8 +537,29 @@ def _unlink_regular(path: Path, label: str) -> None:
 
 def _backup_if_absent(path: Path, data: bytes, mode: int, label: str) -> None:
     """Create one durable backup, while preserving any existing regular backup."""
-    if _lstat_regular(path, label, must_exist=False) is None:
-        _atomic_write(path, data, mode)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if _lstat_regular(path, label, must_exist=False) is not None:
+        return
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temp_path = Path(temporary)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temp_path, mode)
+        try:
+            os.link(temp_path, path, follow_symlinks=False)
+        except FileExistsError:
+            _lstat_regular(path, label, must_exist=True)
+            return
+        directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def _successful(result: CommandResult, label: str) -> None:
@@ -844,7 +866,10 @@ def apply_uninstall(plan: UninstallPlan, *, runner, confirm: Callable[[str], boo
 def _interactive_confirmation(expected: str) -> bool:
     if not sys.stdin.isatty():
         raise InstallError("Apply requires an interactive terminal and exact typed confirmation")
-    typed = input(f"Type {expected!r} to continue: ")
+    try:
+        typed = input(f"Type {expected!r} to continue: ")
+    except EOFError as error:
+        raise InstallError("Apply confirmation input ended before a response") from error
     return typed == expected
 
 

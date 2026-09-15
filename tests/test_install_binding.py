@@ -783,6 +783,80 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(self.target.read_bytes(), plan.original)
         self.assertEqual(runner.calls.count(("hyprctl", "reload")), 2)
 
+    def test_backup_race_preserves_competing_regular_file(self):
+        backup = self.root / "race.bak"
+        original_link = os.link
+
+        def competitor_wins(source, destination, *, follow_symlinks=True):
+            Path(destination).write_bytes(b"competitor backup")
+            return original_link(source, destination, follow_symlinks=follow_symlinks)
+
+        with mock.patch.object(installer.os, "link", side_effect=competitor_wins):
+            installer._backup_if_absent(backup, b"our backup", 0o640, "race backup")
+
+        self.assertEqual(backup.read_bytes(), b"competitor backup")
+
+    def test_backup_race_rejects_competing_symlink(self):
+        backup = self.root / "race.bak"
+        protected = self.root / "protected"
+        protected.write_bytes(b"protected bytes")
+        original_link = os.link
+
+        def symlink_wins(source, destination, *, follow_symlinks=True):
+            Path(destination).symlink_to(protected)
+            return original_link(source, destination, follow_symlinks=follow_symlinks)
+
+        with mock.patch.object(installer.os, "link", side_effect=symlink_wins):
+            with self.assertRaisesRegex(installer.InstallError, "symlink"):
+                installer._backup_if_absent(backup, b"our backup", 0o640, "race backup")
+
+        self.assertTrue(backup.is_symlink())
+        self.assertEqual(protected.read_bytes(), b"protected bytes")
+
+    def test_eof_confirmation_is_controlled_and_writes_nothing(self):
+        plan = installer.create_plan(
+            target=self.target,
+            source=self.source,
+            destination=self.destination,
+            runner=FakeRunner(),
+            candidates=["SUPER + SHIFT + K"],
+        )
+        before = self.target.read_bytes()
+
+        with mock.patch.object(sys.stdin, "isatty", return_value=True):
+            with mock.patch("builtins.input", side_effect=EOFError):
+                with self.assertRaisesRegex(installer.InstallError, "confirmation input"):
+                    installer.apply_plan(
+                        plan,
+                        runner=FakeRunner(),
+                        confirm=installer._interactive_confirmation,
+                    )
+
+        self.assertEqual(self.target.read_bytes(), before)
+        self.assertFalse(self.destination.exists())
+
+    def test_same_line_lua_long_comments_do_not_hide_managed_block(self):
+        old = installer.make_block("SUPER + SHIFT + K", self.destination, b"\n")
+        new = installer.make_block("SUPER + SHIFT + Q", self.destination, b"\n")
+
+        for comment in (b"--[[ closed ]]\n", b"--[=[ closed ]=]\n"):
+            with self.subTest(comment=comment):
+                content = comment + old
+                replaced = installer.replace_managed_block(content, new)
+                self.assertEqual(replaced, comment + new)
+                self.assertEqual(installer.replace_managed_block(replaced, new), replaced)
+
+    def test_uninstall_recognizes_block_after_same_line_long_comment(self):
+        comment = b"--[=[ ordinary comment ]=]\n"
+        block = installer.make_block("SUPER + SHIFT + K", self.destination, b"\n")
+        self.target.write_bytes(comment + block)
+
+        plan = installer.create_uninstall_plan(target=self.target)
+
+        self.assertEqual(plan.chord, "SUPER + SHIFT + K")
+        self.assertEqual(plan.destination, self.destination)
+        self.assertEqual(plan.proposed, comment)
+
 
 if __name__ == "__main__":
     unittest.main()
