@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -70,6 +71,10 @@ class CatalogTests(unittest.TestCase):
         self.assertTrue(any("description is required" in error for error in errors), errors)
         self.assertTrue(any("safety_level must be one of" in error for error in errors), errors)
 
+    @unittest.skipUnless(
+        shutil.which("omarchy"),
+        "omarchy is unavailable; live parity requires the installed CLI",
+    )
     def test_generated_catalog_preserves_every_omarchy_binding(self):
         source = subprocess.check_output(
             ["omarchy", "menu", "keybindings", "--print"], text=True

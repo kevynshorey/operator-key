@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .common import entry, run
+from .common import entry, read_optional_text, run
 
 DEFAULT_OVERRIDES = Path.home() / ".config" / "hypr" / "bindings.lua"
 
@@ -62,7 +62,7 @@ def parse_bindings(text: str, product_version: str, *, overrides_text: str = "",
 
 
 def collect(product_version: str, overrides_path: Path = DEFAULT_OVERRIDES) -> list[dict]:
-    overrides_text = overrides_path.read_text(encoding="utf-8") if overrides_path.exists() else ""
+    overrides_text = read_optional_text(overrides_path) or ""
     return parse_bindings(
         run("omarchy", "menu", "keybindings", "--print"), product_version,
         overrides_text=overrides_text, overrides_source=f"local: {overrides_path}",

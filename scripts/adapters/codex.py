@@ -7,7 +7,7 @@ import re
 import tomllib
 from pathlib import Path
 
-from .common import clean, entry, parse_help as parse_cli_help, run, split_markdown_cells
+from .common import clean, entry, parse_help as parse_cli_help, read_optional_text, run, split_markdown_cells
 
 DOCS_URL = "https://developers.openai.com/codex/developer-commands.md"
 
@@ -177,10 +177,12 @@ def collect(product_version: str, docs_text: str, *, home: Path | None = None) -
     rows += parse_docs(docs_text, product_version)
     home = home or Path.home() / ".codex"
     config = home / "config.toml"
-    if config.exists():
-        rows += parse_config(config.read_text(encoding="utf-8"), product_version, f"local: {config}")
+    config_text = read_optional_text(config)
+    if config_text is not None:
+        rows += parse_config(config_text, product_version, f"local: {config}")
     for name in ("keymap.json", "keybindings.json"):
         keymap = home / name
-        if keymap.exists():
-            rows += parse_keymap(keymap.read_text(encoding="utf-8"), product_version, f"local: {keymap}")
+        keymap_text = read_optional_text(keymap)
+        if keymap_text is not None:
+            rows += parse_keymap(keymap_text, product_version, f"local: {keymap}")
     return rows

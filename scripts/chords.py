@@ -120,4 +120,9 @@ def annotate_conflicts(rows: list[dict]) -> list[dict]:
             conflicts.append(conflict)
             for row in unique.values():
                 row["conflict_ids"].append(conflict_id)
+    conflicts.sort(key=lambda conflict: (
+        conflict["canonical_chord"], conflict["context"], conflict["entry_ids"], conflict["id"]
+    ))
+    for row in rows:
+        row["conflict_ids"].sort()
     return conflicts

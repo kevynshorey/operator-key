@@ -6,6 +6,7 @@ import html
 import re
 import subprocess
 from collections.abc import Iterable
+from pathlib import Path
 
 from scripts.chords import canonicalize_chord
 
@@ -30,6 +31,14 @@ def run(*cmd: str, timeout: int = 45) -> str:
         return subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, check=True).stdout
     except (OSError, subprocess.SubprocessError):
         return ""
+
+
+def read_optional_text(path: Path) -> str | None:
+    """Read an optional UTF-8 customization file, or skip an unusable one."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
 
 
 def clean(value: str) -> str:

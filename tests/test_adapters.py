@@ -1,5 +1,7 @@
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from scripts.adapters import claude, codex, hermes, omarchy
 
@@ -42,6 +44,25 @@ class OmarchyAdapterTests(unittest.TestCase):
         disabled = {row["command"] for row in overrides if not row["available"]}
         self.assertEqual(disabled, {"SUPER + SPACE", "SUPER + SHIFT + B"})
 
+    def test_unreadable_optional_override_is_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            override = Path(directory) / "bindings.lua"
+            override.write_text("o.bind('SUPER + X', nil, 'Custom')", encoding="utf-8")
+            original_read_text = Path.read_text
+
+            def unreadable_optional(path, *args, **kwargs):
+                if path == override:
+                    raise OSError("unreadable")
+                return original_read_text(path, *args, **kwargs)
+
+            with (
+                mock.patch.object(Path, "read_text", unreadable_optional),
+                mock.patch.object(omarchy, "run", return_value="SUPER + P → Launcher"),
+            ):
+                rows = omarchy.collect("4.0.3-1", override)
+
+        self.assertEqual([(row["command"], row["description"]) for row in rows], [("SUPER + P", "Launcher")])
+
 
 class HermesAdapterTests(unittest.TestCase):
     def test_help_registry_and_key_control_sources_are_collected(self):
@@ -57,6 +78,32 @@ class HermesAdapterTests(unittest.TestCase):
         voice = next(row for row in rows if row["command"] == "Alt+Space")
         self.assertEqual(voice["provenance"]["kind"], "override")
 
+    def test_unreadable_optional_registry_and_config_are_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            registry = root / "hermes_cli" / "commands.py"
+            registry.parent.mkdir()
+            registry.write_text("CommandDef('custom', 'Custom', 'test')", encoding="utf-8")
+            config = root / "config.yaml"
+            config.write_text("voice:\n  record_key: alt-space\n", encoding="utf-8")
+            original_read_text = Path.read_text
+
+            def unreadable_optional(path, *args, **kwargs):
+                if path in {registry, config}:
+                    raise UnicodeError("invalid encoding")
+                return original_read_text(path, *args, **kwargs)
+
+            with (
+                mock.patch.object(Path, "read_text", unreadable_optional),
+                mock.patch.object(hermes, "run", return_value=""),
+            ):
+                rows = hermes.collect(
+                    "0.21.3", install_dir=root, config_path=config, include_subcommands=False
+                )
+
+        self.assertEqual(len(rows), len(hermes.HERMES_KEYS))
+        self.assertFalse(any(row["provenance"]["kind"] == "override" for row in rows))
+
 
 class ClaudeAdapterTests(unittest.TestCase):
     def test_custom_commands_skills_agents_and_keybindings_are_collected(self):
@@ -68,6 +115,42 @@ class ClaudeAdapterTests(unittest.TestCase):
         self.assertEqual(by_command["shift+ctrl+p"]["provenance"]["kind"], "override")
         self.assertFalse(by_command["ctrl+d"]["available"])
         self.assertEqual(by_command["ctrl+d"]["provenance"]["status"], "disabled")
+
+    def test_non_collection_keybinding_documents_are_ignored(self):
+        documents = (
+            "null",
+            "42",
+            '"shortcut"',
+            '{"unsupported": {"Ctrl+X": "action"}}',
+            '{"bindings": 42}',
+            '{"keybindings": "not-a-collection"}',
+        )
+        for document in documents:
+            with self.subTest(document=document):
+                self.assertEqual(
+                    claude.parse_keybindings(document, "2.1.272", "fixture: keybindings.json"),
+                    [],
+                )
+
+    def test_unusable_optional_customization_files_are_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skill = root / "skills" / "broken" / "SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("---\nname: broken\n---\n", encoding="utf-8")
+            keybindings = root / "keybindings.json"
+            keybindings.write_text("{not json", encoding="utf-8")
+            original_read_text = Path.read_text
+
+            def unusable_optional(path, *args, **kwargs):
+                if path == skill:
+                    raise UnicodeError("invalid encoding")
+                return original_read_text(path, *args, **kwargs)
+
+            with mock.patch.object(Path, "read_text", unusable_optional):
+                rows = claude.parse_customizations(root, "2.1.272")
+
+        self.assertEqual(rows, [])
 
     def test_docs_table_preserves_inline_code_pipes_in_command_and_description(self):
         commands = """\
@@ -121,6 +204,28 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertFalse(any("api_key" in row["command"] or "must-not-leak" in row["command"] for row in rows))
         self.assertEqual(commands['-c model="gpt-5.6"']["provenance"]["kind"], "override")
         self.assertFalse(commands["ctrl+x"]["available"])
+
+    def test_unusable_optional_config_and_keymap_are_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "config.toml"
+            config.write_text('model = "gpt-5.6"\n', encoding="utf-8")
+            keymap = root / "keymap.json"
+            keymap.write_text("{not json", encoding="utf-8")
+            original_read_text = Path.read_text
+
+            def unusable_optional(path, *args, **kwargs):
+                if path == config:
+                    raise OSError("unreadable")
+                return original_read_text(path, *args, **kwargs)
+
+            with (
+                mock.patch.object(Path, "read_text", unusable_optional),
+                mock.patch.object(codex, "run", return_value=""),
+            ):
+                rows = codex.collect("0.154.0", "", home=root)
+
+        self.assertEqual(rows, [])
 
     def test_config_omits_unknown_secret_named_scalar_values(self):
         config = '''

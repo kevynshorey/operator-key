@@ -5,7 +5,7 @@ import json
 import re
 from pathlib import Path
 
-from .common import clean, entry, parse_help as parse_cli_help, run, split_markdown_cells
+from .common import clean, entry, parse_help as parse_cli_help, read_optional_text, run, split_markdown_cells
 
 COMMANDS_URL = "https://code.claude.com/docs/en/commands.md"
 KEYS_URL = "https://code.claude.com/docs/en/interactive-mode.md"
@@ -43,7 +43,17 @@ def parse_keybindings(text: str, product_version: str, source: str) -> list[dict
         document = json.loads(text)
     except (json.JSONDecodeError, TypeError):
         return []
-    groups = document if isinstance(document, list) else document.get("keybindings", document.get("bindings", []))
+    if isinstance(document, list):
+        groups = document
+    elif isinstance(document, dict):
+        if "keybindings" in document:
+            groups = document["keybindings"]
+        elif "bindings" in document:
+            groups = document["bindings"]
+        else:
+            return []
+    else:
+        return []
     if isinstance(groups, dict):
         groups = [{"context": "Claude Code interactive terminal", "bindings": groups}]
     rows: list[dict] = []
@@ -82,7 +92,10 @@ def parse_customizations(root: Path, product_version: str) -> list[dict]:
     skills = root / "skills"
     if skills.exists():
         for path in sorted(skills.glob("*/SKILL.md")):
-            metadata = _frontmatter(path.read_text(encoding="utf-8"))
+            text = read_optional_text(path)
+            if text is None:
+                continue
+            metadata = _frontmatter(text)
             name = metadata.get("name") or path.parent.name
             rows.append(entry("claude-code", "slash-command", f"/{name}",
                               metadata.get("description") or f"Custom skill {name}", f"local: {path}",
@@ -90,14 +103,18 @@ def parse_customizations(root: Path, product_version: str) -> list[dict]:
     agents = root / "agents"
     if agents.exists():
         for path in sorted(agents.glob("*.md")):
-            metadata = _frontmatter(path.read_text(encoding="utf-8"))
+            text = read_optional_text(path)
+            if text is None:
+                continue
+            metadata = _frontmatter(text)
             name = metadata.get("name") or path.stem
             rows.append(entry("claude-code", "cli-flag", f"--agent {name}",
                               metadata.get("description") or f"Use custom agent {name}", f"local: {path}",
                               product_version, context="claude shell invocation", provenance="custom"))
     keybindings = root / "keybindings.json"
-    if keybindings.exists():
-        rows += parse_keybindings(keybindings.read_text(encoding="utf-8"), product_version, f"local: {keybindings}")
+    keybindings_text = read_optional_text(keybindings)
+    if keybindings_text is not None:
+        rows += parse_keybindings(keybindings_text, product_version, f"local: {keybindings}")
     return rows
 
 

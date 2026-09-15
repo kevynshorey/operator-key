@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-09-15T14:42:51.081104+00:00",
+  "generated_at": "2026-09-15T14:53:20.515481+00:00",
   "host": "omarchy",
   "versions": {
     "omarchy": "4.0.3-1",
@@ -22382,8 +22382,8 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "c9f49a750c76fa88",
-        "44084a45e4ff4521"
+        "44084a45e4ff4521",
+        "c9f49a750c76fa88"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -22513,8 +22513,8 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "fed180f2614fadcd",
-        "b4b19fee5354a5df"
+        "b4b19fee5354a5df",
+        "fed180f2614fadcd"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -22566,8 +22566,8 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "4de47be1e9f5b003",
-        "0dc6d88bd83a3501"
+        "0dc6d88bd83a3501",
+        "4de47be1e9f5b003"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -26998,8 +26998,8 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "fed180f2614fadcd",
-        "b4b19fee5354a5df"
+        "b4b19fee5354a5df",
+        "fed180f2614fadcd"
       ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
@@ -27101,8 +27101,8 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "4de47be1e9f5b003",
-        "0dc6d88bd83a3501"
+        "0dc6d88bd83a3501",
+        "4de47be1e9f5b003"
       ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {

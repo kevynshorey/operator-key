@@ -1,4 +1,6 @@
+import copy
 import importlib.util
+import itertools
 import unittest
 from pathlib import Path
 
@@ -84,6 +86,24 @@ class ChordTests(unittest.TestCase):
 
         self.assertEqual({item["canonical_chord"] for item in conflicts}, {"ctrl+c", "esc"})
         self.assertEqual(len(rows[0]["conflict_ids"]), 2)
+
+    def test_conflicts_and_row_conflict_ids_are_independent_of_input_order(self):
+        source = [
+            {"id": "multi", "interface": "hotkey", "command": "Ctrl+Z / Ctrl+A", "context": "terminal"},
+            {"id": "alpha", "interface": "hotkey", "command": "Ctrl+A", "context": "terminal"},
+            {"id": "zulu", "interface": "hotkey", "command": "Ctrl+Z", "context": "terminal"},
+            {"id": "desktop-a", "interface": "hotkey", "command": "Ctrl+A", "context": "desktop"},
+            {"id": "desktop-b", "interface": "hotkey", "command": "Ctrl+A", "context": "desktop"},
+        ]
+        expected = None
+        for permutation in itertools.permutations(source):
+            rows = copy.deepcopy(list(permutation))
+            conflicts = chords.annotate_conflicts(rows)
+            result = (conflicts, {row["id"]: row["conflict_ids"] for row in rows})
+            if expected is None:
+                expected = result
+            else:
+                self.assertEqual(result, expected)
 
     def test_dedupe_preserves_intentional_omarchy_press_release_entries(self):
         press = build.entry("omarchy", "hotkey", "F9", "Mute microphone", "test", "1", context="desktop")
