@@ -277,37 +277,53 @@ fn poll_child_until<T>(
     }
 }
 
-fn run_spawned_child(
+fn error_after_termination(child: &mut Child, program: &str, primary: String) -> String {
+    terminate_and_reap(child, program)
+        .err()
+        .map_or(primary.clone(), |error| format!("{primary}; {error}"))
+}
+
+fn write_child_stdin(child: &mut Child, bytes: &[u8], program: &str) -> Result<(), String> {
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| format!("{program} stdin was unavailable"))?;
+    stdin
+        .write_all(bytes)
+        .map_err(|error| format!("could not write to {program}: {error}"))?;
+    drop(stdin);
+    Ok(())
+}
+
+fn run_spawned_child_with(
     mut child: Child,
     program: &str,
     input: Option<Vec<u8>>,
     deadline: Instant,
     capture: ProcessCapture,
+    mut now: impl FnMut() -> Instant,
+    mut write_input: impl FnMut(&mut Child, &[u8], &str) -> Result<(), String>,
 ) -> Result<ProcessOutput, String> {
+    if let Err(primary) = ensure_before_deadline(deadline, now(), program) {
+        return Err(error_after_termination(&mut child, program, primary));
+    }
+
     if input
         .as_ref()
         .is_some_and(|bytes| bytes.len() > MAX_NATIVE_STDIN_BYTES)
     {
         let primary = format!("{program} input exceeds {MAX_NATIVE_STDIN_BYTES} byte native limit");
-        let cleanup = terminate_and_reap(&mut child, program).err();
-        return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
+        return Err(error_after_termination(&mut child, program, primary));
     }
 
     if let Some(bytes) = input {
-        let mut stdin = match child.stdin.take() {
-            Some(stdin) => stdin,
-            None => {
-                let primary = format!("{program} stdin was unavailable");
-                let cleanup = terminate_and_reap(&mut child, program).err();
-                return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
-            }
-        };
-        if let Err(error) = stdin.write_all(&bytes) {
-            let primary = format!("could not write to {program}: {error}");
-            let cleanup = terminate_and_reap(&mut child, program).err();
-            return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
+        if let Err(primary) = write_input(&mut child, &bytes, program) {
+            return Err(error_after_termination(&mut child, program, primary));
         }
-        drop(stdin);
+    }
+
+    if let Err(primary) = ensure_before_deadline(deadline, now(), program) {
+        return Err(error_after_termination(&mut child, program, primary));
     }
 
     let poll = poll_child_until(
@@ -317,7 +333,7 @@ fn run_spawned_child(
                 .try_wait()
                 .map_err(|error| format!("could not wait for {program}: {error}"))
         },
-        Instant::now,
+        &mut now,
         thread::sleep,
     );
     match poll {
@@ -325,13 +341,35 @@ fn run_spawned_child(
         Ok(ChildPoll::TimedOutAfterExit) => Err(format!("{program} timed out")),
         Ok(ChildPoll::TimedOutRunning) => {
             let primary = format!("{program} timed out");
-            let cleanup = terminate_and_reap(&mut child, program).err();
-            Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")))
+            Err(error_after_termination(&mut child, program, primary))
         }
-        Err(primary) => {
-            let cleanup = terminate_and_reap(&mut child, program).err();
-            Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")))
-        }
+        Err(primary) => Err(error_after_termination(&mut child, program, primary)),
+    }
+}
+
+fn run_spawned_child(
+    child: Child,
+    program: &str,
+    input: Option<Vec<u8>>,
+    deadline: Instant,
+    capture: ProcessCapture,
+) -> Result<ProcessOutput, String> {
+    run_spawned_child_with(
+        child,
+        program,
+        input,
+        deadline,
+        capture,
+        Instant::now,
+        write_child_stdin,
+    )
+}
+
+fn ensure_before_deadline(deadline: Instant, now: Instant, program: &str) -> Result<(), String> {
+    if now >= deadline {
+        Err(format!("{program} timed out"))
+    } else {
+        Ok(())
     }
 }
 
@@ -340,12 +378,18 @@ fn process_output(
     args: &[&str],
     deadline: Instant,
 ) -> Result<ProcessOutput, String> {
+    ensure_before_deadline(deadline, Instant::now(), program)?;
     let capture = ProcessCapture::new()?;
-    let child = Command::new(program)
+    let stdout = capture.stdout.stdio()?;
+    let stderr = capture.stderr.stdio()?;
+    let mut command = Command::new(program);
+    command
         .args(args)
         .stdin(Stdio::null())
-        .stdout(capture.stdout.stdio()?)
-        .stderr(capture.stderr.stdio()?)
+        .stdout(stdout)
+        .stderr(stderr);
+    ensure_before_deadline(deadline, Instant::now(), program)?;
+    let child = command
         .spawn()
         .map_err(|error| format!("could not start {program}: {error}"))?;
     run_spawned_child(child, program, None, deadline, capture)
@@ -357,17 +401,23 @@ fn process_input(
     input: &[u8],
     deadline: Instant,
 ) -> Result<ProcessOutput, String> {
+    ensure_before_deadline(deadline, Instant::now(), program)?;
     if input.len() > MAX_NATIVE_STDIN_BYTES {
         return Err(format!(
             "{program} input exceeds {MAX_NATIVE_STDIN_BYTES} byte native limit"
         ));
     }
     let capture = ProcessCapture::new()?;
-    let child = Command::new(program)
+    let stdout = capture.stdout.stdio()?;
+    let stderr = capture.stderr.stdio()?;
+    let mut command = Command::new(program);
+    command
         .args(args)
         .stdin(Stdio::piped())
-        .stdout(capture.stdout.stdio()?)
-        .stderr(capture.stderr.stdio()?)
+        .stdout(stdout)
+        .stderr(stderr);
+    ensure_before_deadline(deadline, Instant::now(), program)?;
+    let child = command
         .spawn()
         .map_err(|error| format!("could not start {program}: {error}"))?;
     run_spawned_child(child, program, Some(input.to_vec()), deadline, capture)
@@ -617,7 +667,7 @@ pub async fn insert_catalog_command(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::collections::VecDeque;
 
     fn entry(interface: &str, safety_level: &str, available: bool, command: &str) -> CatalogEntry {
@@ -1085,6 +1135,40 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
+    fn expired_spawned_child_is_reaped_without_writing_stdin() {
+        let deadline = Instant::now();
+        let capture = ProcessCapture::new().unwrap();
+        let child = Command::new("sleep")
+            .arg("30")
+            .stdin(Stdio::piped())
+            .stdout(capture.stdout.stdio().unwrap())
+            .stderr(capture.stderr.stdio().unwrap())
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        let write_attempted = Cell::new(false);
+
+        let error = run_spawned_child_with(
+            child,
+            "sleep",
+            Some(b"must not be written".to_vec()),
+            deadline,
+            capture,
+            || deadline,
+            |_, _, _| {
+                write_attempted.set(true);
+                Ok(())
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "sleep timed out");
+        assert!(!write_attempted.get());
+        assert!(!std::path::Path::new(&format!("/proc/{pid}")).exists());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
     fn timeout_does_not_wait_for_descendants_holding_output_descriptors() {
         let started = Instant::now();
 
@@ -1116,6 +1200,31 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("input exceeds"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn expired_output_deadline_is_rejected_before_process_spawn() {
+        let error = process_output(
+            "/operator-key-test-program-does-not-exist",
+            &[],
+            Instant::now() - Duration::from_millis(1),
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "/operator-key-test-program-does-not-exist timed out");
+    }
+
+    #[test]
+    fn expired_input_deadline_is_rejected_before_process_spawn() {
+        let error = process_input(
+            "/operator-key-test-program-does-not-exist",
+            &[],
+            b"must not be written",
+            Instant::now() - Duration::from_millis(1),
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "/operator-key-test-program-does-not-exist timed out");
     }
 
     #[test]
