@@ -596,11 +596,14 @@ fn insert_catalog_command_with(
             return Err(ActionError::NonTerminal);
         }
 
-        let selector = format!("address:{}", captured.address);
+        let focus_dispatcher = format!(
+            r#"hl.dsp.focus({{ window = "address:{}" }})"#,
+            captured.address
+        );
         let focus_output = environment
-            .output("hyprctl", &["dispatch", "focuswindow", &selector])
+            .output("hyprctl", &["dispatch", &focus_dispatcher])
             .map_err(ActionError::TargetDetection)?;
-        successful_output(focus_output, "hyprctl dispatch focuswindow")
+        successful_output(focus_output, "hyprctl dispatch hl.dsp.focus")
             .map_err(ActionError::TargetDetection)?;
 
         let revalidated = active_window(environment)?;
@@ -825,7 +828,7 @@ mod tests {
                 "hide",
                 "wait",
                 "output:hyprctl:-j activewindow",
-                "output:hyprctl:dispatch focuswindow address:0x123",
+                "output:hyprctl:dispatch hl.dsp.focus({ window = \"address:0x123\" })",
                 "output:hyprctl:-j activewindow",
                 "input:wtype:-:hermes help",
             ]
@@ -909,7 +912,7 @@ mod tests {
                 .calls
                 .borrow()
                 .iter()
-                .any(|call| call.contains("dispatch focuswindow")));
+                .any(|call| call.starts_with("output:hyprctl:dispatch")));
         }
     }
 
