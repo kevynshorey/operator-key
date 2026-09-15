@@ -29,7 +29,7 @@ python3 scripts/install-omarchy-binding.py \
   --binary "$PWD/src-tauri/target/debug/operator-key"
 ```
 
-Preview is read-only: it does **not** change `~/.config/hypr/bindings.lua`, install a binary, reload Hyprland, trigger a binding, or launch Operator Key.
+Preview is read-only: it does **not** change `~/.config/hypr/bindings.lua`, install a binary, reload Hyprland, or launch Operator Key. It explicitly identifies the physical shortcut you must press during apply.
 
 Typical output identifies the target and backup, the source and stable destination (`~/.local/bin/operator-key`), the source SHA-256, every candidate decision, and an exact block like:
 
@@ -67,13 +67,13 @@ The installer requires both `--apply` and the exact typed phrase shown at the pr
 
 Apply regenerates and checks the exact proposed config bytes, and rechecks the config, source hash, destination hash, and backup paths immediately before mutation. It reads the written config and destination back before reload and requires the reviewed bytes and SHA-256. Symlinks and non-regular files are rejected. Existing regular backups are preserved and never silently overwritten. New files are written through same-directory temporary files, flushed, mode-set, and atomically replaced. Commands use exact argument arrays, never a shell.
 
-On success it re-reads `hyprctl -j binds`, requires exactly one binding on the selected physical chord with description `Operator Key`, and rejects a late conflict. Omarchy's Lua bridge reports this active binding with dispatcher `__lua` and a numeric callback argument. The installer requires that exact dispatcher and a bounded, strictly positive decimal argument; unexpected or unsafe active data fails closed. It captures clients, then invokes the registered callback with the exact no-shell argument array `hyprctl dispatch __lua <validated-arg>`. This exercises the action attached to the installed active binding without relying on synthetic keyboard routing or direct-spawning the destination.
+On success it re-reads `hyprctl -j binds`, requires exactly one binding on the selected physical chord with description `Operator Key`, and rejects a late conflict. It then captures existing exact-class clients and prints `Press SUPER + SHIFT + K now to verify...` (using the selected chord). You must physically press that shortcut while the installer waits. The installer does not use `hyprctl dispatch`, `wtype`, or a direct process spawn as proof.
 
-The dispatcher command must succeed and produce a new client whose `class` or `initialClass` is exactly `operator-key`; the title, reverse-domain identifiers, and substrings do not count. The new client must include a PID, and `/proc/<pid>/exe` must resolve exactly to the installed destination. An invalid dispatcher record, failed dispatch, missing PID, or mismatched executable causes verification to fail and rollback rather than producing a false success.
+Within one bounded 25-second deadline, the physical press must produce a new client whose `class` or `initialClass` is exactly `operator-key`; the title, reverse-domain identifiers, substrings, and clients present before the prompt do not count. The new client must include a PID, and `/proc/<pid>/exe` must resolve exactly to the installed destination. Each client query and poll sleep is bounded by the time remaining. A query timeout, no verified physical press, missing PID, or mismatched executable causes verification to fail and rollback rather than producing a false success.
 
 `wtype` is not an installer verification dependency. It is required only for Operator Key's optional guarded terminal-insertion runtime feature described in the README.
 
-If any mutation, reload, binding check, or end-to-end trigger check fails, rollback independently attempts config restoration, launcher restoration/removal, and (whenever config mutation was attempted) a Hyprland reload. Every rollback error is reported; one failed restoration never skips later steps. The original config backup is `bindings.lua.operator-key.bak`; a replaced launcher is backed up as `operator-key.operator-key.bak` beside the destination.
+If any mutation, reload, binding check, prompt, client query, or physical-shortcut check fails—including not pressing the shortcut before the deadline—rollback independently attempts config restoration, launcher restoration/removal, and (whenever config mutation was attempted) a Hyprland reload. Every rollback error is reported; one failed restoration never skips later steps. The original config backup is `bindings.lua.operator-key.bak`; a replaced launcher is backed up as `operator-key.operator-key.bak` beside the destination.
 
 ## Verify manually
 

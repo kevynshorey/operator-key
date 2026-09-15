@@ -48,6 +48,7 @@ class FakeRunner:
         self.clients = list(clients or [])
         self.failures = dict(failures or {})
         self.calls = []
+        self.timeouts = []
         self.trigger_client = {
             "address": "0x99", "class": "operator-key",
             "initialClass": "operator-key", "title": "Operator Key", "pid": 4242,
@@ -56,6 +57,7 @@ class FakeRunner:
     def run(self, args, *, timeout=None):
         args = tuple(str(arg) for arg in args)
         self.calls.append(args)
+        self.timeouts.append((args, timeout))
         if self.failures.get(args):
             return installer.CommandResult(1, "", self.failures[args])
         if args == ("hyprctl", "-j", "binds"):
@@ -64,13 +66,7 @@ class FakeRunner:
             return installer.CommandResult(0, json.dumps(self.clients), "")
         if args == ("hyprctl", "reload"):
             return installer.CommandResult(0, "ok", "")
-        if args == ("hyprctl", "dispatch", "__lua", "42"):
-            client = dict(self.trigger_client)
-            existing = {item.get("address") for item in self.clients}
-            if client.get("address") in existing:
-                client["address"] = f"{client['address']}-{len(self.clients)}"
-            self.clients.append(client)
-            return installer.CommandResult(0, "", "")
+
         if args == ("omarchy", "menu", "keybindings", "--print"):
             return installer.CommandResult(0, "SUPER + K → Keybindings\n", "")
         return installer.CommandResult(127, "", "unexpected command")
@@ -95,6 +91,17 @@ class InstallBindingTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def prompt_and_open(self, runner, events=None):
+        def prompt(chord):
+            if events is not None:
+                events.append(("prompt", chord))
+            client = dict(runner.trigger_client)
+            existing = {item.get("address") for item in runner.clients}
+            if client.get("address") in existing:
+                client["address"] = f"{client['address']}-{len(runner.clients)}"
+            runner.clients.append(client)
+        return prompt
 
     def test_parses_hyprctl_structured_bindings_and_preserves_trigger_flags(self):
         rows = [
@@ -193,8 +200,9 @@ class InstallBindingTests(unittest.TestCase):
         self.assertIn("SUPER + K: rejected", preview)
         self.assertIn(f"SHA-256: {hashlib.sha256(self.source.read_bytes()).hexdigest()}", preview)
         self.assertIn("hyprctl reload", preview)
-        self.assertIn("validated __lua dispatcher", preview)
+        self.assertIn("physically press SUPER + SHIFT + K", preview)
         self.assertNotIn("wtype", preview)
+        self.assertNotIn("dispatch __lua", preview)
         self.assertIn(expected_block.rstrip(), preview)
         self.assertEqual(self.target.read_bytes(), before)
         self.assertFalse(self.destination.exists())
@@ -226,11 +234,13 @@ class InstallBindingTests(unittest.TestCase):
         installer.apply_plan(
             plan, runner=runner, confirm=lambda _: True,
             process_exe_resolver=lambda pid: self.destination,
+            prompt_shortcut=self.prompt_and_open(runner),
         )
         first = self.target.read_bytes()
         installer.apply_plan(
             plan, runner=runner, confirm=lambda _: True,
             process_exe_resolver=lambda pid: self.destination,
+            prompt_shortcut=self.prompt_and_open(runner),
         )
         self.assertEqual(self.target.read_bytes(), first)
         self.assertEqual(first.count(installer.BEGIN_MARKER.encode()), 1)
@@ -239,9 +249,7 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(self.destination.read_bytes(), self.source.read_bytes())
         self.assertEqual(stat.S_IMODE(self.destination.stat().st_mode), 0o755)
         self.assertIn(("hyprctl", "reload"), runner.calls)
-        self.assertIn(
-            ("hyprctl", "dispatch", "__lua", "42"), runner.calls,
-        )
+        self.assertFalse(any(call[:2] == ("hyprctl", "dispatch") for call in runner.calls))
         self.assertFalse(any(call and call[0] == "wtype" for call in runner.calls))
 
     def test_refuses_malformed_duplicate_or_nested_marker_blocks(self):
@@ -343,6 +351,7 @@ class InstallBindingTests(unittest.TestCase):
         installer.apply_plan(
             plan, runner=runner, confirm=lambda _: True,
             process_exe_resolver=lambda pid: self.destination,
+            prompt_shortcut=self.prompt_and_open(runner),
         )
         self.assertEqual(config_backup.read_bytes(), b"keep config backup")
         self.assertEqual(binary_backup.read_bytes(), b"keep binary backup")
@@ -494,7 +503,7 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(self.destination.stat().st_mode), 0o700)
         self.assertEqual(runner.calls.count(("hyprctl", "reload")), 2)
 
-    def test_apply_uses_exact_argv_and_verifies_binding_and_new_window(self):
+    def test_apply_prompts_after_reload_and_binding_verification_without_synthetic_trigger(self):
         runner = FakeRunner()
         plan = installer.create_plan(
             target=self.target,
@@ -504,14 +513,30 @@ class InstallBindingTests(unittest.TestCase):
             candidates=["SUPER + SHIFT + K"],
         )
         runner.binds.append(bind(64 | 1, "K", "Operator Key"))
+        events = []
+
+        def prompt(chord):
+            self.assertEqual(runner.calls[-1], ("hyprctl", "-j", "clients"))
+            reload_index = runner.calls.index(("hyprctl", "reload"))
+            verified_bind_index = max(
+                index for index, call in enumerate(runner.calls)
+                if call == ("hyprctl", "-j", "binds")
+            )
+            self.assertLess(reload_index, verified_bind_index)
+            self.assertLess(verified_bind_index, len(runner.calls) - 1)
+            self.assertEqual(self.target.read_bytes(), plan.proposed)
+            self.assertEqual(self.destination.read_bytes(), self.source.read_bytes())
+            events.append(("prompt", chord))
+            runner.clients.append(dict(runner.trigger_client))
+
         installer.apply_plan(
             plan, runner=runner, confirm=lambda _: True,
             process_exe_resolver=lambda pid: self.destination,
+            prompt_shortcut=prompt,
         )
         self.assertNotIn((str(self.destination),), runner.calls)
-        self.assertIn(
-            ("hyprctl", "dispatch", "__lua", "42"), runner.calls,
-        )
+        self.assertEqual(events, [("prompt", "SUPER + SHIFT + K")])
+        self.assertFalse(any(call[:2] == ("hyprctl", "dispatch") for call in runner.calls))
         self.assertFalse(any(call and call[0] == "wtype" for call in runner.calls))
         self.assertIn(("hyprctl", "-j", "clients"), runner.calls)
         self.assertEqual(runner.calls.count(("hyprctl", "reload")), 1)
@@ -543,60 +568,62 @@ class InstallBindingTests(unittest.TestCase):
         verified = installer._verify_binding(plan, runner)
         self.assertEqual((verified.dispatcher, verified.arg), ("__lua", "987"))
 
-    def test_dispatcher_argv_is_exact_and_rejects_untrusted_active_data(self):
-        valid = installer.Binding(
-            "SUPER + SHIFT + K", "shift+super+k", "Operator Key", "press", "test",
-            "__lua", "987654321",
-        )
-        self.assertEqual(
-            installer.dispatcher_argv(valid),
-            ["hyprctl", "dispatch", "__lua", "987654321"],
-        )
-        invalid = [
-            ("exec", "42"), ("__lua", "0"), ("__lua", "-1"),
-            ("__lua", "42; exec bad"), ("__lua", " 42"),
-            ("__lua", "1" * 20), ("__lua", "9" * 19),
-        ]
-        for dispatcher, arg in invalid:
-            with self.subTest(dispatcher=dispatcher, arg=arg):
-                binding = installer.Binding(
-                    valid.chord, valid.physical, valid.description, valid.trigger,
-                    valid.source, dispatcher, arg,
-                )
-                with self.assertRaisesRegex(installer.InstallError, "dispatcher|argument"):
-                    installer.dispatcher_argv(binding)
-
-    def test_invalid_dispatcher_or_arg_rolls_back_without_triggering(self):
-        for dispatcher, arg in (("exec", "42"), ("__lua", "42; bad")):
-            with self.subTest(dispatcher=dispatcher, arg=arg):
-                self.target.write_bytes(b"-- personal\r\n")
-                self.destination.unlink(missing_ok=True)
-                runner = FakeRunner()
-                plan = installer.create_plan(
-                    target=self.target, source=self.source, destination=self.destination,
-                    runner=runner, candidates=["SUPER + SHIFT + K"],
-                )
-                runner.binds.append(bind(65, "K", "Operator Key", dispatcher=dispatcher, arg=arg))
-                with self.assertRaisesRegex(installer.InstallError, "dispatcher|argument"):
-                    installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
-                self.assertEqual(self.target.read_bytes(), plan.original)
-                self.assertFalse(self.destination.exists())
-                self.assertFalse(any(call[:2] == ("hyprctl", "dispatch") for call in runner.calls))
-                self.assertFalse(any(call and call[0] == "wtype" for call in runner.calls))
-
-    def test_failed_active_dispatch_rolls_back(self):
-        dispatch = ("hyprctl", "dispatch", "__lua", "42")
-        runner = FakeRunner(failures={dispatch: "dispatcher failed"})
+    def test_new_client_present_before_prompt_does_not_count(self):
+        runner = FakeRunner(clients=[dict(FakeRunner().trigger_client)])
         plan = installer.create_plan(
             target=self.target, source=self.source, destination=self.destination,
             runner=runner, candidates=["SUPER + SHIFT + K"],
         )
         runner.binds.append(bind(65, "K", "Operator Key"))
-        with self.assertRaisesRegex(installer.InstallError, "binding trigger failed"):
-            installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
-        self.assertIn(dispatch, runner.calls)
+        clock = mock.Mock(side_effect=[0.0, 0.0, 0.2, 0.4, 0.6])
+        with self.assertRaisesRegex(installer.InstallError, "[Pp]hysical shortcut"):
+            installer.apply_plan(
+                plan, runner=runner, confirm=lambda _: True,
+                prompt_shortcut=lambda chord: None,
+                monotonic=clock, sleep=lambda seconds: None,
+                verification_timeout=0.5,
+            )
         self.assertEqual(self.target.read_bytes(), plan.original)
         self.assertFalse(self.destination.exists())
+
+    def test_prompt_exception_rolls_back(self):
+        runner = FakeRunner(binds=[bind(65, "K", "Operator Key")])
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
+        )
+
+        def fail_prompt(chord):
+            raise RuntimeError("tty write failed")
+
+        with self.assertRaisesRegex(installer.InstallError, "tty write failed"):
+            installer.apply_plan(
+                plan, runner=runner, confirm=lambda _: True,
+                prompt_shortcut=fail_prompt,
+            )
+        self.assertEqual(self.target.read_bytes(), plan.original)
+        self.assertFalse(self.destination.exists())
+
+    def test_physical_verification_uses_one_bounded_deadline(self):
+        runner = FakeRunner(binds=[bind(65, "K", "Operator Key")])
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
+        )
+        times = iter([100.0, 100.0, 100.2, 100.7, 101.0])
+        sleeps = []
+        with self.assertRaisesRegex(installer.InstallError, "[Pp]hysical shortcut"):
+            installer.apply_plan(
+                plan, runner=runner, confirm=lambda _: True,
+                prompt_shortcut=lambda chord: None,
+                monotonic=lambda: next(times), sleep=sleeps.append,
+                verification_timeout=1.0,
+            )
+        client_timeouts = [timeout for args, timeout in runner.timeouts
+                           if args == ("hyprctl", "-j", "clients")]
+        self.assertTrue(client_timeouts)
+        self.assertTrue(all(0 < timeout <= 1.0 for timeout in client_timeouts))
+        self.assertTrue(all(0 < seconds <= 0.25 for seconds in sleeps))
 
     def test_launch_requires_new_exact_class_not_title_or_substring(self):
         runner = FakeRunner()
@@ -609,8 +636,12 @@ class InstallBindingTests(unittest.TestCase):
             runner=runner, candidates=["SUPER + SHIFT + K"],
         )
         runner.binds.append(bind(65, "K", "Operator Key"))
-        with self.assertRaisesRegex(installer.InstallError, "new exact-class"):
-            installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+        with self.assertRaisesRegex(installer.InstallError, "[Pp]hysical shortcut"):
+            installer.apply_plan(
+                plan, runner=runner, confirm=lambda _: True,
+                prompt_shortcut=self.prompt_and_open(runner),
+                verification_timeout=0.01,
+            )
 
     def test_runtime_identity_is_exact_operator_key_class(self):
         clients = installer._operator_clients(FakeRunner(clients=[
@@ -630,7 +661,10 @@ class InstallBindingTests(unittest.TestCase):
         )
         runner.binds.append(bind(65, "K", "Operator Key"))
         with self.assertRaisesRegex(installer.InstallError, "PID"):
-            installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+            installer.apply_plan(
+                plan, runner=runner, confirm=lambda _: True,
+                prompt_shortcut=self.prompt_and_open(runner),
+            )
 
     def test_post_reload_binding_verification_rejects_same_chord_conflict(self):
         runner = FakeRunner()
@@ -657,6 +691,7 @@ class InstallBindingTests(unittest.TestCase):
             installer.apply_plan(
                 plan, runner=runner, confirm=lambda _: True,
                 process_exe_resolver=lambda pid: Path("/wrong/binary"),
+                prompt_shortcut=self.prompt_and_open(runner),
             )
 
     def test_launch_accepts_pid_only_when_executable_matches_destination(self):
@@ -670,6 +705,7 @@ class InstallBindingTests(unittest.TestCase):
         installer.apply_plan(
             plan, runner=runner, confirm=lambda _: True,
             process_exe_resolver=lambda pid: self.destination,
+            prompt_shortcut=self.prompt_and_open(runner),
         )
 
     def test_uninstall_reloads_then_requires_managed_binding_absent(self):

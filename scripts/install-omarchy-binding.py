@@ -53,8 +53,10 @@ KEY_ALIASES = {
     "spacebar": "space",
 }
 SAFE_PATH = re.compile(r"^/[A-Za-z0-9_./+-]+$")
-SAFE_LUA_DISPATCH_ARG = re.compile(r"^[1-9][0-9]{0,18}$")
 OPERATOR_KEY_CLASS = "operator-key"
+PHYSICAL_VERIFICATION_TIMEOUT = 25.0
+CLIENT_QUERY_TIMEOUT = 5.0
+CLIENT_POLL_INTERVAL = 0.25
 
 
 class InstallError(RuntimeError):
@@ -503,7 +505,7 @@ def render_preview(plan: InstallPlan) -> str:
         "  1. Atomically copy the prebuilt binary and update bindings.lua\n"
         "  2. Run exact argv: hyprctl reload\n"
         "  3. Re-read hyprctl -j binds and require one exact Operator Key chord/description\n"
-        "  4. Invoke its validated __lua dispatcher with exact argv (no shell) and require a new exact-class client\n"
+        f"  4. You must physically press {plan.chord}; require a new exact-class client\n"
         "  5. On any failure, restore exact prior bytes/modes and run hyprctl reload again\n"
     )
 
@@ -594,21 +596,11 @@ def _validate_plan_integrity(plan: InstallPlan, source_bytes: bytes) -> None:
         raise InstallError("Source binary changed after preview; preview again before applying")
 
 
-def dispatcher_argv(binding: Binding) -> list[str]:
-    if binding.dispatcher != "__lua":
-        raise InstallError(
-            f"Refusing unexpected active binding dispatcher {binding.dispatcher!r}"
-        )
-    if (
-        not SAFE_LUA_DISPATCH_ARG.fullmatch(binding.arg)
-        or int(binding.arg) > (1 << 63) - 1
-    ):
-        raise InstallError("Refusing unsafe active __lua dispatcher argument")
-    return ["hyprctl", "dispatch", "__lua", binding.arg]
-
-
-def _operator_clients(runner) -> dict[str, dict]:
-    result = runner.run(["hyprctl", "-j", "clients"], timeout=5)
+def _operator_clients(runner, *, timeout: float = CLIENT_QUERY_TIMEOUT) -> dict[str, dict]:
+    try:
+        result = runner.run(["hyprctl", "-j", "clients"], timeout=timeout)
+    except (subprocess.TimeoutExpired, TimeoutError) as error:
+        raise InstallError(f"window verification query timed out: {error}") from error
     _successful(result, "window verification")
     try:
         clients = json.loads(result.stdout)
@@ -634,12 +626,23 @@ def resolve_process_exe(pid: int) -> Path:
     return Path(os.readlink(f"/proc/{pid}/exe"))
 
 
-def _verify_launch(plan: InstallPlan, binding: Binding, runner, process_exe_resolver) -> None:
-    trigger_argv = dispatcher_argv(binding)
-    before = _operator_clients(runner)
-    _successful(runner.run(trigger_argv, timeout=5), "binding trigger")
-    for _ in range(20):
-        current = _operator_clients(runner)
+def _verify_launch(
+    plan: InstallPlan, runner, process_exe_resolver, prompt_shortcut,
+    *, monotonic=time.monotonic, sleep=time.sleep,
+    verification_timeout: float = PHYSICAL_VERIFICATION_TIMEOUT,
+) -> None:
+    deadline = monotonic() + verification_timeout
+
+    def query_clients() -> dict[str, dict]:
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise InstallError("Physical shortcut verification timed out")
+        return _operator_clients(runner, timeout=min(CLIENT_QUERY_TIMEOUT, remaining))
+
+    before = query_clients()
+    prompt_shortcut(plan.chord)
+    while True:
+        current = query_clients()
         for identity in current.keys() - before.keys():
             client = current[identity]
             pid = client.get("pid")
@@ -654,8 +657,13 @@ def _verify_launch(plan: InstallPlan, binding: Binding, runner, process_exe_reso
                     f"New exact-class client executable {executable} does not match {plan.destination}"
                 )
             return
-        runner.sleep(0.25)
-    raise InstallError("Binding trigger did not observe a new exact-class Operator Key client")
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            break
+        sleep(min(CLIENT_POLL_INTERVAL, remaining))
+    raise InstallError(
+        "Physical shortcut verification did not observe a new exact-class Operator Key client"
+    )
 
 
 def _rollback(actions: Sequence[tuple[str, Callable[[], None]]]) -> list[str]:
@@ -679,7 +687,13 @@ def _raise_transaction_failure(operation: str, error: Exception, rollback_errors
 def apply_plan(
     plan: InstallPlan, *, runner, confirm: Callable[[str], bool],
     process_exe_resolver: Callable[[int], Path] = resolve_process_exe,
+    prompt_shortcut: Callable[[str], None] | None = None,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+    verification_timeout: float = PHYSICAL_VERIFICATION_TIMEOUT,
 ) -> None:
+    if prompt_shortcut is None:
+        prompt_shortcut = _interactive_shortcut_prompt
     phrase = f"APPLY {plan.chord}"
     if not confirm(phrase):
         raise InstallError("Confirmation declined; no files changed")
@@ -696,8 +710,11 @@ def apply_plan(
     old_destination_mode = stat.S_IMODE(destination_info.st_mode) if destination_info else None
     if current == plan.proposed and old_destination == source_bytes:
         _successful(runner.run(["hyprctl", "reload"], timeout=10), "Hyprland reload")
-        binding = _verify_binding(plan, runner)
-        _verify_launch(plan, binding, runner, process_exe_resolver)
+        _verify_binding(plan, runner)
+        _verify_launch(
+            plan, runner, process_exe_resolver, prompt_shortcut,
+            monotonic=monotonic, sleep=sleep, verification_timeout=verification_timeout,
+        )
         return
     binary_backup = Path(str(plan.destination) + ".operator-key.bak")
     # Inspect every backup before creating either one, so a symlink or special
@@ -734,8 +751,11 @@ def apply_plan(
         if sha256(plan.destination.read_bytes()) != plan.source_hash:
             raise InstallError("Installed launcher hash does not match reviewed source hash")
         _successful(runner.run(["hyprctl", "reload"], timeout=10), "Hyprland reload")
-        binding = _verify_binding(plan, runner)
-        _verify_launch(plan, binding, runner, process_exe_resolver)
+        _verify_binding(plan, runner)
+        _verify_launch(
+            plan, runner, process_exe_resolver, prompt_shortcut,
+            monotonic=monotonic, sleep=sleep, verification_timeout=verification_timeout,
+        )
     except Exception as error:
         if destination_attempted or target_attempted:
             actions: list[tuple[str, Callable[[], None]]] = []
@@ -870,6 +890,12 @@ def _interactive_confirmation(expected: str) -> bool:
     return typed == expected
 
 
+def _interactive_shortcut_prompt(chord: str) -> None:
+    if not sys.stdin.isatty():
+        raise InstallError("Physical shortcut verification requires an interactive terminal")
+    print(f"Press {chord} now to verify...", flush=True)
+
+
 def _default_source(repo: Path) -> Path:
     release = repo / "src-tauri" / "target" / "release" / "operator-key"
     return release if release.exists() else repo / "src-tauri" / "target" / "debug" / "operator-key"
@@ -916,6 +942,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 plan,
                 runner=runner,
                 confirm=_interactive_confirmation,
+                prompt_shortcut=_interactive_shortcut_prompt,
             )
             print("Install, reload, and end-to-end binding verification passed.")
         return 0
