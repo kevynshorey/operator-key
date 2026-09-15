@@ -87,6 +87,27 @@ class CatalogTests(unittest.TestCase):
         ]
         self.assertEqual(actual, expected)
 
+    def test_production_catalog_has_well_formed_claude_hotkeys_and_conflicts(self):
+        catalog = json.loads((ROOT / "data" / "catalog.json").read_text(encoding="utf-8"))
+        hotkeys = [
+            row for row in catalog["entries"]
+            if row["product"] == "claude-code" and row["interface"] == "hotkey"
+        ]
+
+        self.assertFalse(any("| Enter NORMAL mode" in row["command"] for row in hotkeys))
+        self.assertFalse(any(row["command"] == "Quick escape" for row in hotkeys))
+
+        quick_escape = next(row for row in hotkeys if row["description"] == "Quick escape")
+        self.assertEqual(quick_escape["command"], r"\ + Enter")
+
+        alternatives = next(row for row in hotkeys if row["command"] == "q, Ctrl+C, Esc")
+        conflict_chords = {
+            conflict["canonical_chord"]
+            for conflict in catalog["conflicts"]
+            if conflict["id"] in alternatives["conflict_ids"]
+        }
+        self.assertEqual(conflict_chords, {"ctrl+c", "esc"})
+
     def test_build_document_integrates_adapters_schema_and_conflicts(self):
         versions = {
             "omarchy": "4.0.3-1",

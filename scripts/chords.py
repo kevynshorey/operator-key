@@ -35,12 +35,18 @@ def _canonical_combo(value: str) -> str:
 
 def canonicalize_chord(display: str) -> str:
     """Normalize chord spelling/order without modifying the display value."""
-    alternatives = [part.strip() for part in re.split(r"\s+/\s+", display.strip()) if part.strip()]
+    alternatives = [
+        part.strip()
+        for part in re.split(r"\s+or\s+|,\s+(?:or\s+)?|\s+/\s+", display.strip(), flags=re.IGNORECASE)
+        if part.strip()
+    ]
     normalized: list[str] = []
     for alternative in alternatives:
+        alternative = re.sub(r"\s*\([^)]*\)", "", alternative).strip()
         words = alternative.split()
+        has_spaced_plus = bool(re.search(r"\s+\+\s+", alternative))
         is_plus_sequence = len(words) > 1 and all("+" in word for word in words)
-        is_plain_sequence = len(words) > 1 and not any(_name(word) in MODIFIER_ORDER for word in words)
+        is_plain_sequence = len(words) > 1 and not has_spaced_plus and not any(_name(word) in MODIFIER_ORDER for word in words)
         if is_plus_sequence or is_plain_sequence:
             normalized.append(" ".join(_canonical_combo(word) for word in words))
         else:

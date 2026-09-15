@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-09-15T14:20:09.659503+00:00",
+  "generated_at": "2026-09-15T14:42:51.081104+00:00",
   "host": "omarchy",
   "versions": {
     "omarchy": "4.0.3-1",
@@ -11,11 +11,20 @@
   "counts": {
     "omarchy": 227,
     "hermes": 707,
-    "claude-code": 126,
+    "claude-code": 281,
     "codex": 87
   },
-  "total": 1147,
+  "total": 1302,
   "conflicts": [
+    {
+      "id": "c9f49a750c76fa88",
+      "canonical_chord": "alt+enter",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: After enabling Option as Meta on macOS",
+      "entry_ids": [
+        "06f8e3f5c7026c76",
+        "85c31daa2ffa80a5"
+      ]
+    },
     {
       "id": "eb1970c88fc0528c",
       "canonical_chord": "alt+shift+tab",
@@ -35,48 +44,151 @@
       ]
     },
     {
-      "id": "6004520b7a4bc772",
+      "id": "4de47be1e9f5b003",
+      "canonical_chord": "alt+v",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Inserts an [Image #N] chip at the cursor so you can reference it positionally in your prompt. On WSL, both Ctrl+V and Alt+V are bound; use Alt+V if your terminal intercepts Ctrl+V",
+      "entry_ids": [
+        "45a045817024bb08",
+        "6caf04e2b3ef3ae6"
+      ]
+    },
+    {
+      "id": "641a71ea98187943",
       "canonical_chord": "ctrl+b",
-      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Backgrounds Bash commands and agents. Tmux users press twice",
       "entry_ids": [
         "08ea6f7094dc4a9f",
-        "2933e25734737fe6"
+        "2aa00b4cb1adf0ba"
       ]
     },
     {
-      "id": "d13d3d919ff240e4",
+      "id": "18a35dc4c0c5b1bd",
       "canonical_chord": "ctrl+c",
-      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "context": "Hermes interactive terminal | claude-code interactive terminal | claude-code interactive terminal; Context: Interrupts a running operation. If nothing is running, the first press clears the prompt input and a second press exits Claude Code",
       "entry_ids": [
-        "ab4b1a544656fdb0",
-        "cfee54b5721b4b87"
+        "cfee54b5721b4b87",
+        "fc9c44f92abc77f1",
+        "fdfdf9a19222bd98"
       ]
     },
     {
-      "id": "3de88df0e2469708",
+      "id": "918ba1819950f499",
+      "canonical_chord": "ctrl+d",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: The first press shows a confirmation hint and a second press within 800ms exits. When the prompt has text, Ctrl+D deletes the character after the cursor instead",
+      "entry_ids": [
+        "3d97dd0d6fffe7e6",
+        "ae6362f60c3c7b99"
+      ]
+    },
+    {
+      "id": "f048bc147d00912f",
+      "canonical_chord": "ctrl+e",
+      "context": "claude-code interactive terminal | claude-code interactive terminal; Context: In multiline input, moves to the end of the current logical line",
+      "entry_ids": [
+        "140794a167b858c6",
+        "3997a4feb16c2a34"
+      ]
+    },
+    {
+      "id": "fed180f2614fadcd",
+      "canonical_chord": "ctrl+g",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Edit your prompt or custom response in your default text editor. Ctrl+X Ctrl+E is the readline-native binding. Turn on Show last response in external editor in /config to prepend Claude's previous reply as #-commented context above your prompt; Claude Code strips the comment block when you save",
+      "entry_ids": [
+        "93ae0bf02d864c1c",
+        "bc51ae7f5a1c707f"
+      ]
+    },
+    {
+      "id": "44084a45e4ff4521",
+      "canonical_chord": "ctrl+j",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Works in any terminal without configuration",
+      "entry_ids": [
+        "06f8e3f5c7026c76",
+        "be6b00abdb155ea9"
+      ]
+    },
+    {
+      "id": "a2979512c4ef6a95",
       "canonical_chord": "ctrl+l",
-      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Forces a full terminal redraw, keeping input and conversation history. Use this to recover if the display becomes garbled or partially blank. In fullscreen rendering, it also clears the screen, and you can scroll up to see the earlier messages",
       "entry_ids": [
-        "2b169808850cbc96",
-        "ac146ad73cdce9b4"
+        "07f7704063792159",
+        "2b169808850cbc96"
       ]
     },
     {
-      "id": "65e631ff9bee8760",
+      "id": "abf25b8bbd84496b",
       "canonical_chord": "ctrl+r",
-      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Search through previous commands interactively",
       "entry_ids": [
-        "094617e9923cee74",
-        "6341fa91a20d96f8"
+        "6341fa91a20d96f8",
+        "db050438eb11202d"
       ]
     },
     {
-      "id": "83f376238b53b5f1",
+      "id": "b5d325d5aa6bb1e1",
       "canonical_chord": "ctrl+s",
-      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: With text in the input, stashes it and clears the prompt. Pressed again on an empty prompt, restores the stashed text, cursor position, and pasted content",
       "entry_ids": [
         "686bb5363c891dc1",
-        "e3f97d6a73224680"
+        "a131dec2a766087d"
+      ]
+    },
+    {
+      "id": "da27954ff26bcc0d",
+      "canonical_chord": "ctrl+t",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Only works inside the /theme picker menu. Controls whether code in Claude's responses uses syntax coloring | claude-code interactive terminal; Context: Show or hide Claude's to-do checklist in the status area. This is not the background-task view; use /tasks to see running shells and subagents",
+      "entry_ids": [
+        "40db6ea1255a0e38",
+        "79ff469e324ec089",
+        "977abbcf4ad4f452"
+      ]
+    },
+    {
+      "id": "0dc6d88bd83a3501",
+      "canonical_chord": "ctrl+v",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Inserts an [Image #N] chip at the cursor so you can reference it positionally in your prompt. On WSL, both Ctrl+V and Alt+V are bound; use Alt+V if your terminal intercepts Ctrl+V",
+      "entry_ids": [
+        "45a045817024bb08",
+        "6caf04e2b3ef3ae6"
+      ]
+    },
+    {
+      "id": "b4b19fee5354a5df",
+      "canonical_chord": "ctrl+x ctrl+e",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: Edit your prompt or custom response in your default text editor. Ctrl+X Ctrl+E is the readline-native binding. Turn on Show last response in external editor in /config to prepend Claude's previous reply as #-commented context above your prompt; Claude Code strips the comment block when you save",
+      "entry_ids": [
+        "93ae0bf02d864c1c",
+        "bc51ae7f5a1c707f"
+      ]
+    },
+    {
+      "id": "6b5a8f471c1a46fd",
+      "canonical_chord": "down",
+      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "entry_ids": [
+        "1224ef88f09cdfdd",
+        "b3801cb4d82bafd0"
+      ]
+    },
+    {
+      "id": "0e2cda2d83afcfe9",
+      "canonical_chord": "enter",
+      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "entry_ids": [
+        "19d259aaf006bcab",
+        "a5543f01b14a5d21"
+      ]
+    },
+    {
+      "id": "ed383a512baa0921",
+      "canonical_chord": "esc",
+      "context": "claude-code interactive terminal | claude-code interactive terminal; Context: Stop the current response or tool call mid-turn so you can redirect. Claude keeps the work done so far. If you have messages queued, Claude Code sends them next. When a dialog is open, Esc closes the dialog. On a permission prompt, Esc declines the action, the same as No without a comment | claude-code interactive terminal; From mode: INSERT, VISUAL",
+      "entry_ids": [
+        "81f203349a1095b2",
+        "a5543f01b14a5d21",
+        "cce73729c1f2e269",
+        "fdfdf9a19222bd98"
       ]
     },
     {
@@ -89,12 +201,48 @@
       ]
     },
     {
-      "id": "232130078e7142ad",
+      "id": "3471bef1a7d5ea99",
+      "canonical_chord": "o",
+      "context": "claude-code interactive terminal | claude-code interactive terminal; From mode: NORMAL",
+      "entry_ids": [
+        "2495383dd73a371d",
+        "35f77c5f3256b8dc"
+      ]
+    },
+    {
+      "id": "ff43ac65ec938624",
+      "canonical_chord": "space",
+      "context": "claude-code interactive terminal",
+      "entry_ids": [
+        "01ad56e281a0893d",
+        "a5543f01b14a5d21"
+      ]
+    },
+    {
+      "id": "f6c3c417f7c5c943",
       "canonical_chord": "tab",
-      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "context": "Hermes interactive terminal | claude-code interactive terminal; Context: While autocomplete suggestions are showing in the prompt input, accepts the selected suggestion. On most permission prompts, with Yes or No focused, opens a comment field on that option, and pressing it again closes the field. See add a comment when you answer a permission prompt",
       "entry_ids": [
         "64ef3705734e84bc",
-        "b87f7e831970a0d5"
+        "8467d31a8f39cdb8"
+      ]
+    },
+    {
+      "id": "c526a163e36e4f98",
+      "canonical_chord": "up",
+      "context": "Hermes interactive terminal | claude-code interactive terminal",
+      "entry_ids": [
+        "1224ef88f09cdfdd",
+        "b3801cb4d82bafd0"
+      ]
+    },
+    {
+      "id": "07d9c7400d9988fd",
+      "canonical_chord": "v",
+      "context": "claude-code interactive terminal | claude-code interactive terminal; From mode: NORMAL",
+      "entry_ids": [
+        "0509a96dbc86c5cf",
+        "60b4acc75dff7333"
       ]
     }
   ],
@@ -22207,7 +22355,9 @@
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "0e2cda2d83afcfe9"
+      ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
         "kind": "default",
@@ -22231,7 +22381,10 @@
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "c9f49a750c76fa88",
+        "44084a45e4ff4521"
+      ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
         "kind": "default",
@@ -22256,7 +22409,7 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "d13d3d919ff240e4"
+        "18a35dc4c0c5b1bd"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -22281,7 +22434,9 @@
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "918ba1819950f499"
+      ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
         "kind": "default",
@@ -22306,7 +22461,7 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "3de88df0e2469708"
+        "a2979512c4ef6a95"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -22332,7 +22487,7 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "65e631ff9bee8760"
+        "abf25b8bbd84496b"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -22357,7 +22512,10 @@
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "fed180f2614fadcd",
+        "b4b19fee5354a5df"
+      ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
         "kind": "default",
@@ -22382,7 +22540,7 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "83f376238b53b5f1"
+        "b5d325d5aa6bb1e1"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -22407,7 +22565,10 @@
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "4de47be1e9f5b003",
+        "0dc6d88bd83a3501"
+      ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
         "kind": "default",
@@ -22455,7 +22616,9 @@
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "da27954ff26bcc0d"
+      ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
         "kind": "default",
@@ -22528,7 +22691,7 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "232130078e7142ad"
+        "f6c3c417f7c5c943"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -22553,7 +22716,10 @@
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "6b5a8f471c1a46fd",
+        "c526a163e36e4f98"
+      ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
         "kind": "default",
@@ -22578,7 +22744,7 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "6004520b7a4bc772"
+        "641a71ea98187943"
       ],
       "source": "local source and Hermes interactive controls",
       "provenance": {
@@ -24053,6 +24219,318 @@
       }
     },
     {
+      "id": "ddea9dcf17fa6288",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/add-dir",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Add a working directory for file access during the current session. Type a partial path to see matching directory suggestions; press Tab to accept one. Most .claude/ configuration isn't discovered from the added directory. You can't add most network paths, such as servershare. After a successful add, your DirectoryAdded hooks run. When you run it while Claude is responding, Claude Code asks you to confirm the directory right away, and once you confirm, Claude's next tool call in the same turn can access it. Before v2.1.234, Claude Code queued the command until the turn finished",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "d2f3ffe08c6535c9",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/advisor",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Enable or disable the advisor tool, which consults a second model for guidance at key moments during a task. Accepts fable, opus, sonnet, or a full model ID. fable requires Fable access. Without an argument, opens a picker. In a session without an interactive terminal, or over Remote Control, pass the model or off as an argument; with no argument there, the command prints the current advisor as text. These forms require Claude Code v2.1.260 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "8046a5611925bc99",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/agents",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "As of v2.1.198, running /agents prints a reminder to ask Claude to create or manage subagents, or to edit .claude/agents/ or ~/.claude/agents/ directly. On v2.1.197 and earlier, opens an interactive interface for creating and managing subagent configurations",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f6d5de6b4ac884fb",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "capture-and-input",
+      "category": "All commands",
+      "command": "/artifacts",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "List the artifacts you own or that are shared with you, then attach one to the session, open it in your browser, or copy its link. Available where artifacts are. Requires Claude Code v2.1.208 or later; attaching with Enter requires v2.1.216",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "7eea559821c5d857",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/auto-mode-setup",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Draft autoMode.environment entries from your project and recent sessions, then review the draft and save it to your user settings. Requires a Pro, Max, or Team plan and Claude Code v2.1.228 or later. On native Windows, requires v2.1.233 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "fb58fa4a80ae6458",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/autocompact",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Set the auto-compact window: how full the context window gets before Claude Code compacts automatically. Pass a size such as 500k, or auto to return to the window tuned for your model. Claude Code saves the value to user settings and applies it to the current session. See Set the auto-compact window for accepted values and what overrides it. Without an argument, opens a dialog that shows the current window. Requires Claude Code v2.1.221 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "b073ae1627b60ede",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/autofix-pr",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Spawn a Claude Code on the web session that watches the current branch's PR and pushes fixes when CI fails or reviewers leave comments. Detects the open PR from your checked-out branch with gh pr view; to watch a different PR, check out its branch first. By default the cloud session is told to fix every CI failure and review comment; pass a prompt to give it different instructions, for example /autofix-pr only fix lint and type errors. Requires the gh CLI and access to Claude Code on the web",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "7624313945096cee",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/background",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Detach the current session to run as a background agent and free this terminal. Pass a prompt to send one more instruction before detaching. Monitor the session with claude agents. To copy the conversation into a new background session while this one keeps running, use /fork. Alias: /bg",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "79523f38ea377429",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/batch",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Orchestrate large-scale changes across a codebase in parallel. Researches the codebase, decomposes the work into 5 to 30 independent units, and presents a plan. Once approved, spawns one background subagent per unit in an isolated git worktree. Each subagent implements its unit, runs tests, and opens a pull request. Requires a git repository. Example: /batch migrate src/ from JavaScript to TypeScript",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f7558bf62aba7395",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/branch",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Create a branch of the current conversation at this point, so you can try a different direction without losing the conversation as it stands. Switches you into the branch and preserves the original, which you can return to with /resume. To run a copy as a separate background session instead of switching into it, use /fork; to hand a side task to a subagent that reports back into this conversation, use /subtask",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "64965e4362cfeb04",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/btw",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Ask a side question about the current session without adding to the conversation. If you run /btw without a question, Claude Code shows your most recent side question so you can browse earlier answers; if you haven't asked one yet, Claude Code prints a usage line. Before v2.1.212, /btw required a question",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "68b4b624e0ab6314",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/bug",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Report a bug or share your conversation. You choose how much session history to include and confirm on a consent screen before anything is sent. When you're signed in to Anthropic on a first-party connection, the report goes to Anthropic; on a third-party provider, or without Anthropic credentials, Claude Code writes the report to a local archive under ~/.claude/feedback-bundles/ that you forward yourself. In the VS Code extension, /bug opens the extension's own feedback dialog instead; requires Claude Code v2.1.229 or later. When you run it while Claude is responding, Claude Code opens the dialog immediately. Before v2.1.232, Claude Code queued the command until the turn finished. Alias: /share. Before v2.1.212, /bug and /share were aliases of /feedback",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "8b4b5d10f0d7b343",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/cd",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Move this session to a new working directory, keeping the conversation. Type a partial path to see matching directory suggestions; press Tab to accept one. The suggestions require Claude Code v2.1.206 or later. For what Claude Code applies from the new directory as soon as you move, and how /cd differs from /add-dir, see Move the session to another directory",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "5bd7bc593d16a9a2",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24063,6 +24541,102 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Configure Claude in Chrome settings",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "935406591f5a0b6f",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/claude-api",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Load Claude API and Managed Agents reference material for your project's language. Also activates automatically when your code imports anthropic or @anthropic-ai/sdk. Run migrate to update existing Claude API code to a newer model. Run upgrade to move your project's Anthropic SDK dependency across a major version, currently the Python anthropic package from 0.x to 1.x. Run managed-agents-onboard for a walkthrough that creates a new Managed Agent. Run prompt-audit to flag instructions written for older models in your prompts, skills, and tool descriptions and propose fixes as a diff. Run cost-optimize to profile where your project's Claude API spend goes and propose savings from options such as prompt caching, trimming unneeded input and output tokens, batch processing, effort, and model choice, one change at a time. Run build-eval to build an eval set for your Claude-powered app, and hillclimb to iteratively improve the app against an existing eval. The prompt-audit subcommand requires Claude Code v2.1.221 or later, upgrade requires v2.1.236 or later, cost-optimize requires v2.1.247 or later, and build-eval and hillclimb require v2.1.259 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "1419a6f1f5598a3e",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/clear",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Start a new conversation with empty context. Pass a name to label the previous conversation in the /resume picker. To free up context while continuing the same conversation, use /compact instead. Resume the previous conversation with /resume, or, in the same Claude Code process, restore it from the rewind menu's previous-session entry. The rewind entry requires Claude Code v2.1.191 or later. Aliases: /reset, /new",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "e3216d02de1b1eae",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/code-review",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Review the current diff, or a PR number, branch, or path you pass, for correctness bugs and cleanup opportunities. Pass --fix to apply findings, --comment to post them on the GitHub PR or GitLab merge request, or ultra to run a deep cloud review. Posting to a GitLab merge request requires Claude Code v2.1.257 or later. With ultra on a github.com PR target, pass --post to preselect posting the finished findings to the PR in the launch dialog; --post requires Claude Code v2.1.227 or later. See Review a diff locally for the effort levels, targeting, and how it relates to /simplify. Alias: /review",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "5d2c9d6a24d6b980",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "development",
+      "category": "All commands",
+      "command": "/color",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Set the prompt bar color for the current session. Available colors: red, blue, green, yellow, purple, orange, pink, cyan. Use default to reset, or run with no argument to pick a random color. When Remote Control is connected, the color syncs to claude.ai/code. Also available in non-interactive mode (-p); requires Claude Code v2.1.205 or later",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24101,6 +24675,102 @@
       }
     },
     {
+      "id": "5fe1800eef4ff6cb",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/config",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Open the Settings interface to adjust theme, model, output style, and other preferences. From v2.1.181, pass one or more key=value pairs to set a setting directly without opening the interface, for example /config thinking=false. From v2.1.182, named shorthand keys are also accepted, such as /config theme=dark or /config model=sonnet. The key=value form also works in non-interactive mode (-p) and from the Claude mobile app via Remote Control. The key=value form can't turn on a setting that needs your confirmation in the panel, such as autoContinueAtUsageLimit, though it can turn one off. Run /config --help to list the keys it accepts. Alias: /settings",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "7663d815fc2a1583",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/context",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Visualize current context usage as a colored grid. Shows optimization suggestions for context-heavy tools, memory bloat, and capacity warnings. When the conversation exceeds the context window, the output includes a warning showing how far over the limit you are and which command frees space. In fullscreen mode, /context collapses the per-item breakdown to keep the grid visible. Pass all to expand it",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f167c31b50474440",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/copy",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Copy the last assistant response to clipboard. Pass a number N to copy the Nth-latest response: /copy 2 copies the second-to-last. When code blocks are present, shows an interactive picker to select individual blocks or the full response. Press w in the picker to write the selection to a file instead of the clipboard, which is useful over SSH",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "baed20e750ea91e8",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/cost",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Alias for /usage",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "288da2b8d6c75486",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24111,6 +24781,30 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Skill. Design guidance for charts, graphs, and dashboards. Claude picks the chart form for the data, assigns color by role, validates the palette for colorblind safety and contrast with a bundled script, and applies mark, interaction, and accessibility rules. Uses a brand-neutral placeholder palette that you replace with your own. Requires Claude Code v2.1.198 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "bafcac8a7ded917b",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/debug",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Enable debug logging for the current session and troubleshoot issues by reading the session debug log. Debug logging is off by default unless you started with claude --debug, so running /debug mid-session starts capturing logs from that point forward. Optionally describe the issue to focus the analysis",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24149,6 +24843,102 @@
       }
     },
     {
+      "id": "c1c3a1e11dbd9615",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/design",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Draft UI mockups, screen flows, landing pages, or posters as artboards on one canvas, published as an artifact that runs a research preview of Claude Design's editor, for example /design a settings screen for a mobile banking app. Where saving is enabled for your account, you edit the artboards on the canvas and save to publish a new version; otherwise you view the draft and export it as PNG or PDF. Requires a session where artifacts are available and Claude Code v2.1.234 or later. Available on the Anthropic API. On Amazon Bedrock, Google Cloud's Agent Platform, Microsoft Foundry, and Claude Platform on AWS, artifacts aren't available, so the command is unavailable there",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f603eb3825ed5050",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "configuration",
+      "category": "All commands",
+      "command": "/design-login",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Authorize design-system access for /design-sync with your claude.ai account",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "afcf5d45af337774",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/design-sync",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Convert your repo's React design system and upload it to Claude Design, so designs it produces use your real components. Optionally name the design system, for example /design-sync Acme DS. A first-time sync verifies every component and can take a few hours on a large repo. Available on the Anthropic API. It needs claude.ai, which the CLI doesn't contact on Amazon Bedrock, Google Cloud's Agent Platform, Microsoft Foundry, or Claude Platform on AWS, or through a Claude apps gateway, so the command is unavailable there",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f185b41cc40567d5",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "sessions-and-navigation",
+      "category": "All commands",
+      "command": "/desktop",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Continue the current session in the Claude Code Desktop app. Requires macOS or x64 Windows and a Claude subscription. Alias: /app",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "96a06322fd44adb2",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24159,6 +24949,78 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Review the changes in your working tree, including the edits Claude has made so far. See Review changes with /diff",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "e8336566eaaa8a68",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/doctor",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Run a setup checkup that diagnoses issues and can fix them. Checks installation health, including duplicate or leftover installs, PATH problems, and unparseable settings files. Finds unused skills, MCP servers, and plugins versus their context cost, flags slow hooks, and checks for a newer version on your release channel. Deduplicates local CLAUDE.md files against checked-in ones, trims checked-in CLAUDE.md files by cutting content Claude could derive from the codebase, and migrates the always-loaded guidance that remains into skills and nested CLAUDE.md files that load on demand. Also offers to make auto mode your default and to pre-approve frequently denied read-only commands. Reports findings first and asks for confirmation before changing anything. From the terminal, claude doctor prints read-only installation diagnostics without starting a session. Alias: /checkup. The CLAUDE.md trim check requires Claude Code v2.1.206 or later. Before v2.1.205, /doctor opened a read-only diagnostics screen and pressing f sent the report to Claude",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "63a8cabd0035be9a",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/effort",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Set the effort level: low to xhigh, max, ultracode, or auto; status prints it. max and ultracode are session-only; the ultracode key persists. Run it while Claude is responding and, once you confirm the cache warning, if Claude Code shows one, Claude Code applies the new level to the next request in that turn. Before v2.1.242, Claude Code decided from a feature flag it fetched from Anthropic whether to run the command mid-turn or queue it until the turn finished, and always queued it in a session that doesn't fetch feature flags, such as on a third-party provider. Works in -p outside the effort hold",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "793b592a77ab6cba",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/exit",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Exit the CLI. In an attached background session, this detaches and the session keeps running. Alias: /quit",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24185,6 +25047,174 @@
       "description": "Export the current conversation as plain text. With a filename, writes directly to that file. Without, opens a dialog to copy to clipboard or save to a file",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "c360598586021ee0",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/fast",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Toggle fast mode on or off. Run it while Claude is responding and Claude Code toggles fast mode without waiting for the turn to end, though the running turn finishes at its original speed. Before v2.1.242, Claude Code decided from a feature flag it fetched from Anthropic whether to run the command mid-turn or queue it until the turn finished, and always queued it in a session that doesn't fetch feature flags. Availability in non-interactive mode with -p is limited; see Toggle fast mode. Requires Claude Code v2.1.205 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "de98f9a49183ba63",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/feedback",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Send product feedback about Claude Code. Opens the same dialog as /bug, with the same consent step, sending rules, and mid-turn behavior. In sessions with Claude-drafted feedback, /feedback with no argument opens the drafts queue instead, where you review, edit, send, or discard the drafts Claude queued; the queue includes an option to write a new report in the dialog. With an argument, and for /bug always, the dialog opens directly",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "a6464de4656589e8",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/fewer-permission-prompts",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "830addd9765ab60e",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/focus",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Toggle the focus view, which shows only your last prompt, a one-line tool-call summary with edit diffstats, and the final response. The tool-call summary also counts the subagents launched in the turn and collapses completed background-task notifications into a single count. The selection persists across sessions; set viewMode in settings to override it. Only available in fullscreen rendering. The VS Code extension offers its own Focus view as a command-menu toggle, stored as an extension setting, independent of viewMode",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "b7db029b76d52234",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/fork",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Copy the current conversation into a new background session and keep working here. Pass a prompt and the copy starts working on it immediately; without one it waits in agent view for its first prompt. Except when the copy edits in place, Claude Code instructs it to create a worktree of its own before making code changes; the isolation instruction requires Claude Code v2.1.221 or later. To hand a side task to a subagent whose result comes back into this conversation, use /subtask; to switch into a copy yourself, use /branch. Requires Claude Code v2.1.212 or later; on v2.1.161 through v2.1.211, and whenever agent view is turned off, /fork starts a forked subagent instead",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "702cf1efb35a4406",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "debug-and-recover",
+      "category": "All commands",
+      "command": "/goal",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Set a goal: Claude keeps working across turns until the condition is met or the goal clears for another reason. With no argument, shows the current or most recently achieved goal. clear, stop, off, reset, none, or cancel removes an active goal early",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "b2f61400df967129",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/heapdump",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Write a JavaScript heap snapshot and a memory breakdown to ~/Desktop, or your home directory on Linux without a Desktop folder, for diagnosing high memory usage. Attach only the -diagnostics.json file when reporting a memory issue; the .heapsnapshot contains your full conversation and credentials, so don't share it. Hidden from the command menu; type it in full. See what to do with the output",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
       "destructive": false,
       "available": true,
       "conflict_ids": [],
@@ -24255,6 +25285,54 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Manage IDE integrations and show status",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "397135b81dbd9cae",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/import",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Bring configuration from OpenAI Codex, Google Gemini CLI, or Cursor on your machine into Claude Code, including instruction files, MCP servers, commands, subagents, and skills. In non-interactive mode with -p, /import lists what it found and gives you the command that confirms the import. Add --dry-run to preview without writing anything, or --yes to skip the interactive picker. Not available on Amazon Bedrock, Google Cloud's Agent Platform, Microsoft Foundry, or Claude Platform on AWS, or through a Claude apps gateway. Also unavailable when you turn off feature-flag fetching. Requires Claude Code v2.1.213 or later. Importing from Cursor requires v2.1.265 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "6589ee1cb2c2c3d3",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/init",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Initialize project with a CLAUDE.md guide. Set CLAUDE_CODE_NEW_INIT=1 for an interactive flow that also walks through skills, hooks, and personal memory files. If /init finds OpenAI Codex or Google Gemini CLI configuration, it offers to carry it over with /import",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24365,6 +25443,30 @@
       }
     },
     {
+      "id": "8eda99a0e33a8407",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/list-agents",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "List the subagents, agent team teammates, and other Claude Code sessions Claude can message, with the name to use for each. See cross-session messaging. Also available as /peers. Requires Claude Code v2.1.224 or later; earlier versions report Unknown command: /list-agents. Teammate rows and the first line showing this session's own name require v2.1.239 or later. Available only in sessions where cross-session messaging is enabled",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "20e244751455ee4c",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24413,6 +25515,126 @@
       }
     },
     {
+      "id": "46f6b93259b598b3",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/loop",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Run a prompt repeatedly while the session stays open. Omit the interval and Claude self-paces between iterations. Omit the prompt and Claude runs the built-in maintenance prompt or your loop.md. Example: /loop 5m check if the deploy finished. See Run prompts on a schedule. Alias: /proactive",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "996be04c9a69f27d",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "configuration",
+      "category": "All commands",
+      "command": "/mcp",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Manage MCP server connections and OAuth authentication. Run with no argument to open the interactive list, pass reconnect to reconnect one disconnected server, or pass enable/disable with a server name or all to change connection state without opening the dialog. Also available in non-interactive mode (-p), where running it with no argument prints a text summary of server status instead of opening the list; requires Claude Code v2.1.205 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "c2d7c2a41f3e68d3",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/memory",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Edit CLAUDE.md files, enable or disable auto memory, and view auto memory entries",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "261730445a702cf5",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "development",
+      "category": "All commands",
+      "command": "/mobile",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Show QR code to download the Claude mobile app. Aliases: /ios, /android",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "99e9f16eb702af15",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/model",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Switch the AI model and save it as your default for new sessions. For models that support it, use left/right arrows to adjust effort level. With no argument, opens a picker; press s on a row to switch for the current session only. See when Claude Code asks you to confirm the switch. Once you confirm the switch, if Claude Code asks, Claude Code applies the change without waiting for the current response to finish. Before v2.1.242, Claude Code decided from a feature flag it fetched from Anthropic whether to run the command mid-turn or queue it until the turn finished, and always queued it in a session that doesn't fetch feature flags, such as on a third-party provider. Also available in non-interactive mode (-p) with a model argument instead of the picker, where it applies to the current session only and isn't saved as your default; requires Claude Code v2.1.205 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "36b6e06ed060cfd3",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24423,6 +25645,78 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Share a free week of Claude Code with friends. Only visible if your account is eligible",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "25b9125458965054",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/permissions",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Manage allow, ask, and deny rules for tool permissions. Opens an interactive dialog where you can view rules by scope, add or remove rules, manage working directories, and review recent auto mode denials. You can also view and edit auto mode classifier rules from the dialog's Auto mode tab. When you run it while Claude is responding, Claude Code opens the dialog immediately and applies your changes starting with Claude's next tool call in the same turn. Before v2.1.234, Claude Code queued the command until the turn finished. Alias: /allowed-tools",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "a3cd61fc133dc7d3",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "help-and-reference",
+      "category": "All commands",
+      "command": "/plan",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Enter plan mode directly from the prompt. Pass an optional description to enter plan mode and immediately start with that task, for example /plan fix the auth bug",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "2b06bd7d0f13a537",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "configuration",
+      "category": "All commands",
+      "command": "/plugin",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Manage Claude Code plugins. Run with no argument to open the plugin menu, or pass a subcommand such as list, install, enable, or disable to act directly. Claude Code can activate a plugin during the install; the install summary tells you whether it did or whether to run /reload-plugins",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24450,6 +25744,30 @@
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "34cc3e5e45e8b9fe",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "sessions-and-navigation",
+      "category": "All commands",
+      "command": "/pr-comments",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Removed in v2.1.91. Ask Claude directly to view pull request comments instead. On earlier versions, fetches and displays comments from a GitHub pull request; automatically detects the PR for the current branch, or pass a PR URL or number. Requires the gh CLI",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
       "available": true,
       "conflict_ids": [],
       "source": "official: https://code.claude.com/docs/en/commands.md",
@@ -24581,6 +25899,30 @@
       }
     },
     {
+      "id": "c603531ed15dc82a",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/reload-plugins",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Reload all active plugins to apply pending changes without restarting. Reports counts for each reloaded component and flags any load errors. When the reload would change which MCP tools are loaded and invalidate the prompt cache, the command warns and skips unless you pass --force. Also available in non-interactive mode (-p), the Agent SDK, and the desktop app, where it runs only on input typed directly into the session and doesn't apply plugin MCP server changes; requires Claude Code v2.1.260 or later. See Apply plugin changes without restarting",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "51e4d5a4d688481c",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24605,6 +25947,30 @@
       }
     },
     {
+      "id": "deb0fd188a0a8c13",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "development",
+      "category": "All commands",
+      "command": "/remote-control",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Make this session available for Remote Control from claude.ai. Running it while signed out prints that Remote Control requires a claude.ai subscription and tells you how to sign in; before v2.1.206 it reported Unknown command: /remote-control. Alias: /rc",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "3606f8d9e9d06103",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24615,6 +25981,102 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Choose the default environment for cloud agents",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "14bf5ef1ab85e249",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/rename",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Rename the current session and show the name on the prompt bar. Without a name, auto-generates one from conversation history. Also available in non-interactive mode (-p); requires Claude Code v2.1.205 or later. From every rename surface, including claude.ai and the desktop app, Claude Code replaces control and invisible characters in the new name with spaces and caps the name at 200 characters. If the name is empty once invisible characters are removed, Claude Code rejects it and shows That name is empty once invisible characters are removed. Usage: /rename . The character replacement and length cap require Claude Code v2.1.221 or later. If another live session on this machine already uses a name you pass, Claude Code applies a variant of it instead",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "7a28fc9f8f6f2116",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/resume",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Resume a conversation by ID or name, or open the session picker. Background sessions appear in the picker marked with bg; one that is still running can't be resumed here, so attach to it from claude agents or stop it there first. Alias: /continue",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "c46cfa3ca7e129ad",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/review",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Alias of /code-review: reviews the current diff, or a PR number, branch, or path you pass, such as /review 1234, and takes the same effort levels and flags. With no level given, the review reuses the last low through max level you typed; see Review a diff locally for the exact rules. For a deep cloud review, use /code-review ultra. Before v2.1.223, /review was a separate command that ran a single-pass, read-only review of a GitHub pull request by number, listing open PRs to pick from when run with no argument; from v2.1.186 through v2.1.201, it ran the same multi-agent engine as /code-review medium",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "51b28bc2c13c4a43",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "debug-and-recover",
+      "category": "All commands",
+      "command": "/rewind",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Rewind the conversation and/or code to a previous point, or summarize from a selected message. See checkpointing. Aliases: /checkpoint, /undo",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24653,6 +26115,30 @@
       }
     },
     {
+      "id": "cbf9590264b69843",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/run-skill-generator",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Teach /run and /verify how to build, launch, and drive your project's app from a clean environment by writing a per-project skill",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "c9c000db344149eb",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24663,6 +26149,30 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Toggle sandbox mode. Available on supported platforms only",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "c8f63dd67becc2b1",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "development",
+      "category": "All commands",
+      "command": "/schedule",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Create, update, list, or run routines, which execute in the cloud. Claude walks you through the setup conversationally. You can also ask about a routine's recent runs. Alias: /routines",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24701,6 +26211,102 @@
       }
     },
     {
+      "id": "f59f16c2fdf2e3d5",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/security-review",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Analyze the changes on your current branch for security vulnerabilities. Reviews the diff between your branch and origin's default branch, identifying risks like injection, auth issues, and data exposure. Needs an origin remote; if the review fails with an ambiguous argument error, see the error reference",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "89503424ec11b2e6",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/setup-bedrock",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Configure Amazon Bedrock authentication, region, and model pins through an interactive wizard. Hidden from the command menu until CLAUDE_CODE_USE_BEDROCK=1 is set; type it in full. First-time Amazon Bedrock users can also access this wizard from the login screen",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "61e02d569ac7fdf9",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/setup-vertex",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Configure Google Cloud's Agent Platform authentication, project, region, and model pins through an interactive wizard. Hidden from the command menu until CLAUDE_CODE_USE_VERTEX=1 is set; type it in full. First-time Google Cloud's Agent Platform users can also access this wizard from the login screen",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "16aecc921ff6f204",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/simplify",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Skill. Review the changed code for cleanup opportunities and apply the fixes. Four review agents run in parallel, covering reuse of existing helpers, simplification, efficiency, and whether the change is at the right level of abstraction. The review doesn't look for correctness bugs. Use /code-review to find bugs. Pass a path or PR reference to review a specific target",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "1ff40e982ec32f75",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24714,6 +26320,78 @@
       "context": "claude-code interactive terminal",
       "safety_level": "red",
       "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "d406371004982f44",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "context-and-memory",
+      "category": "All commands",
+      "command": "/skills",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "List available skills. Type to filter the list by name, description, or source. Press t to sort by token count, Space or Enter to cycle a skill's visibility to Claude and the / menu, and Esc to save and close. You can't cycle plugin skills, skills whose frontmatter sets disable-model-invocation: true, or skills with a skillOverrides entry in managed settings or the --settings flag",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "293defd536a0e826",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/stats",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Alias for /usage. Opens on the Stats tab",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "fc2b76b3ed7b8b40",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/status",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Open the Settings interface on the Status tab, showing version, model, account, and connectivity. A Session kind row reads background job · attached or background job · unattended in a background session, depending on whether a terminal is attached, and interactive in any other session. Before v2.1.221, /status didn't show this row. Works while Claude is responding",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
       "available": true,
       "conflict_ids": [],
       "source": "official: https://code.claude.com/docs/en/commands.md",
@@ -24773,6 +26451,78 @@
       }
     },
     {
+      "id": "9f54993c32848cd0",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/stop",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Stop the current background session. Only available while attached to a background session; the transcript and any worktree are kept. To detach without stopping, use /exit or press ←",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "13722bede0ef21e5",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/subtask",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Spawn a forked subagent: a background subagent that inherits the full conversation and works on the task while you keep working. Its result returns to this conversation when it finishes. To copy the conversation into a separate background session instead, use /fork. Requires Claude Code v2.1.212 or later; on v2.1.161 through v2.1.211 this command is /fork. When agent view is turned off, /subtask isn't available and /fork keeps the forked-subagent behavior",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ea251688197604dd",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/tasks",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "View and manage background work in the current session, including subagents that have finished. Also available as /bashes",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "64c8f39c9f69270b",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24783,6 +26533,102 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Generate a team onboarding guide from your Claude Code usage history. Claude analyzes your sessions, commands, and MCP server usage from the past 30 days and produces a markdown guide a teammate can paste as a first message to get set up quickly. For claude.ai subscribers on Pro, Max, Team, and Enterprise plans, also returns a share link teammates can open directly in Claude Code",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "82b05cd0e09e5dcc",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "development",
+      "category": "All commands",
+      "command": "/teleport",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Pull a Claude Code on the web session into this terminal. Opens a picker, then fetches the branch and conversation. Also available as /tp. Requires a claude.ai subscription",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "cc60f4c65126301e",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "capture-and-input",
+      "category": "All commands",
+      "command": "/terminal-setup",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Install a Shift+Enter keybinding for newlines in VS Code, Cursor, Devin Desktop, Alacritty, or Zed. In Apple Terminal, enable Option+Enter for newlines and turn off the audible bell instead. In iTerm2, turn on clipboard access so that /copy works",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "57cbf171966301a2",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "parallel-agents",
+      "category": "All commands",
+      "command": "/theme",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Change the color theme. Includes an auto option that matches your terminal's light or dark background, light and dark variants, colorblind-accessible (daltonized) themes, ANSI themes that use your terminal's color palette, and any custom themes from ~/.claude/themes/ or plugins. Select New custom theme… to create one",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "be3c973b99c6bc05",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "development",
+      "category": "All commands",
+      "command": "/tui",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Set the terminal UI renderer and relaunch into it with your conversation intact. fullscreen enables the flicker-free alt-screen renderer. With no argument, prints the active renderer",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24821,6 +26667,30 @@
       }
     },
     {
+      "id": "6b08e855a372426c",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "review-and-verify",
+      "category": "All commands",
+      "command": "/ultrareview",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Run a deep, multi-agent code review in a cloud sandbox with ultrareview. Pass a PR reference to review that pull request, or a branch name to change the comparison base. The preferred invocation is now /code-review ultra, and /ultrareview remains as an alias. Includes 3 free runs on Pro and Max, then requires usage credits",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "83456f688228f69b",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24833,6 +26703,54 @@
       "description": "Open the upgrade page in your browser to switch to a higher plan tier. When the browser fails to open, the command shows a sign-in prompt without printing the URL",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "550c96aeeb0b5ce8",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/usage",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Show session cost, plan usage limits, and activity stats. On a Pro, Max, Team, or Enterprise plan, includes a breakdown of what counts against your plan limits. /cost and /stats are aliases",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "65693d72d3338944",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "models-and-performance",
+      "category": "All commands",
+      "command": "/usage-credits",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Configure usage credits, or request them from your admin, when you hit a limit. Opens your usage-credits billing settings in the browser, except that Team and Enterprise members without billing access instead send a usage-credits request to their admin from the CLI, after confirming in a dialog that the request notifies their admins. When no browser can open the billing page, for example over SSH, the command prints the URL to visit instead; this requires Claude Code v2.1.205 or later, and earlier versions showed nothing in that case. Previously /extra-usage",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
       "destructive": false,
       "available": true,
       "conflict_ids": [],
@@ -24869,6 +26787,30 @@
       }
     },
     {
+      "id": "41f2b5e374cb3f02",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "sessions-and-navigation",
+      "category": "All commands",
+      "command": "/vim",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Removed in v2.1.92. To toggle between Vim and Normal editing modes, use /config → Editor mode",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "ddce16545a299073",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -24879,6 +26821,30 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Toggle voice dictation, or enable it in a specific mode. Requires a Claude.ai account",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "140fbbd55e495f86",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "development",
+      "category": "All commands",
+      "command": "/web-setup",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Connect your GitHub account to Claude Code on the web using your local gh CLI credentials",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24941,7 +26907,7 @@
       }
     },
     {
-      "id": "ab4b1a544656fdb0",
+      "id": "fc9c44f92abc77f1",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -24951,12 +26917,12 @@
       "canonical_chord": "ctrl+c",
       "aliases": [],
       "description": "Interrupt, or clear input",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Interrupts a running operation. If nothing is running, the first press clears the prompt input and a second press exits Claude Code",
       "safety_level": "green",
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "d13d3d919ff240e4"
+        "18a35dc4c0c5b1bd"
       ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
@@ -24967,7 +26933,7 @@
       }
     },
     {
-      "id": "3039bbde3016c641",
+      "id": "4a26c1f27b918e45",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -24977,7 +26943,7 @@
       "canonical_chord": "ctrl+x ctrl+k",
       "aliases": [],
       "description": "Stop all running background subagents in this session, and turn off artifact auto-replies for the rest of it. Press twice within 3 seconds to confirm",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Subagent control",
       "safety_level": "green",
       "destructive": false,
       "available": true,
@@ -24991,7 +26957,60 @@
       }
     },
     {
-      "id": "ac146ad73cdce9b4",
+      "id": "ae6362f60c3c7b99",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "development",
+      "category": "General controls",
+      "command": "Ctrl+D",
+      "canonical_chord": "ctrl+d",
+      "aliases": [],
+      "description": "Exit Claude Code session",
+      "context": "claude-code interactive terminal; Context: The first press shows a confirmation hint and a second press within 800ms exits. When the prompt has text, Ctrl+D deletes the character after the cursor instead",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "918ba1819950f499"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "bc51ae7f5a1c707f",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "development",
+      "category": "General controls",
+      "command": "Ctrl+G or Ctrl+X Ctrl+E",
+      "canonical_chord": "ctrl+g / ctrl+x ctrl+e",
+      "aliases": [],
+      "description": "Open in default text editor",
+      "context": "claude-code interactive terminal; Context: Edit your prompt or custom response in your default text editor. Ctrl+X Ctrl+E is the readline-native binding. Turn on Show last response in external editor in /config to prepend Claude's previous reply as #-commented context above your prompt; Claude Code strips the comment block when you save",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "fed180f2614fadcd",
+        "b4b19fee5354a5df"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "07f7704063792159",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25001,12 +27020,12 @@
       "canonical_chord": "ctrl+l",
       "aliases": [],
       "description": "Redraw or clear the screen",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Forces a full terminal redraw, keeping input and conversation history. Use this to recover if the display becomes garbled or partially blank. In fullscreen rendering, it also clears the screen, and you can scroll up to see the earlier messages",
       "safety_level": "green",
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "3de88df0e2469708"
+        "a2979512c4ef6a95"
       ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
@@ -25017,7 +27036,31 @@
       }
     },
     {
-      "id": "094617e9923cee74",
+      "id": "966dae7fed4d2254",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "General controls",
+      "command": "Ctrl+O",
+      "canonical_chord": "ctrl+o",
+      "aliases": [],
+      "description": "Toggle transcript viewer",
+      "context": "claude-code interactive terminal; Context: Shows detailed tool usage and execution, with a timestamp and the model used on each assistant message. Also expands lines that collapse by default, such as MCP calls, shown as a single Called slack 3 times line, and messages from your other sessions, shown as a one-line Message from @ preview",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "db050438eb11202d",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25027,12 +27070,12 @@
       "canonical_chord": "ctrl+r",
       "aliases": [],
       "description": "Reverse search command history",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Search through previous commands interactively",
       "safety_level": "green",
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "65e631ff9bee8760"
+        "abf25b8bbd84496b"
       ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
@@ -25043,7 +27086,34 @@
       }
     },
     {
-      "id": "2933e25734737fe6",
+      "id": "6caf04e2b3ef3ae6",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "sessions-and-navigation",
+      "category": "General controls",
+      "command": "Ctrl+V or Cmd+V (iTerm2) or Alt+V (Windows and WSL)",
+      "canonical_chord": "ctrl+v / super+v / alt+v",
+      "aliases": [],
+      "description": "Paste image from clipboard",
+      "context": "claude-code interactive terminal; Context: Inserts an [Image #N] chip at the cursor so you can reference it positionally in your prompt. On WSL, both Ctrl+V and Alt+V are bound; use Alt+V if your terminal intercepts Ctrl+V",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "4de47be1e9f5b003",
+        "0dc6d88bd83a3501"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "2aa00b4cb1adf0ba",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25053,12 +27123,12 @@
       "canonical_chord": "ctrl+b",
       "aliases": [],
       "description": "Background running tasks",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Backgrounds Bash commands and agents. Tmux users press twice",
       "safety_level": "green",
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "6004520b7a4bc772"
+        "641a71ea98187943"
       ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
@@ -25069,7 +27139,33 @@
       }
     },
     {
-      "id": "e3f97d6a73224680",
+      "id": "977abbcf4ad4f452",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "General controls",
+      "command": "Ctrl+T",
+      "canonical_chord": "ctrl+t",
+      "aliases": [],
+      "description": "Toggle Claude's task checklist",
+      "context": "claude-code interactive terminal; Context: Show or hide Claude's to-do checklist in the status area. This is not the background-task view; use /tasks to see running shells and subagents",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "da27954ff26bcc0d"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "a131dec2a766087d",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25079,12 +27175,12 @@
       "canonical_chord": "ctrl+s",
       "aliases": [],
       "description": "Stash or restore prompt",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: With text in the input, stashes it and clears the prompt. Pressed again on an empty prompt, restores the stashed text, cursor position, and pasted content",
       "safety_level": "green",
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "83f376238b53b5f1"
+        "b5d325d5aa6bb1e1"
       ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
@@ -25095,7 +27191,31 @@
       }
     },
     {
-      "id": "c0d3128024e3419e",
+      "id": "e0d5987452d42883",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "development",
+      "category": "General controls",
+      "command": "Ctrl+Z",
+      "canonical_chord": "ctrl+z",
+      "aliases": [],
+      "description": "Suspend Claude Code",
+      "context": "claude-code interactive terminal; Context: Unix only. Suspends the process to your shell; run fg to resume",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "748c926e37cfa653",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25105,7 +27225,7 @@
       "canonical_chord": "left/right arrows",
       "aliases": [],
       "description": "Cycle through dialog tabs",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Navigate between tabs in permission dialogs and menus",
       "safety_level": "green",
       "destructive": false,
       "available": true,
@@ -25119,7 +27239,7 @@
       }
     },
     {
-      "id": "b87f7e831970a0d5",
+      "id": "8467d31a8f39cdb8",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25129,12 +27249,12 @@
       "canonical_chord": "tab",
       "aliases": [],
       "description": "Accept an autocomplete suggestion, or add a comment to a permission answer",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: While autocomplete suggestions are showing in the prompt input, accepts the selected suggestion. On most permission prompts, with Yes or No focused, opens a comment field on that option, and pressing it again closes the field. See add a comment when you answer a permission prompt",
       "safety_level": "green",
       "destructive": false,
       "available": true,
       "conflict_ids": [
-        "232130078e7142ad"
+        "f6c3c417f7c5c943"
       ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
@@ -25145,17 +27265,115 @@
       }
     },
     {
-      "id": "535563e52f96c2ab",
+      "id": "60f34af830dcd09c",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "sessions-and-navigation",
+      "category": "General controls",
+      "command": "Up/Down arrows or Ctrl+P/Ctrl+N",
+      "canonical_chord": "up/down arrows / ctrl+p/ctrl+n",
+      "aliases": [],
+      "description": "Move cursor or navigate command history",
+      "context": "claude-code interactive terminal; Context: When the input spans more than one visual row, whether wrapped or multiline, first moves the cursor within the prompt. Once the cursor is on the first or last visual row, pressing again navigates command history. While you have messages queued, Up from the first row instead takes them back",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "cce73729c1f2e269",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "debug-and-recover",
+      "category": "General controls",
+      "command": "Esc",
+      "canonical_chord": "esc",
+      "aliases": [],
+      "description": "Interrupt Claude, or close a dialog",
+      "context": "claude-code interactive terminal; Context: Stop the current response or tool call mid-turn so you can redirect. Claude keeps the work done so far. If you have messages queued, Claude Code sends them next. When a dialog is open, Esc closes the dialog. On a permission prompt, Esc declines the action, the same as No without a comment",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "ed383a512baa0921"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "9f1641b053cf44cd",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "debug-and-recover",
+      "category": "General controls",
+      "command": "Esc + Esc",
+      "canonical_chord": "esc+esc",
+      "aliases": [],
+      "description": "Clear input draft, or rewind",
+      "context": "claude-code interactive terminal; Context: When the prompt input contains text, double Esc clears it and saves the draft to history so Up recalls it. When the input is empty, double Esc opens the rewind menu to restore or summarize code and conversation from a previous point",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "26668f374a2de1c6",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "sessions-and-navigation",
+      "category": "General controls",
+      "command": "Shift+Tab, or Alt+M on Windows when the Node or Bun runtime doesn't enable VT input mode",
+      "canonical_chord": "shift+tab / alt+super+m+on+when+the+node / bun runtime doesn't enable vt input mode",
+      "aliases": [],
+      "description": "Cycle permission modes",
+      "context": "claude-code interactive terminal; Context: Cycle through default (labeled Manual in the mode indicator), acceptEdits, plan, and, when available, bypassPermissions and then auto. From auto, the first press switches to default. See permission modes. On a file permission prompt, the same key closes an open comment field. With no field open, it selects the option that allows the action for the rest of the session, when the prompt offers that option",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "e2bfe5755422dc95",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
       "task_group": "models-and-performance",
       "category": "General controls",
       "command": "Option+P (macOS) or Alt+P (Windows/Linux)",
-      "canonical_chord": "alt+p (macos) or alt+p (windows/linux)",
+      "canonical_chord": "alt+p / alt+p",
       "aliases": [],
       "description": "Switch model",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Switch models without clearing your prompt",
       "safety_level": "green",
       "destructive": false,
       "available": true,
@@ -25169,17 +27387,17 @@
       }
     },
     {
-      "id": "6b72446f5d6620b3",
+      "id": "5269d1534fef9132",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
       "task_group": "sessions-and-navigation",
       "category": "General controls",
       "command": "Option+T (macOS) or Alt+T (Windows/Linux)",
-      "canonical_chord": "alt+t (macos) or alt+t (windows/linux)",
+      "canonical_chord": "alt+t / alt+t",
       "aliases": [],
       "description": "Toggle extended thinking",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Enable or disable extended thinking mode. Has no effect on Fable 5.1 or Fable 5, which always use extended thinking. Works on macOS without configuring Option as Meta",
       "safety_level": "green",
       "destructive": false,
       "available": true,
@@ -25193,17 +27411,17 @@
       }
     },
     {
-      "id": "f47e41afeb813ca3",
+      "id": "6439a4ba033aa1d2",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
       "task_group": "models-and-performance",
       "category": "General controls",
       "command": "Option+O (macOS) or Alt+O (Windows/Linux)",
-      "canonical_chord": "alt+o (macos) or alt+o (windows/linux)",
+      "canonical_chord": "alt+o / alt+o",
       "aliases": [],
       "description": "Toggle fast mode",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Enable or disable fast mode",
       "safety_level": "green",
       "destructive": false,
       "available": true,
@@ -25217,7 +27435,7 @@
       }
     },
     {
-      "id": "81f2f3f269279432",
+      "id": "b7f45e3e4aecbb35",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25227,7 +27445,7 @@
       "canonical_chord": "ctrl+a",
       "aliases": [],
       "description": "Move cursor to start of current line",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: In multiline input, moves to the start of the current logical line",
       "safety_level": "amber",
       "destructive": false,
       "available": true,
@@ -25241,7 +27459,7 @@
       }
     },
     {
-      "id": "a867c1081453b5dc",
+      "id": "140794a167b858c6",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25251,11 +27469,13 @@
       "canonical_chord": "ctrl+e",
       "aliases": [],
       "description": "Move cursor to end of current line",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: In multiline input, moves to the end of the current logical line",
       "safety_level": "amber",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "f048bc147d00912f"
+      ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
         "kind": "official",
@@ -25265,7 +27485,7 @@
       }
     },
     {
-      "id": "94b31f1573ce80bb",
+      "id": "c7a9c9ed10312a83",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25275,7 +27495,7 @@
       "canonical_chord": "ctrl+k",
       "aliases": [],
       "description": "Delete to end of line",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Stores deleted text for pasting",
       "safety_level": "red",
       "destructive": true,
       "available": true,
@@ -25289,17 +27509,65 @@
       }
     },
     {
-      "id": "55b47de6e7eb38be",
+      "id": "143522d9f228ad93",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Text editing",
+      "command": "Ctrl+U",
+      "canonical_chord": "ctrl+u",
+      "aliases": [],
+      "description": "Delete from cursor to line start",
+      "context": "claude-code interactive terminal; Context: Stores deleted text for pasting. Repeat to clear across lines in multiline input. On macOS, terminal emulators including iTerm2 and Terminal.app map Cmd+Backspace to this shortcut",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "b3ccc22e0991e4cc",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Text editing",
+      "command": "Ctrl+W",
+      "canonical_chord": "ctrl+w",
+      "aliases": [],
+      "description": "Delete back to previous whitespace",
+      "context": "claude-code interactive terminal; Context: Stores deleted text for pasting. One press removes a whole path or --flag=value. To delete only the previous word, press Option+Delete on macOS or Ctrl+Backspace on Windows",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ec360999b998be91",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
       "task_group": "capture-and-input",
       "category": "Text editing",
-      "command": "Alt+Y (after Ctrl+Y)",
-      "canonical_chord": "alt+y (after ctrl+y)",
+      "command": "Ctrl+Y",
+      "canonical_chord": "ctrl+y",
       "aliases": [],
-      "description": "Cycle paste history",
-      "context": "claude-code interactive terminal",
+      "description": "Paste deleted text",
+      "context": "claude-code interactive terminal; Context: Pastes the text you last deleted with one of the word or line deletion shortcuts, such as Ctrl+K, Ctrl+U, or Ctrl+W",
       "safety_level": "green",
       "destructive": false,
       "available": true,
@@ -25313,7 +27581,31 @@
       }
     },
     {
-      "id": "ce536b7df91415b9",
+      "id": "8b47c231b53366bc",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "capture-and-input",
+      "category": "Text editing",
+      "command": "Alt+Y (after Ctrl+Y)",
+      "canonical_chord": "alt+y",
+      "aliases": [],
+      "description": "Cycle paste history",
+      "context": "claude-code interactive terminal; Context: After pasting, cycle through previously deleted text. Requires Option as Meta on macOS",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "5f26b371ba796e4f",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25323,7 +27615,7 @@
       "canonical_chord": "alt+b",
       "aliases": [],
       "description": "Move cursor back one word",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Word navigation. Requires Option as Meta on macOS",
       "safety_level": "amber",
       "destructive": false,
       "available": true,
@@ -25337,7 +27629,7 @@
       }
     },
     {
-      "id": "a9557d8be55527b8",
+      "id": "e8d4c6ff9c2b8ab6",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25347,7 +27639,7 @@
       "canonical_chord": "alt+f",
       "aliases": [],
       "description": "Move cursor forward one word",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Moves to the end of the current word, or to the end of the next word when the cursor is between words. Requires Option as Meta on macOS",
       "safety_level": "amber",
       "destructive": false,
       "available": true,
@@ -25361,7 +27653,7 @@
       }
     },
     {
-      "id": "e57cf32dd5b7f008",
+      "id": "bf555a519da7f2ca",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
@@ -25371,7 +27663,7 @@
       "canonical_chord": "alt+d",
       "aliases": [],
       "description": "Delete to end of word",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Deletes to the end of the current word, or to the end of the next word when the cursor is between words. Stores deleted text for pasting. Requires Option as Meta on macOS",
       "safety_level": "red",
       "destructive": true,
       "available": true,
@@ -25385,17 +27677,17 @@
       }
     },
     {
-      "id": "7aba1231b4fa7eab",
+      "id": "d5e3acc2427325d9",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
       "task_group": "debug-and-recover",
       "category": "Text editing",
       "command": "Ctrl+_ or Ctrl+Shift+-",
-      "canonical_chord": "ctrl+_ or ctrl+shift+-",
+      "canonical_chord": "ctrl+_ / ctrl+shift+-",
       "aliases": [],
       "description": "Undo last input edit",
-      "context": "claude-code interactive terminal",
+      "context": "claude-code interactive terminal; Context: Restores the previous input text and cursor position",
       "safety_level": "green",
       "destructive": false,
       "available": true,
@@ -25409,21 +27701,23 @@
       }
     },
     {
-      "id": "ab3602761ecc360e",
+      "id": "79ff469e324ec089",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
-      "task_group": "development",
-      "category": "Multiline input",
-      "command": "Quick escape | + Enter",
-      "canonical_chord": "quick esc |  enter",
+      "task_group": "system-and-hardware",
+      "category": "Theme and display",
+      "command": "Ctrl+T",
+      "canonical_chord": "ctrl+t",
       "aliases": [],
-      "description": "Works in all terminals",
-      "context": "claude-code interactive terminal",
+      "description": "Toggle syntax highlighting for code blocks",
+      "context": "claude-code interactive terminal; Context: Only works inside the /theme picker menu. Controls whether code in Claude's responses uses syntax coloring",
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "da27954ff26bcc0d"
+      ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
         "kind": "official",
@@ -25433,17 +27727,17 @@
       }
     },
     {
-      "id": "06f00cdfc6a23289",
+      "id": "fbc293455e7bc856",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
       "task_group": "help-and-reference",
       "category": "Multiline input",
-      "command": "Option key | Option+Enter",
-      "canonical_chord": "alt+key+|+enter",
+      "command": "\\ + Enter",
+      "canonical_chord": "\\+enter",
       "aliases": [],
-      "description": "After enabling Option as Meta on macOS",
-      "context": "claude-code interactive terminal",
+      "description": "Quick escape",
+      "context": "claude-code interactive terminal; Context: Works in all terminals",
       "safety_level": "green",
       "destructive": false,
       "available": true,
@@ -25457,21 +27751,23 @@
       }
     },
     {
-      "id": "54dbc34ff75df550",
+      "id": "85c31daa2ffa80a5",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
-      "task_group": "sessions-and-navigation",
+      "task_group": "help-and-reference",
       "category": "Multiline input",
-      "command": "Shift+Enter | Shift+Enter",
-      "canonical_chord": "shift+enter | shift+enter",
+      "command": "Option+Enter",
+      "canonical_chord": "alt+enter",
       "aliases": [],
-      "description": "Native in iTerm2, WezTerm, Ghostty, Kitty, Warp, Apple Terminal, Windows Terminal. For other terminals, see Enter multiline prompts",
-      "context": "claude-code interactive terminal",
+      "description": "Option key",
+      "context": "claude-code interactive terminal; Context: After enabling Option as Meta on macOS",
       "safety_level": "green",
       "destructive": false,
       "available": true,
-      "conflict_ids": [],
+      "conflict_ids": [
+        "c9f49a750c76fa88"
+      ],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
         "kind": "official",
@@ -25481,16 +27777,210 @@
       }
     },
     {
-      "id": "be4d7822685c4657",
+      "id": "990d4e70623968b0",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
-      "task_group": "configuration",
+      "task_group": "help-and-reference",
       "category": "Multiline input",
-      "command": "Control sequence | Ctrl+J",
-      "canonical_chord": "ctrl+sequence+|+j",
+      "command": "Shift+Enter",
+      "canonical_chord": "shift+enter",
       "aliases": [],
-      "description": "Works in any terminal without configuration",
+      "description": "Shift+Enter",
+      "context": "claude-code interactive terminal; Context: Native in iTerm2, WezTerm, Ghostty, Kitty, Warp, Apple Terminal, Windows Terminal. For other terminals, see Enter multiline prompts",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "be6b00abdb155ea9",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Multiline input",
+      "command": "Ctrl+J",
+      "canonical_chord": "ctrl+j",
+      "aliases": [],
+      "description": "Control sequence",
+      "context": "claude-code interactive terminal; Context: Works in any terminal without configuration",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "44084a45e4ff4521"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f346e0e8335809cc",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "capture-and-input",
+      "category": "Multiline input",
+      "command": "Paste directly",
+      "canonical_chord": "paste directly",
+      "aliases": [],
+      "description": "Paste mode",
+      "context": "claude-code interactive terminal; Context: For code blocks, logs",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ef9f5b7d3720eeb4",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "context-and-memory",
+      "category": "Quick commands",
+      "command": "/ at start",
+      "canonical_chord": "/ at start",
+      "aliases": [],
+      "description": "Command or skill",
+      "context": "claude-code interactive terminal; Notes: See commands and skills",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f960f4385b961bc2",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "development",
+      "category": "Quick commands",
+      "command": "! at start",
+      "canonical_chord": "! at start",
+      "aliases": [],
+      "description": "Shell mode",
+      "context": "claude-code interactive terminal; Notes: Run a command directly, add its output to the session, and have Claude respond to it",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "d9feb5916044a0bb",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "development",
+      "category": "Quick commands",
+      "command": "@",
+      "canonical_chord": "@",
+      "aliases": [],
+      "description": "File path mention",
+      "context": "claude-code interactive terminal; Notes: Trigger file path autocomplete. In sessions with cross-session messaging, when you type at least one letter after the @, Claude Code also suggests your other live sessions on this machine, so you can tell Claude to message the one you pick. Requires Claude Code v2.1.232 or later",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ebd6fb75ce62468d",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "development",
+      "category": "Quick commands",
+      "command": ":",
+      "canonical_chord": ":",
+      "aliases": [],
+      "description": "Emoji shortcode",
+      "context": "claude-code interactive terminal; Notes: Type a full :name: to insert the emoji, or two or more characters for suggestions. See Emoji shortcodes. Requires Claude Code v2.1.217 or later",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "4930599a9a1580d2",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Quick commands",
+      "command": "? on empty input",
+      "canonical_chord": "? on empty input",
+      "aliases": [],
+      "description": "Toggle the shortcut help panel",
+      "context": "claude-code interactive terminal; Notes: Typing ? when the input already contains text inserts the character",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "111fd2886a6b6bc3",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Transcript viewer",
+      "command": "?",
+      "canonical_chord": "?",
+      "aliases": [],
+      "description": "Toggle the keyboard shortcut help panel. Requires fullscreen rendering",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -25505,18 +27995,295 @@
       }
     },
     {
-      "id": "f9eeeee5656c5b82",
+      "id": "188335b4cfdde15b",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Transcript viewer",
+      "command": "{ / }",
+      "canonical_chord": "{ / }",
+      "aliases": [],
+      "description": "Jump to the previous or next user prompt, like vim paragraph motion. Requires fullscreen rendering",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "3997a4feb16c2a34",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Transcript viewer",
+      "command": "Ctrl+E",
+      "canonical_chord": "ctrl+e",
+      "aliases": [],
+      "description": "Toggle show all content. Available in the classic renderer only, not in fullscreen rendering",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "f048bc147d00912f"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "495727dde998af29",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "debug-and-recover",
+      "category": "Transcript viewer",
+      "command": "[",
+      "canonical_chord": "[",
+      "aliases": [],
+      "description": "Write the full conversation to your terminal's native scrollback so Cmd+F, tmux copy mode, and other native tools can search it. Requires fullscreen rendering",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "60b4acc75dff7333",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "development",
+      "category": "Transcript viewer",
+      "command": "v",
+      "canonical_chord": "v",
+      "aliases": [],
+      "description": "Write the conversation to a temporary file and open it in $VISUAL or $EDITOR. Requires fullscreen rendering",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "07d9c7400d9988fd"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "fdfdf9a19222bd98",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Transcript viewer",
+      "command": "q, Ctrl+C, Esc",
+      "canonical_chord": "q / ctrl+c / esc",
+      "aliases": [],
+      "description": "Exit transcript view. All three can be rebound via transcript:exit",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "18a35dc4c0c5b1bd",
+        "ed383a512baa0921"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "28373beb49aa5e9a",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "capture-and-input",
+      "category": "Voice input",
+      "command": "Hold or tap Space",
+      "canonical_chord": "hold / tap space",
+      "aliases": [],
+      "description": "Voice dictation",
+      "context": "claude-code interactive terminal; Notes: Requires voice dictation to be enabled. Hold to record, or run /voice tap for tap-to-toggle. Rebindable",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "81f203349a1095b2",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "hotkey",
       "task_group": "development",
       "category": "Mode switching",
-      "command": "Esc or Ctrl+[ | Enter NORMAL mode. In terminals that use the Kitty keyboard protocol, Ctrl+[ requires v2.1.242 or later",
-      "canonical_chord": "esc or ctrl+[ | enter normal mode. in terminals that use the kitty keyboard protocol, ctrl+[ requires v2.1.242 or later",
+      "command": "Esc or Ctrl+[",
+      "canonical_chord": "esc / ctrl+[",
       "aliases": [],
-      "description": "INSERT, VISUAL",
-      "context": "claude-code interactive terminal",
+      "description": "Enter NORMAL mode. In terminals that use the Kitty keyboard protocol, Ctrl+[ requires v2.1.242 or later",
+      "context": "claude-code interactive terminal; From mode: INSERT, VISUAL",
       "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "ed383a512baa0921"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "c4d5847e68b2f1c9",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Mode switching",
+      "command": "i",
+      "canonical_chord": "i",
+      "aliases": [],
+      "description": "Insert before cursor",
+      "context": "claude-code interactive terminal; From mode: NORMAL",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "d88417d41c79ae02",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Mode switching",
+      "command": "a",
+      "canonical_chord": "a",
+      "aliases": [],
+      "description": "Insert after cursor",
+      "context": "claude-code interactive terminal; From mode: NORMAL",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "2495383dd73a371d",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Mode switching",
+      "command": "o",
+      "canonical_chord": "o",
+      "aliases": [],
+      "description": "Open line below",
+      "context": "claude-code interactive terminal; From mode: NORMAL",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "3471bef1a7d5ea99"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "0509a96dbc86c5cf",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Mode switching",
+      "command": "v",
+      "canonical_chord": "v",
+      "aliases": [],
+      "description": "Start character-wise visual selection",
+      "context": "claude-code interactive terminal; From mode: NORMAL",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "07d9c7400d9988fd"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "36a83c45b3011dfd",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "sessions-and-navigation",
+      "category": "Navigation (NORMAL mode)",
+      "command": "h/j/k/l",
+      "canonical_chord": "h/j/k/l",
+      "aliases": [],
+      "description": "Move left/down/up/right",
+      "context": "claude-code interactive terminal",
+      "safety_level": "amber",
       "destructive": false,
       "available": true,
       "conflict_ids": [],
@@ -25543,6 +28310,1090 @@
       "safety_level": "amber",
       "destructive": false,
       "available": true,
+      "conflict_ids": [
+        "ff43ac65ec938624"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "1a42ba69adc8a7fa",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "w",
+      "canonical_chord": "w",
+      "aliases": [],
+      "description": "Next word",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "3b113fa374bf28b5",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "e",
+      "canonical_chord": "e",
+      "aliases": [],
+      "description": "End of word",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "005698b7fab2d60b",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "b",
+      "canonical_chord": "b",
+      "aliases": [],
+      "description": "Previous word",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "703281bda3a0e058",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "0",
+      "canonical_chord": "0",
+      "aliases": [],
+      "description": "Beginning of line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "cd42d57e5e00dfd5",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "$",
+      "canonical_chord": "$",
+      "aliases": [],
+      "description": "End of line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "8b23db39f3bdc862",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "^",
+      "canonical_chord": "^",
+      "aliases": [],
+      "description": "First non-blank character",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "6ecb126dd78902da",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "gg",
+      "canonical_chord": "gg",
+      "aliases": [],
+      "description": "Beginning of input",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "500af7a9b4533828",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "G",
+      "canonical_chord": "g",
+      "aliases": [],
+      "description": "End of input",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "14ed7b8ddc7fa6ba",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "f{char}",
+      "canonical_chord": "f{char}",
+      "aliases": [],
+      "description": "Jump to next occurrence of character",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "c371409e36ac97ca",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "t{char}",
+      "canonical_chord": "t{char}",
+      "aliases": [],
+      "description": "Jump to just before next occurrence of character",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "cd01b9d55b1769db",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": ";",
+      "canonical_chord": ";",
+      "aliases": [],
+      "description": "Repeat last f/F/t/T motion",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "4c4965c4fd05d470",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": ",",
+      "canonical_chord": ",",
+      "aliases": [],
+      "description": "Repeat last f/F/t/T motion in reverse",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "bfbae20388de5aec",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Navigation (NORMAL mode)",
+      "command": "/",
+      "canonical_chord": "/",
+      "aliases": [],
+      "description": "Open reverse history search, same as Ctrl+R. The empty search prompt shows a hint: press Esc then i then / to open the command menu instead",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ab7bd6c2d85f73c1",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "x",
+      "canonical_chord": "x",
+      "aliases": [],
+      "description": "Delete character",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "9a3ae6e218ddeb4c",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "dd",
+      "canonical_chord": "dd",
+      "aliases": [],
+      "description": "Delete line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "0499bead9fa1ca36",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "D",
+      "canonical_chord": "d",
+      "aliases": [],
+      "description": "Delete to end of line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "c9ec8297ecb7360a",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "dw/de/db",
+      "canonical_chord": "dw/de/db",
+      "aliases": [],
+      "description": "Delete word/to end/back",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "acc0f0a97c84a681",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "df{char}/dt{char}",
+      "canonical_chord": "df{char}/dt{char}",
+      "aliases": [],
+      "description": "Delete to and including, or up to, the next occurrence of a character",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "945b42707e5dc638",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "cc",
+      "canonical_chord": "cc",
+      "aliases": [],
+      "description": "Change line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ae9d9331169dabfc",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "C",
+      "canonical_chord": "c",
+      "aliases": [],
+      "description": "Change to end of line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "41c54ba108227f88",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "cw/ce/cb",
+      "canonical_chord": "cw/ce/cb",
+      "aliases": [],
+      "description": "Change word/to end/back",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "77b302b0959ad906",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "development",
+      "category": "Editing (NORMAL mode)",
+      "command": "s",
+      "canonical_chord": "s",
+      "aliases": [],
+      "description": "Substitute character: delete the character under the cursor and enter INSERT mode. Requires Claude Code v2.1.211 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "44e4c4258bb07f6b",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "capture-and-input",
+      "category": "Editing (NORMAL mode)",
+      "command": "yy/Y",
+      "canonical_chord": "yy/y",
+      "aliases": [],
+      "description": "Yank (copy) line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "017e90fc1ebf62ec",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "yw/ye/yb",
+      "canonical_chord": "yw/ye/yb",
+      "aliases": [],
+      "description": "Yank word/to end/back",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "2305151a5615b3a7",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "capture-and-input",
+      "category": "Editing (NORMAL mode)",
+      "command": "p",
+      "canonical_chord": "p",
+      "aliases": [],
+      "description": "Paste after cursor",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "5480e06d25ca0ebe",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": ">>",
+      "canonical_chord": ">>",
+      "aliases": [],
+      "description": "Indent line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "d0820ed6fce08dd4",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "<<",
+      "canonical_chord": "<<",
+      "aliases": [],
+      "description": "Dedent line",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "3f10afc0952ed93e",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": "J",
+      "canonical_chord": "j",
+      "aliases": [],
+      "description": "Join lines",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "a221df48a3ebfbc5",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "debug-and-recover",
+      "category": "Editing (NORMAL mode)",
+      "command": "u",
+      "canonical_chord": "u",
+      "aliases": [],
+      "description": "Undo",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "b1e7924a37f2f363",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Editing (NORMAL mode)",
+      "command": ".",
+      "canonical_chord": ".",
+      "aliases": [],
+      "description": "Repeat last change",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f4fc31f2a47806bc",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Text objects (NORMAL mode)",
+      "command": "iw/aw",
+      "canonical_chord": "iw/aw",
+      "aliases": [],
+      "description": "Inner/around word",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "84d7530af628a4ee",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Text objects (NORMAL mode)",
+      "command": "i\"/a\"",
+      "canonical_chord": "i\"/a\"",
+      "aliases": [],
+      "description": "Inner/around double quotes",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "b4703f86ee59cfdb",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Text objects (NORMAL mode)",
+      "command": "i'/a'",
+      "canonical_chord": "i'/a'",
+      "aliases": [],
+      "description": "Inner/around single quotes",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "e344b7b676b61238",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Text objects (NORMAL mode)",
+      "command": "i(/a(",
+      "canonical_chord": "i(/a(",
+      "aliases": [],
+      "description": "Inner/around parentheses",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "2c960334e1bec999",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Text objects (NORMAL mode)",
+      "command": "i[/a[",
+      "canonical_chord": "i[/a[",
+      "aliases": [],
+      "description": "Inner/around brackets",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "3258f0a510220466",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Text objects (NORMAL mode)",
+      "command": "i{/a{",
+      "canonical_chord": "i{/a{",
+      "aliases": [],
+      "description": "Inner/around braces",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "e27adf0a33298fd3",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": "d/x",
+      "canonical_chord": "d/x",
+      "aliases": [],
+      "description": "Delete selection",
+      "context": "claude-code interactive terminal",
+      "safety_level": "red",
+      "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ade92ae6b6ecfbe0",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": "y",
+      "canonical_chord": "y",
+      "aliases": [],
+      "description": "Yank selection",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ac2e1b2cad585f24",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": "c/s",
+      "canonical_chord": "c/s",
+      "aliases": [],
+      "description": "Change selection",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "60a6e66b343ef74d",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": "r{char}",
+      "canonical_chord": "r{char}",
+      "aliases": [],
+      "description": "Replace every selected character with {char}",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "17b0890d63fa9c5f",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": "~/u/U",
+      "canonical_chord": "~/u/u",
+      "aliases": [],
+      "description": "Toggle, lowercase, or uppercase selection",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "8f76caa673c0c956",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": ">/<",
+      "canonical_chord": ">/<",
+      "aliases": [],
+      "description": "Indent or dedent selected lines",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "35f77c5f3256b8dc",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": "o",
+      "canonical_chord": "o",
+      "aliases": [],
+      "description": "Swap cursor and anchor",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "3471bef1a7d5ea99"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "ee21b96277b8800c",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": "iw/aw/i\"/…",
+      "canonical_chord": "iw/aw/i\"/…",
+      "aliases": [],
+      "description": "Select a text object",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "10dee89910714fef",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Visual mode",
+      "command": "v/V",
+      "canonical_chord": "v/v",
+      "aliases": [],
+      "description": "Toggle between character-wise and line-wise, or exit",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
       "conflict_ids": [],
       "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
       "provenance": {
@@ -25560,9 +29411,88 @@
       "task_group": "help-and-reference",
       "category": "Side questions with /btw",
       "command": "Space, Enter, Escape",
-      "canonical_chord": "space, enter, esc",
+      "canonical_chord": "space / enter / esc",
       "aliases": [],
       "description": "Dismiss the answer and return to the prompt",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "0e2cda2d83afcfe9",
+        "ed383a512baa0921",
+        "ff43ac65ec938624"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "b3801cb4d82bafd0",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "Side questions with /btw",
+      "command": "Up / Down",
+      "canonical_chord": "up / down",
+      "aliases": [],
+      "description": "Scroll the answer",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [
+        "6b5a8f471c1a46fd",
+        "c526a163e36e4f98"
+      ],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "f95904cf96c61520",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "sessions-and-navigation",
+      "category": "Side questions with /btw",
+      "command": "Shift+Left / Shift+Right",
+      "canonical_chord": "shift+left / shift+right",
+      "aliases": [],
+      "description": "Step between this answer and your earlier /btw answers. Shift+Left moves to older answers and Shift+Right returns toward the current one. [ and ] do the same, for terminals that don't report Shift with arrow keys. Tab / Shift+Tab cycle through the same answers. Requires Claude Code v2.1.257 or later. Between v2.1.187 and v2.1.256, the keys were plain Left / Right",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+      "provenance": {
+        "kind": "official",
+        "status": "version-gated",
+        "source": "official: https://code.claude.com/docs/en/interactive-mode.md",
+        "version": "2.1.272"
+      }
+    },
+    {
+      "id": "e89efa24b36e4f1d",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "hotkey",
+      "task_group": "parallel-agents",
+      "category": "Side questions with /btw",
+      "command": "f",
+      "canonical_chord": "f",
+      "aliases": [],
+      "description": "Start a forked subagent that inherits the parent conversation plus this question and answer, so it can continue with full tool access. You stay in the current session and find the fork in the panel below your prompt. Available in local sessions only",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,

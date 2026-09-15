@@ -39,6 +39,24 @@ class ChordTests(unittest.TestCase):
         )
         self.assertEqual(chords.canonicalize_chord("Ctrl+X Ctrl+E"), "ctrl+x ctrl+e")
 
+    def test_canonicalization_normalizes_documented_alternative_syntax(self):
+        cases = {
+            "Ctrl+_ or Ctrl+Shift+-": "ctrl+_ / ctrl+shift+-",
+            "Option+P (macOS) or Alt+P (Windows/Linux)": "alt+p / alt+p",
+            "{ / }": "{ / }",
+            "q, Ctrl+C, Esc": "q / ctrl+c / esc",
+        }
+        for display, expected in cases.items():
+            with self.subTest(display=display):
+                self.assertEqual(chords.canonicalize_chord(display), expected)
+
+    def test_canonicalization_does_not_split_compact_vim_expressions_or_paths(self):
+        self.assertEqual(chords.canonicalize_chord("h/j/k/l"), "h/j/k/l")
+        self.assertEqual(chords.canonicalize_chord("/tmp/operator-key"), "/tmp/operator-key")
+
+    def test_canonicalization_handles_a_backslash_plus_enter_combo(self):
+        self.assertEqual(chords.canonicalize_chord(r"\ + Enter"), r"\+enter")
+
     def test_conflicts_are_keyed_by_canonical_chord_and_overlapping_context(self):
         rows = [
             {"id": "a", "product": "hermes", "interface": "hotkey", "command": "Ctrl+Shift+P", "context": "Hermes interactive terminal"},
@@ -54,6 +72,18 @@ class ChordTests(unittest.TestCase):
         self.assertEqual(rows[0]["command"], "Ctrl+Shift+P")
         self.assertEqual(rows[0]["conflict_ids"], [conflicts[0]["id"]])
         self.assertEqual(rows[2]["conflict_ids"], [])
+
+    def test_alternative_chords_conflict_with_each_single_chord(self):
+        rows = [
+            {"id": "alternatives", "product": "claude-code", "interface": "hotkey", "command": "q, Ctrl+C, Esc", "context": "Claude Code interactive terminal"},
+            {"id": "interrupt", "product": "claude-code", "interface": "hotkey", "command": "Ctrl+C", "context": "Claude Code interactive terminal"},
+            {"id": "escape", "product": "claude-code", "interface": "hotkey", "command": "Esc", "context": "Claude Code interactive terminal"},
+        ]
+
+        conflicts = chords.annotate_conflicts(rows)
+
+        self.assertEqual({item["canonical_chord"] for item in conflicts}, {"ctrl+c", "esc"})
+        self.assertEqual(len(rows[0]["conflict_ids"]), 2)
 
     def test_dedupe_preserves_intentional_omarchy_press_release_entries(self):
         press = build.entry("omarchy", "hotkey", "F9", "Mute microphone", "test", "1", context="desktop")

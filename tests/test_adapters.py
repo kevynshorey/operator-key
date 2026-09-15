@@ -69,6 +69,44 @@ class ClaudeAdapterTests(unittest.TestCase):
         self.assertFalse(by_command["ctrl+d"]["available"])
         self.assertEqual(by_command["ctrl+d"]["provenance"]["status"], "disabled")
 
+    def test_docs_table_preserves_inline_code_pipes_in_command_and_description(self):
+        commands = """\
+## Review
+| Command | Purpose |
+| --- | --- |
+| `/review [low | high]` | Use `foo | bar` safely |
+"""
+
+        rows = claude.parse_docs(commands, "", "2.1.272")
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["command"], "/review")
+        self.assertEqual(rows[0]["description"], "Use foo | bar safely")
+
+    def test_keyboard_tables_select_columns_by_header_and_append_context(self):
+        keys = r"""
+### Multiline input
+| Method | Shortcut | Context |
+| --- | --- | --- |
+| Quick escape | `\` + `Enter` | Works in all terminals |
+
+### Mode switching
+| Command | Action | From mode |
+| --- | --- | --- |
+| `Esc` or `Ctrl+[` | Enter NORMAL mode | INSERT, VISUAL |
+"""
+
+        rows = claude.parse_docs("", keys, "2.1.272")
+        by_description = {row["description"]: row for row in rows}
+
+        quick_escape = by_description["Quick escape"]
+        self.assertEqual(quick_escape["command"], r"\ + Enter")
+        self.assertIn("Works in all terminals", quick_escape["context"])
+
+        normal_mode = by_description["Enter NORMAL mode"]
+        self.assertEqual(normal_mode["command"], "Esc or Ctrl+[")
+        self.assertIn("From mode: INSERT, VISUAL", normal_mode["context"])
+
 
 class CodexAdapterTests(unittest.TestCase):
     def test_help_config_and_keymap_are_collected_without_secrets(self):

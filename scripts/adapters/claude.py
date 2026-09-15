@@ -5,7 +5,7 @@ import json
 import re
 from pathlib import Path
 
-from .common import clean, entry, parse_help as parse_cli_help, run
+from .common import clean, entry, parse_help as parse_cli_help, run, split_markdown_cells
 
 COMMANDS_URL = "https://code.claude.com/docs/en/commands.md"
 KEYS_URL = "https://code.claude.com/docs/en/interactive-mode.md"
@@ -103,30 +103,70 @@ def parse_customizations(root: Path, product_version: str) -> list[dict]:
 
 def _table_rows(text: str):
     heading = ""
-    for line in text.splitlines():
+    headers: list[str] | None = None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
         if line.startswith("#"):
             heading = clean(line.lstrip("# "))
-        elif line.startswith("|") and not re.match(r"^\|?\s*:?-+", line):
-            cells = [cell.strip() for cell in re.split(r"\|(?![^`]*`)", line.strip().strip("|"))]
-            if len(cells) >= 2 and cells[0].lower() not in {"command", "shortcut", "action", "key"}:
-                yield heading, cells
+            headers = None
+            continue
+        if not line.startswith("|"):
+            headers = None
+            continue
+
+        cells = split_markdown_cells(line)
+        if cells and all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in cells):
+            continue
+        if headers is None:
+            headers = [clean(cell).lower() for cell in cells]
+            continue
+        yield heading, {
+            header: cell
+            for header, cell in zip(headers, cells)
+            if header
+        }
+
+
+def _first(row: dict[str, str], *headers: str) -> str:
+    for header in headers:
+        value = row.get(header, "")
+        if value:
+            return value
+    return ""
+
+
+def _clean_chord(value: str) -> str:
+    """Clean Markdown markup while retaining a displayed backslash key."""
+    sentinel = "OPERATORKEYBACKSLASH"
+    protected = re.sub(r"`\\`", f"`{sentinel}`", value)
+    return clean(protected).replace(sentinel, "\\")
+
+
+def _hotkey_context(row: dict[str, str]) -> str:
+    parts = ["claude-code interactive terminal"]
+    for header, label in (("notes", "Notes"), ("context", "Context"), ("from mode", "From mode")):
+        value = clean(row.get(header, ""))
+        if value:
+            parts.append(f"{label}: {value}")
+    return "; ".join(parts)
 
 
 def parse_docs(commands_text: str, keys_text: str, product_version: str) -> list[dict]:
     rows: list[dict] = []
-    for heading, cells in _table_rows(commands_text):
-        description = clean(cells[1])
-        for command in re.findall(r"/[\w-]+", clean(cells[0])):
+    for heading, row in _table_rows(commands_text):
+        description = clean(_first(row, "description", "action", "purpose"))
+        for command in re.findall(r"/[\w-]+", clean(_first(row, "command", "key"))):
             rows.append(entry("claude-code", "slash-command", command, description,
                               f"official: {COMMANDS_URL}", product_version,
                               context="claude-code interactive terminal", category=heading,
                               provenance="official"))
-    for heading, cells in _table_rows(keys_text):
-        chord, description = clean(cells[0]), clean(cells[1])
-        if chord and description and any(token in chord.lower() for token in ("ctrl", "alt", "option", "shift", "esc", "enter", "tab", "arrow", "cmd", "space")):
+    for heading, row in _table_rows(keys_text):
+        chord = _clean_chord(_first(row, "shortcut", "command", "key"))
+        description = clean(_first(row, "description", "action", "purpose", "method"))
+        if chord and description:
             rows.append(entry("claude-code", "hotkey", chord, description, f"official: {KEYS_URL}",
-                              product_version, context="claude-code interactive terminal", category=heading,
-                              provenance="official", status="version-gated"))
+                              product_version, context=_hotkey_context(row), category=heading,
+                              provenance="official", status="version-gated", verbatim=True))
     return rows
 
 

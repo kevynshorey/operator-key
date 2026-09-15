@@ -109,7 +109,9 @@ def split_markdown_cells(line: str) -> list[str]:
             escaped = False
         elif char == "\\":
             current.append(char)
-            escaped = True
+            # Backslashes are literal inside code spans (including the `\` key).
+            # Outside code, retain Markdown's escaped-delimiter behavior.
+            escaped = not in_code
         elif char == "`":
             current.append(char)
             in_code = not in_code
