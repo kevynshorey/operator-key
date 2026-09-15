@@ -110,6 +110,9 @@ select:focus-visible,
 .text-mode { display: flex; gap: 6px; align-items: center; border: 0; background: transparent; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .text-mode span { color: var(--cyan); font-family: var(--display); font-size: 14px; font-weight: 800; }
 .text-mode[aria-pressed="true"] { color: var(--white); }
+.close-overlay { display: grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid var(--graphite-600); border-radius: 2px; background: var(--graphite-850); color: var(--muted); }
+.close-overlay:hover { border-color: var(--cyan); color: var(--white); }
+.close-overlay span { font-family: var(--mono); font-size: 18px; line-height: 1; }
 
 .search-deck { flex: 0 0 auto; border-bottom: 1px solid var(--graphite-600); background: #12171a; }
 .search-field { display: grid; grid-template-columns: auto 1fr auto; align-items: center; height: 74px; padding: 0 20px; border-bottom: 1px solid var(--etched); }
@@ -216,6 +219,7 @@ select:focus-visible,
 .large-text { font-size: 18px; }
 .large-text .masthead { min-height: 52px; font-size: 14px; }
 .large-text .text-mode { font-size: 14px; }
+.large-text .close-overlay { width: 36px; height: 36px; }
 .large-text .search-index { font-size: 14px; }
 .large-text .escape-key { font-size: 13px; }
 .large-text .product-tabs button { min-height: 48px; font-size: 14px; }

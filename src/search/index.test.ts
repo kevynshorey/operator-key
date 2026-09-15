@@ -8,6 +8,20 @@ if (!catalogResult.ok) throw new Error(catalogResult.error);
 const entries = catalogResult.catalog.entries;
 const index = createSearchIndex(entries);
 
+function exhaustiveCandidates(query: string) {
+  const allRecordIndexes = index.records.map((_, recordIndex) => recordIndex);
+  const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const candidateKeys = new Set(terms.flatMap((term) => {
+    const trigrams: string[] = [];
+    for (let start = 0; start <= term.length - 3; start += 1) trigrams.push(term.slice(start, start + 3));
+    return term.length <= 3 ? [term] : trigrams;
+  }));
+  return {
+    ...index,
+    termPostings: new Map([...candidateKeys].map((term) => [term, allRecordIndexes])),
+  };
+}
+
 describe("intent search", () => {
   it("ranks exact command above alias, task, description, and product matches", () => {
     const fixture = [
@@ -101,6 +115,40 @@ describe("intent search", () => {
     expect(searchCatalog(reusableIndex, "tracked")[0].entry.id).toBe(tracked.id);
     expect(searchCatalog(reusableIndex, tracked.command)[0].entry.id).toBe(tracked.id);
     expect(aliasReads).toBe(1);
+  });
+
+  it("preserves arbitrary substring matches and ranking with bounded candidates", () => {
+    for (const query of ["eview", "indow", "ssion", "ermes", "code revi", "avig sess"]) {
+      const bounded = searchCatalog(index, query, {}, 50);
+      const exhaustive = searchCatalog(exhaustiveCandidates(query), query, {}, 50);
+      expect(bounded.map(({ entry, score }) => [entry.id, score])).toEqual(
+        exhaustive.map(({ entry, score }) => [entry.id, score]),
+      );
+    }
+  });
+
+  it("bounds index growth to exact tokens plus unigrams, bigrams, and trigrams", () => {
+    const started = performance.now();
+    const boundedIndex = createSearchIndex(entries);
+    const elapsed = performance.now() - started;
+    const postingReferences = [...boundedIndex.termPostings.values()]
+      .reduce((total, postings) => total + postings.length, 0);
+    const gramBudget = entries.reduce((total, entry) => {
+      const tokens = new Set([
+        entry.command,
+        ...entry.aliases,
+        entry.task_group,
+        entry.description,
+        entry.product,
+      ].flatMap((value) => value.toLowerCase().replace(/^\/+/, "").split(/[^a-z0-9]+/).filter(Boolean)));
+      return total + [...tokens].reduce((tokenTotal, token) => (
+        tokenTotal + 1 + token.length + Math.max(0, token.length - 1) + Math.max(0, token.length - 2)
+      ), 0);
+    }, 0);
+
+    expect(entries).toHaveLength(1302);
+    expect(postingReferences).toBeLessThanOrEqual(gramBudget);
+    expect(elapsed).toBeLessThan(500);
   });
 
   it("returns top results from the precomputed 1,302-record index under 50ms", () => {

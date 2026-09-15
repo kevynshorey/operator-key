@@ -73,12 +73,18 @@ function addPosting(postings: Map<string, number[]>, term: string, recordIndex: 
   }
 }
 
-function indexTokenSubstrings(postings: Map<string, number[]>, token: string, recordIndex: number): void {
-  for (let start = 0; start < token.length; start += 1) {
-    for (let end = start + 1; end <= token.length; end += 1) {
-      addPosting(postings, token.slice(start, end), recordIndex);
+function tokenGrams(token: string, maxGramLength = 3): Set<string> {
+  const grams = new Set([token]);
+  for (let length = 1; length <= Math.min(maxGramLength, token.length); length += 1) {
+    for (let start = 0; start <= token.length - length; start += 1) {
+      grams.add(token.slice(start, start + length));
     }
   }
+  return grams;
+}
+
+function indexToken(postings: Map<string, number[]>, token: string, recordIndex: number): void {
+  for (const term of tokenGrams(token)) addPosting(postings, term, recordIndex);
 }
 
 /** Build normalized records and lookup postings once for repeated local queries. */
@@ -102,7 +108,7 @@ export function createSearchIndex(entries: readonly CatalogEntry[]): SearchIndex
     const indexedTokens = new Set([
       ...commandWords, ...aliasWords, ...taskWords, ...descriptionWords, ...productWords,
     ]);
-    for (const token of indexedTokens) indexTokenSubstrings(termPostings, token, recordIndex);
+    for (const token of indexedTokens) indexToken(termPostings, token, recordIndex);
     if (chord) addPosting(chordPostings, chord, recordIndex);
 
     return {
@@ -172,13 +178,24 @@ function intersectSorted(left: readonly number[], right: readonly number[]): num
   return result;
 }
 
+function candidatesForTerm(index: SearchIndex, term: string): readonly number[] {
+  if (term.length <= 3) return index.termPostings.get(term) ?? [];
+  const trigrams = [...tokenGrams(term, 3)].filter((gram) => gram.length === 3);
+  let candidates: readonly number[] = index.termPostings.get(trigrams[0]) ?? [];
+  for (const trigram of trigrams.slice(1)) {
+    candidates = intersectSorted(candidates, index.termPostings.get(trigram) ?? []);
+    if (candidates.length === 0) break;
+  }
+  return candidates;
+}
+
 function candidateIndexes(index: SearchIndex, queryTerms: readonly string[], chordQuery: string): readonly number[] {
   const chordCandidates = chordQuery ? index.chordPostings.get(chordQuery) : undefined;
   if (chordCandidates?.length) return chordCandidates;
   if (queryTerms.length === 0) return index.records.map((_, recordIndex) => recordIndex);
-  let candidates = index.termPostings.get(queryTerms[0]) ?? [];
+  let candidates = candidatesForTerm(index, queryTerms[0]);
   for (const term of queryTerms.slice(1)) {
-    candidates = intersectSorted(candidates, index.termPostings.get(term) ?? []);
+    candidates = intersectSorted(candidates, candidatesForTerm(index, term));
     if (candidates.length === 0) break;
   }
   return candidates;

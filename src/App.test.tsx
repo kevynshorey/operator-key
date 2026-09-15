@@ -1,7 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+
+afterEach(() => {
+  if (originalScrollIntoView) Object.defineProperty(Element.prototype, "scrollIntoView", originalScrollIntoView);
+  else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+});
 
 describe("Operator Key overlay", () => {
   it("renders the keyboard-first search shell and catalog status", () => {
@@ -20,6 +27,52 @@ describe("Operator Key overlay", () => {
     expect(await screen.findByRole("heading", { name: "/code-review" })).toBeInTheDocument();
     await user.keyboard("{ArrowDown}");
     expect(screen.getByRole("option", { selected: true })).toHaveAttribute("aria-posinset", "2");
+  });
+
+  it("keeps the keyboard-active result visible as selection changes", async () => {
+    const scrolledIds: string[] = [];
+    const scrollIntoView = vi.fn(function (this: Element, options?: ScrollIntoViewOptions) {
+      scrolledIds.push(`${this.id}:${options?.block}`);
+    });
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    scrollIntoView.mockClear();
+    scrolledIds.length = 0;
+    const search = screen.getByRole("searchbox", { name: /operator intent/i });
+    await user.type(search, "review code");
+    await user.keyboard("{ArrowDown}");
+
+    const active = screen.getByRole("option", { selected: true });
+    await waitFor(() => expect(scrolledIds.at(-1)).toBe(`${active.id}:nearest`));
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+  });
+
+  it("dismisses once with Escape from controls outside the search input", async () => {
+    const user = userEvent.setup();
+    const hideOverlay = vi.fn();
+    render(<App hideOverlay={hideOverlay} />);
+
+    screen.getByRole("button", { name: /large text/i }).focus();
+    await user.keyboard("{Escape}");
+    expect(hideOverlay).toHaveBeenCalledTimes(1);
+
+    screen.getByRole("searchbox", { name: /operator intent/i }).focus();
+    await user.keyboard("{Escape}");
+    expect(hideOverlay).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers an accessible visible close control", async () => {
+    const user = userEvent.setup();
+    const hideOverlay = vi.fn();
+    render(<App hideOverlay={hideOverlay} />);
+    await user.click(screen.getByRole("button", { name: /close operator key/i }));
+    expect(hideOverlay).toHaveBeenCalledOnce();
   });
 
   it("provides filters and an explicit empty state", async () => {

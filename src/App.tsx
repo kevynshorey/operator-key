@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import catalogJson from "../data/catalog.json";
 import {
   INTERFACES,
@@ -14,6 +14,7 @@ import {
   type TaskGroup,
 } from "./catalog";
 import { createSearchIndex, searchCatalog } from "./search";
+import { hideOverlay, type HideOverlay } from "./overlay";
 
 const PRODUCT_LABELS: Record<Product, string> = {
   omarchy: "Omarchy",
@@ -40,6 +41,7 @@ const SAFETY_LABELS: Record<SafetyLevel, { icon: string; label: string }> = {
 interface AppProps {
   loading?: boolean;
   catalogData?: unknown;
+  hideOverlay?: HideOverlay;
 }
 
 function KeyChord({ entry }: { entry: CatalogEntry }) {
@@ -61,16 +63,22 @@ function ProductMark({ product }: { product: Product }) {
   return <span className={`product-mark product-${product}`} aria-hidden="true" />;
 }
 
-function ResultRow({ entry, active, position, total, onSelect }: {
+function ResultRow({ entry, active, position, total, onSelect, setRowRef }: {
   entry: CatalogEntry;
   active: boolean;
   position: number;
   total: number;
   onSelect: () => void;
+  setRowRef: (entryId: string, node: HTMLLIElement | null) => void;
 }) {
   const safety = SAFETY_LABELS[entry.safety_level];
+  const rowRef = useCallback(
+    (node: HTMLLIElement | null) => setRowRef(entry.id, node),
+    [entry.id, setRowRef],
+  );
   return (
     <li
+      ref={rowRef}
       id={`result-${entry.id}`}
       role="option"
       aria-selected={active}
@@ -95,7 +103,7 @@ function ResultRow({ entry, active, position, total, onSelect }: {
   );
 }
 
-function Header({ largeText, onLargeText }: { largeText: boolean; onLargeText: () => void }) {
+function Header({ largeText, onLargeText, onClose }: { largeText: boolean; onLargeText: () => void; onClose: () => void }) {
   return (
     <header className="masthead">
       <div className="wordmark" aria-label="Operator Key">
@@ -108,15 +116,18 @@ function Header({ largeText, onLargeText }: { largeText: boolean; onLargeText: (
         <button type="button" className="text-mode" aria-pressed={largeText} onClick={onLargeText}>
           <span aria-hidden="true">Aa</span> Large text
         </button>
+        <button type="button" className="close-overlay" aria-label="Close Operator Key" onClick={onClose}>
+          <span aria-hidden="true">×</span>
+        </button>
       </div>
     </header>
   );
 }
 
-function ShellState({ kind, message }: { kind: "status" | "alert"; message: string }) {
+function ShellState({ kind, message, onClose }: { kind: "status" | "alert"; message: string; onClose: () => void }) {
   return (
     <main className="state-shell" data-testid="operator-shell">
-      <Header largeText={false} onLargeText={() => undefined} />
+      <Header largeText={false} onLargeText={() => undefined} onClose={onClose} />
       <section className="state-panel" role={kind}>
         <span className="state-code">SYSTEM / CATALOG</span>
         <h1>{message}</h1>
@@ -176,7 +187,7 @@ function DetailCard({ entry, catalog }: { entry: CatalogEntry; catalog: Catalog 
   );
 }
 
-export default function App({ loading = false, catalogData = catalogJson }: AppProps) {
+export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay }: AppProps) {
   const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
   const searchIndex = useMemo(
     () => parsed.ok ? createSearchIndex(parsed.catalog.entries) : undefined,
@@ -191,6 +202,12 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
   const [actionStatus, setActionStatus] = useState("");
   const [largeText, setLargeText] = useState(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const resultRefs = useRef(new Map<string, HTMLLIElement>());
+  const dismissOverlay = injectedHideOverlay ?? hideOverlay;
+  const setResultRef = useCallback((entryId: string, node: HTMLLIElement | null) => {
+    if (node) resultRefs.current.set(entryId, node);
+    else resultRefs.current.delete(entryId);
+  }, []);
 
   const results = useMemo(() => {
     if (!searchIndex) return [];
@@ -199,8 +216,23 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
   const boundedIndex = Math.min(selectedIndex, Math.max(0, results.length - 1));
   const selected = results[boundedIndex]?.entry;
 
-  if (loading) return <ShellState kind="status" message="Loading command catalog…" />;
-  if (!parsed.ok) return <ShellState kind="alert" message={parsed.error} />;
+  useEffect(() => {
+    const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      void dismissOverlay();
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [dismissOverlay]);
+
+  useEffect(() => {
+    if (!selected) return;
+    resultRefs.current.get(selected.id)?.scrollIntoView?.({ block: "nearest" });
+  }, [selected, results]);
+
+  if (loading) return <ShellState kind="status" message="Loading command catalog…" onClose={() => { void dismissOverlay(); }} />;
+  if (!parsed.ok) return <ShellState kind="alert" message={parsed.error} onClose={() => { void dismissOverlay(); }} />;
 
   const selectProduct = (value?: Product) => {
     setProduct(value);
@@ -223,9 +255,6 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
     } else if (event.key === "Enter") {
       event.preventDefault();
       invokePlaceholder();
-    } else if (event.key === "Escape" && "__TAURI_INTERNALS__" in window) {
-      event.preventDefault();
-      void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => getCurrentWindow().hide());
     }
   };
 
@@ -245,7 +274,7 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
 
   return (
     <main className={`operator-shell${largeText ? " large-text" : ""}`} data-testid="operator-shell">
-      <Header largeText={largeText} onLargeText={() => setLargeText((value) => !value)} />
+      <Header largeText={largeText} onLargeText={() => setLargeText((value) => !value)} onClose={() => { void dismissOverlay(); }} />
 
       <section className="search-deck" aria-label="Command search controls">
         <label className="search-field">
@@ -327,7 +356,15 @@ export default function App({ loading = false, catalogData = catalogJson }: AppP
             <div className="lane-heading"><span>MATCHES</span><strong>{results.length.toString().padStart(2, "0")}</strong></div>
             <ul id="result-list" role="listbox" aria-label="Command results">
               {results.map(({ entry }, index) => (
-                <ResultRow key={entry.id} entry={entry} active={index === boundedIndex} position={index + 1} total={results.length} onSelect={() => setSelectedIndex(index)} />
+                <ResultRow
+                  key={entry.id}
+                  entry={entry}
+                  active={index === boundedIndex}
+                  position={index + 1}
+                  total={results.length}
+                  onSelect={() => setSelectedIndex(index)}
+                  setRowRef={setResultRef}
+                />
               ))}
             </ul>
           </aside>
