@@ -1,14 +1,23 @@
 use serde::Deserialize;
 use std::fmt;
+use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::process::{Child, Command, ExitStatus, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 
 const CATALOG_JSON: &str = include_str!("../../data/catalog.json");
 const NATIVE_DEADLINE: Duration = Duration::from_secs(2);
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
+const MAX_NATIVE_STDIN_BYTES: usize = 4 * 1024;
+const MAX_CAPTURE_BYTES: usize = 64 * 1024;
+const OUTPUT_TRUNCATED_MARKER: &str = "\n[output truncated]";
+static CAPTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const TERMINAL_CLASSES: &[&str] = &[
     "Alacritty",
     "alacritty",
@@ -143,11 +152,91 @@ fn terminate_and_reap(child: &mut Child, program: &str) -> Result<(), String> {
     }
 }
 
-fn read_pipe<R: Read>(mut pipe: R) -> Result<Vec<u8>, String> {
-    let mut bytes = Vec::new();
-    pipe.read_to_end(&mut bytes)
-        .map_err(|error| format!("could not read process output: {error}"))?;
-    Ok(bytes)
+struct CaptureFile {
+    file: File,
+    path: std::path::PathBuf,
+}
+
+impl CaptureFile {
+    fn new(stream: &str) -> Result<Self, String> {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        for _ in 0..128 {
+            let sequence = CAPTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "operator-key-{}-{timestamp}-{sequence}-{stream}.tmp",
+                std::process::id()
+            ));
+            let mut options = OpenOptions::new();
+            options.read(true).write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            match options.open(&path) {
+                Ok(file) => return Ok(Self { file, path }),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(format!("could not create process capture file: {error}"));
+                }
+            }
+        }
+        Err("could not create a unique process capture file".into())
+    }
+
+    fn stdio(&self) -> Result<Stdio, String> {
+        self.file
+            .try_clone()
+            .map(Stdio::from)
+            .map_err(|error| format!("could not clone process capture file: {error}"))
+    }
+
+    fn read_bounded(&self) -> Result<String, String> {
+        let mut file = File::open(&self.path)
+            .map_err(|error| format!("could not open process capture file: {error}"))?;
+        let truncated = file
+            .metadata()
+            .map_err(|error| format!("could not inspect process capture file: {error}"))?
+            .len()
+            > MAX_CAPTURE_BYTES as u64;
+        let mut bytes = Vec::with_capacity(MAX_CAPTURE_BYTES.min(8 * 1024));
+        Read::take(&mut file, MAX_CAPTURE_BYTES as u64)
+            .read_to_end(&mut bytes)
+            .map_err(|error| format!("could not read process capture file: {error}"))?;
+        let mut output = String::from_utf8_lossy(&bytes).into_owned();
+        if truncated {
+            output.push_str(OUTPUT_TRUNCATED_MARKER);
+        }
+        Ok(output)
+    }
+}
+
+impl Drop for CaptureFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+struct ProcessCapture {
+    stdout: CaptureFile,
+    stderr: CaptureFile,
+}
+
+impl ProcessCapture {
+    fn new() -> Result<Self, String> {
+        Ok(Self {
+            stdout: CaptureFile::new("stdout")?,
+            stderr: CaptureFile::new("stderr")?,
+        })
+    }
+
+    fn output(&self, status: ExitStatus) -> Result<ProcessOutput, String> {
+        Ok(ProcessOutput {
+            success: status.success(),
+            stdout: self.stdout.read_bounded()?,
+            stderr: self.stderr.read_bounded()?.trim().to_owned(),
+        })
+    }
 }
 
 fn restore_window(
@@ -163,121 +252,56 @@ fn run_spawned_child(
     program: &str,
     input: Option<Vec<u8>>,
     timeout: Duration,
+    capture: ProcessCapture,
 ) -> Result<ProcessOutput, String> {
-    let stdout = match child.stdout.take() {
-        Some(stdout) => stdout,
-        None => {
-            let primary = format!("{program} stdout was unavailable");
-            return match terminate_and_reap(&mut child, program) {
-                Ok(()) => Err(primary),
-                Err(cleanup) => Err(format!("{primary}; {cleanup}")),
-            };
-        }
-    };
-    let stderr = match child.stderr.take() {
-        Some(stderr) => stderr,
-        None => {
-            let primary = format!("{program} stderr was unavailable");
-            return match terminate_and_reap(&mut child, program) {
-                Ok(()) => Err(primary),
-                Err(cleanup) => Err(format!("{primary}; {cleanup}")),
-            };
-        }
-    };
-    let stdout_reader = thread::spawn(move || read_pipe(stdout));
-    let stderr_reader = thread::spawn(move || read_pipe(stderr));
+    if input
+        .as_ref()
+        .is_some_and(|bytes| bytes.len() > MAX_NATIVE_STDIN_BYTES)
+    {
+        let primary = format!("{program} input exceeds {MAX_NATIVE_STDIN_BYTES} byte native limit");
+        let cleanup = terminate_and_reap(&mut child, program).err();
+        return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
+    }
 
-    let mut writer = match input {
-        Some(bytes) => {
-            let mut stdin = match child.stdin.take() {
-                Some(stdin) => stdin,
-                None => {
-                    let primary = format!("{program} stdin was unavailable");
-                    let cleanup = terminate_and_reap(&mut child, program).err();
-                    let _ = stdout_reader.join();
-                    let _ = stderr_reader.join();
-                    return Err(
-                        cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}"))
-                    );
-                }
-            };
-            let program = program.to_owned();
-            Some(thread::spawn(move || {
-                stdin
-                    .write_all(&bytes)
-                    .map_err(|error| format!("could not write to {program}: {error}"))
-            }))
-        }
-        None => None,
-    };
-
-    let started = Instant::now();
-    let status: ExitStatus = loop {
-        if writer.as_ref().is_some_and(|handle| handle.is_finished()) {
-            let write_result = writer.take().expect("writer exists").join();
-            let write_result = match write_result {
-                Ok(result) => result,
-                Err(_) => {
-                    let primary = format!("{program} stdin writer panicked");
-                    let cleanup = terminate_and_reap(&mut child, program).err();
-                    let _ = stdout_reader.join();
-                    let _ = stderr_reader.join();
-                    return Err(
-                        cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}"))
-                    );
-                }
-            };
-            if let Err(primary) = write_result {
+    let deadline = Instant::now() + timeout;
+    if let Some(bytes) = input {
+        let mut stdin = match child.stdin.take() {
+            Some(stdin) => stdin,
+            None => {
+                let primary = format!("{program} stdin was unavailable");
                 let cleanup = terminate_and_reap(&mut child, program).err();
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
             }
+        };
+        if let Err(error) = stdin.write_all(&bytes) {
+            let primary = format!("could not write to {program}: {error}");
+            let cleanup = terminate_and_reap(&mut child, program).err();
+            return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
         }
+        drop(stdin);
+    }
+
+    let status: ExitStatus = loop {
         match child.try_wait() {
             Ok(Some(status)) => break status,
-            Ok(None) if started.elapsed() < timeout => {
-                thread::sleep(POLL_INTERVAL.min(timeout.saturating_sub(started.elapsed())));
+            Ok(None) if Instant::now() < deadline => {
+                thread::sleep(
+                    POLL_INTERVAL.min(deadline.saturating_duration_since(Instant::now())),
+                );
             }
             Ok(None) => {
                 let primary = format!("{program} timed out after {} ms", timeout.as_millis());
                 let cleanup = terminate_and_reap(&mut child, program).err();
-                if let Some(writer) = writer.take() {
-                    let _ = writer.join();
-                }
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
             }
             Err(error) => {
                 let primary = format!("could not wait for {program}: {error}");
                 let cleanup = terminate_and_reap(&mut child, program).err();
-                if let Some(writer) = writer.take() {
-                    let _ = writer.join();
-                }
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
             }
         }
     };
-
-    if let Some(writer) = writer {
-        writer
-            .join()
-            .map_err(|_| format!("{program} stdin writer panicked"))??;
-    }
-    let stdout = stdout_reader
-        .join()
-        .map_err(|_| format!("{program} stdout reader panicked"))??;
-    let stderr = stderr_reader
-        .join()
-        .map_err(|_| format!("{program} stderr reader panicked"))??;
-    Ok(ProcessOutput {
-        success: status.success(),
-        stdout: String::from_utf8_lossy(&stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&stderr).trim().to_owned(),
-    })
+    capture.output(status)
 }
 
 fn process_output(
@@ -285,14 +309,22 @@ fn process_output(
     args: &[&str],
     timeout: Duration,
 ) -> Result<ProcessOutput, String> {
+    let deadline = Instant::now() + timeout;
+    let capture = ProcessCapture::new()?;
     let child = Command::new(program)
         .args(args)
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdout(capture.stdout.stdio()?)
+        .stderr(capture.stderr.stdio()?)
         .spawn()
         .map_err(|error| format!("could not start {program}: {error}"))?;
-    run_spawned_child(child, program, None, timeout)
+    run_spawned_child(
+        child,
+        program,
+        None,
+        deadline.saturating_duration_since(Instant::now()),
+        capture,
+    )
 }
 
 fn process_input(
@@ -301,14 +333,27 @@ fn process_input(
     input: &[u8],
     timeout: Duration,
 ) -> Result<ProcessOutput, String> {
+    if input.len() > MAX_NATIVE_STDIN_BYTES {
+        return Err(format!(
+            "{program} input exceeds {MAX_NATIVE_STDIN_BYTES} byte native limit"
+        ));
+    }
+    let deadline = Instant::now() + timeout;
+    let capture = ProcessCapture::new()?;
     let child = Command::new(program)
         .args(args)
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdout(capture.stdout.stdio()?)
+        .stderr(capture.stderr.stdio()?)
         .spawn()
         .map_err(|error| format!("could not start {program}: {error}"))?;
-    run_spawned_child(child, program, Some(input.to_vec()), timeout)
+    run_spawned_child(
+        child,
+        program,
+        Some(input.to_vec()),
+        deadline.saturating_duration_since(Instant::now()),
+        capture,
+    )
 }
 
 struct NativeClipboard;
@@ -989,18 +1034,103 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn child_timeout_kills_and_reaps_the_process() {
+        let capture = ProcessCapture::new().unwrap();
         let child = Command::new("sleep")
             .arg("30")
             .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stdout(capture.stdout.stdio().unwrap())
+            .stderr(capture.stderr.stdio().unwrap())
             .spawn()
             .unwrap();
         let pid = child.id();
 
-        let error = run_spawned_child(child, "sleep", None, Duration::from_millis(20)).unwrap_err();
+        let error = run_spawned_child(child, "sleep", None, Duration::from_millis(20), capture)
+            .unwrap_err();
 
         assert!(error.contains("timed out"));
         assert!(!std::path::Path::new(&format!("/proc/{pid}")).exists());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn timeout_does_not_wait_for_descendants_holding_output_descriptors() {
+        let started = Instant::now();
+
+        let error = process_output(
+            "sh",
+            &["-c", "sleep 1 & exec sleep 30"],
+            Duration::from_millis(30),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("timed out"));
+        assert!(
+            started.elapsed() < Duration::from_millis(500),
+            "runner exceeded hard deadline: {:?}",
+            started.elapsed()
+        );
+    }
+
+    #[test]
+    fn oversized_input_is_rejected_before_process_spawn() {
+        let input = vec![b'x'; MAX_NATIVE_STDIN_BYTES + 1];
+
+        let error = process_input(
+            "/operator-key-test-program-does-not-exist",
+            &[],
+            &input,
+            Duration::from_secs(1),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("input exceeds"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn capture_files_are_deleted_when_the_capture_is_dropped() {
+        let (stdout_path, stderr_path) = {
+            let capture = ProcessCapture::new().unwrap();
+            assert!(capture.stdout.path.exists());
+            assert!(capture.stderr.path.exists());
+            (capture.stdout.path.clone(), capture.stderr.path.clone())
+        };
+
+        assert!(!stdout_path.exists());
+        assert!(!stderr_path.exists());
+    }
+
+    #[test]
+    fn captured_output_is_bounded_and_reports_truncation() {
+        let mut capture = CaptureFile::new("bounded-test").unwrap();
+        capture
+            .file
+            .write_all(&vec![b'x'; MAX_CAPTURE_BYTES + 1])
+            .unwrap();
+
+        let output = capture.read_bounded().unwrap();
+
+        assert_eq!(
+            output.len(),
+            MAX_CAPTURE_BYTES + OUTPUT_TRUNCATED_MARKER.len()
+        );
+        assert!(output.ends_with(OUTPUT_TRUNCATED_MARKER));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn completed_process_preserves_normal_stdout_and_stderr() {
+        let output = process_output(
+            "sh",
+            &[
+                "-c",
+                "printf stdout-value; printf ' stderr-value\\n' >&2; exit 7",
+            ],
+            Duration::from_secs(1),
+        )
+        .unwrap();
+
+        assert!(!output.success);
+        assert_eq!(output.stdout, "stdout-value");
+        assert_eq!(output.stderr, "stderr-value");
     }
 }
