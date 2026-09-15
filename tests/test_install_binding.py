@@ -625,6 +625,58 @@ class InstallBindingTests(unittest.TestCase):
         self.assertTrue(all(0 < timeout <= 1.0 for timeout in client_timeouts))
         self.assertTrue(all(0 < seconds <= 0.25 for seconds in sleeps))
 
+    def test_launch_rejects_valid_client_when_query_crosses_deadline(self):
+        clock = [0.0]
+
+        class DeadlineCrossingRunner(FakeRunner):
+            def __init__(inner_self):
+                super().__init__()
+                inner_self.client_queries = 0
+
+            def run(inner_self, args, *, timeout=None):
+                if tuple(args) == ("hyprctl", "-j", "clients"):
+                    inner_self.client_queries += 1
+                    if inner_self.client_queries == 2:
+                        inner_self.clients.append(dict(inner_self.trigger_client))
+                result = super().run(args, timeout=timeout)
+                if tuple(args) == ("hyprctl", "-j", "clients") and inner_self.client_queries == 2:
+                    clock[0] = 1.1
+                return result
+
+        runner = DeadlineCrossingRunner()
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=["SUPER + SHIFT + K"],
+        )
+        with self.assertRaisesRegex(installer.InstallError, "timed out"):
+            installer._verify_launch(
+                plan, runner, lambda pid: self.destination, lambda chord: None,
+                monotonic=lambda: clock[0], sleep=lambda seconds: None,
+                verification_timeout=1.0,
+            )
+
+    def test_launch_rejects_valid_client_when_pid_resolution_crosses_deadline(self):
+        clock = [0.0]
+        runner = FakeRunner()
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=["SUPER + SHIFT + K"],
+        )
+
+        def prompt(chord):
+            runner.clients.append(dict(runner.trigger_client))
+
+        def resolve_after_deadline(pid):
+            clock[0] = 1.1
+            return self.destination
+
+        with self.assertRaisesRegex(installer.InstallError, "timed out"):
+            installer._verify_launch(
+                plan, runner, resolve_after_deadline, prompt,
+                monotonic=lambda: clock[0], sleep=lambda seconds: None,
+                verification_timeout=1.0,
+            )
+
     def test_launch_requires_new_exact_class_not_title_or_substring(self):
         runner = FakeRunner()
         runner.trigger_client = {

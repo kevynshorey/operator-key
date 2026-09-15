@@ -633,11 +633,17 @@ def _verify_launch(
 ) -> None:
     deadline = monotonic() + verification_timeout
 
-    def query_clients() -> dict[str, dict]:
+    def require_time_remaining() -> float:
         remaining = deadline - monotonic()
         if remaining <= 0:
             raise InstallError("Physical shortcut verification timed out")
-        return _operator_clients(runner, timeout=min(CLIENT_QUERY_TIMEOUT, remaining))
+        return remaining
+
+    def query_clients() -> dict[str, dict]:
+        remaining = require_time_remaining()
+        clients = _operator_clients(runner, timeout=min(CLIENT_QUERY_TIMEOUT, remaining))
+        require_time_remaining()
+        return clients
 
     before = query_clients()
     prompt_shortcut(plan.chord)
@@ -652,10 +658,12 @@ def _verify_launch(
                 executable = Path(process_exe_resolver(int(pid))).resolve()
             except (OSError, TypeError, ValueError) as error:
                 raise InstallError(f"Could not resolve new Operator Key client executable: {error}") from error
+            require_time_remaining()
             if executable != plan.destination.resolve():
                 raise InstallError(
                     f"New exact-class client executable {executable} does not match {plan.destination}"
                 )
+            require_time_remaining()
             return
         remaining = deadline - monotonic()
         if remaining <= 0:
