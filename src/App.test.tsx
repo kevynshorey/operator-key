@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -27,6 +27,27 @@ describe("Operator Key overlay", () => {
     expect(await screen.findByRole("heading", { name: "/code-review" })).toBeInTheDocument();
     await user.keyboard("{ArrowDown}");
     expect(screen.getByRole("option", { selected: true })).toHaveAttribute("aria-posinset", "2");
+  });
+
+  it("debounces result reconciliation while preserving immediate query input", () => {
+    vi.useFakeTimers();
+    try {
+      render(<App />);
+      const search = screen.getByRole("searchbox", { name: /operator intent/i });
+      const initialHeading = screen.getByRole("heading", { level: 2 }).textContent;
+
+      fireEvent.change(search, { target: { value: "h" } });
+      fireEvent.change(search, { target: { value: "hermes status" } });
+
+      expect(search).toHaveValue("hermes status");
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(initialHeading ?? "");
+      act(() => vi.advanceTimersByTime(119));
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(initialHeading ?? "");
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("hermes status");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the keyboard-active result visible as selection changes", async () => {
@@ -80,7 +101,7 @@ describe("Operator Key overlay", () => {
     render(<App />);
     await user.selectOptions(screen.getByLabelText(/safety filter/i), "red");
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "move window");
-    expect(screen.getByRole("status")).toHaveTextContent(/no matching command/i);
+    expect(await screen.findByRole("status")).toHaveTextContent(/no matching command/i);
   });
 
   it("copies the selected catalog command with Enter", async () => {
@@ -122,7 +143,7 @@ describe("Operator Key overlay", () => {
     const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
     render(<App actions={actions} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes logout");
-    expect(screen.getByRole("alert")).toHaveTextContent(/danger|red/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/danger|red/i);
     expect(screen.getByRole("button", { name: /insert into confirmed terminal/i })).toBeDisabled();
     await user.keyboard("{Shift>}{Enter}{/Shift}");
     expect(actions.insert).not.toHaveBeenCalled();
@@ -155,7 +176,8 @@ describe("Operator Key overlay", () => {
     expect(screen.getByLabelText(/interface filter/i)).toBeDisabled();
     expect(screen.getByLabelText(/safety filter/i)).toBeDisabled();
     expect(screen.getAllByRole("radio").every((control) => control.hasAttribute("disabled"))).toBe(true);
-    expect(screen.getAllByRole("option").every((option) => option.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(screen.getByRole("listbox", { name: /command results/i })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("option").every((option) => option.getAttribute("aria-disabled") === "false")).toBe(true);
     expect(screen.getAllByRole("button", { name: /task/i }).every((control) => control.hasAttribute("disabled"))).toBe(true);
 
     finishCopy?.();
@@ -169,7 +191,7 @@ describe("Operator Key overlay", () => {
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes logout");
 
     const insert = screen.getByRole("button", { name: /insert into confirmed terminal/i });
-    expect(insert).toHaveAttribute("aria-describedby", "insert-disabled-reason");
+    await waitFor(() => expect(insert).toHaveAttribute("aria-describedby", "insert-disabled-reason"));
     expect(document.getElementById("insert-disabled-reason")).toHaveTextContent(/copy-only/i);
   });
 
@@ -196,7 +218,7 @@ describe("Operator Key overlay", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Ctrl+B");
-    expect(screen.getByText(/binding conflict/i)).toBeInTheDocument();
+    expect(await screen.findByText(/binding conflict/i)).toBeInTheDocument();
     expect(screen.getByText(/safety level/i)).toBeInTheDocument();
     expect(screen.getByText(/version/i)).toBeInTheDocument();
     expect(screen.getByText(/provenance/i)).toBeInTheDocument();

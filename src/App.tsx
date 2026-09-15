@@ -95,7 +95,7 @@ function ResultRow({ entry, active, position, total, disabled, onSelect, setRowR
       id={`result-${entry.id}`}
       role="option"
       aria-selected={active}
-      aria-disabled={disabled}
+      aria-disabled={false}
       aria-posinset={position}
       aria-setsize={total}
       data-product={entry.product}
@@ -244,6 +244,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
     [parsed],
   );
   const [query, setQuery] = useState("");
+  const [settledQuery, setSettledQuery] = useState("");
   const [product, setProduct] = useState<Product>();
   const [interfaceType, setInterfaceType] = useState<InterfaceType>();
   const [task, setTask] = useState<TaskGroup>();
@@ -261,12 +262,22 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
     else resultRefs.current.delete(entryId);
   }, []);
 
-  const results = useMemo(() => {
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setSettledQuery(query), 120);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
+
+  const liveResults = useMemo(() => {
     if (!searchIndex) return [];
     return searchCatalog(searchIndex, query, { product, interface: interfaceType, task, safety }, 50);
   }, [searchIndex, query, product, interfaceType, task, safety]);
+  const results = useMemo(() => {
+    if (!searchIndex) return [];
+    return searchCatalog(searchIndex, settledQuery, { product, interface: interfaceType, task, safety }, 50);
+  }, [searchIndex, settledQuery, product, interfaceType, task, safety]);
   const boundedIndex = Math.min(selectedIndex, Math.max(0, results.length - 1));
   const selected = results[boundedIndex]?.entry;
+  const actionSelection = query === settledQuery ? selected : liveResults[0]?.entry;
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -296,11 +307,11 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const actionErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
 
   const copySelected = async () => {
-    if (!selected || actionPending) return;
+    if (!actionSelection || actionPending) return;
     setActionPending(true);
     try {
-      await operatorActions.copy(selected);
-      setActionStatus({ kind: "status", message: `Copied “${selected.command}” to the clipboard.` });
+      await operatorActions.copy(actionSelection);
+      setActionStatus({ kind: "status", message: `Copied “${actionSelection.command}” to the clipboard.` });
     } catch (error) {
       setActionStatus({ kind: "alert", message: `Copy failed: ${actionErrorMessage(error)}` });
     } finally {
@@ -309,16 +320,16 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   };
 
   const insertSelected = async () => {
-    if (!selected || actionPending) return;
-    const availability = getActionAvailability(selected);
+    if (!actionSelection || actionPending) return;
+    const availability = getActionAvailability(actionSelection);
     if (!availability.insert) {
       setActionStatus({ kind: "status", message: availability.insertReason ?? "Terminal insertion is unavailable." });
       return;
     }
     setActionPending(true);
     try {
-      await operatorActions.insert(selected);
-      setActionStatus({ kind: "status", message: `Inserted “${selected.command}” without executing it.` });
+      await operatorActions.insert(actionSelection);
+      setActionStatus({ kind: "status", message: `Inserted “${actionSelection.command}” without executing it.` });
     } catch (error) {
       setActionStatus({ kind: "alert", message: `Insert failed: ${actionErrorMessage(error)}` });
     } finally {
@@ -445,7 +456,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         <section className="workspace-grid">
           <aside className="result-lane" aria-label="Search results">
             <div className="lane-heading"><span>MATCHES</span><strong>{results.length.toString().padStart(2, "0")}</strong></div>
-            <ul id="result-list" role="listbox" aria-label="Command results">
+            <ul id="result-list" role="listbox" aria-label="Command results" aria-busy={actionPending}>
               {results.map(({ entry }, index) => (
                 <ResultRow
                   key={entry.id}
@@ -453,7 +464,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
                   active={index === boundedIndex}
                   position={index + 1}
                   total={results.length}
-                  disabled={actionPending}
+                  disabled={false}
                   onSelect={() => { if (!actionPending) setSelectedIndex(index); }}
                   setRowRef={setResultRef}
                 />
