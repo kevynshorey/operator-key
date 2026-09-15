@@ -26,7 +26,8 @@ def load_installer():
 installer = load_installer()
 
 
-def bind(modmask, key, description, *, release=False, locked=False, repeat=False):
+def bind(modmask, key, description, *, release=False, locked=False, repeat=False,
+         dispatcher="__lua", arg="opaque"):
     return {
         "modmask": modmask,
         "key": key,
@@ -36,6 +37,8 @@ def bind(modmask, key, description, *, release=False, locked=False, repeat=False
         "locked": locked,
         "repeat": repeat,
         "submap": "",
+        "dispatcher": dispatcher,
+        "arg": arg,
     }
 
 
@@ -45,7 +48,10 @@ class FakeRunner:
         self.clients = list(clients or [])
         self.failures = dict(failures or {})
         self.calls = []
-        self.spawned = []
+        self.trigger_client = {
+            "address": "0x99", "class": "operator-key",
+            "initialClass": "operator-key", "title": "Operator Key", "pid": 4242,
+        }
 
     def run(self, args, *, timeout=None):
         args = tuple(str(arg) for arg in args)
@@ -58,16 +64,17 @@ class FakeRunner:
             return installer.CommandResult(0, json.dumps(self.clients), "")
         if args == ("hyprctl", "reload"):
             return installer.CommandResult(0, "ok", "")
+        if args and args[0] == "wtype":
+            client = dict(self.trigger_client)
+            existing = {item.get("address") for item in self.clients}
+            if client.get("address") in existing:
+                client["address"] = f"{client['address']}-{len(self.clients)}"
+            self.clients.append(client)
+            return installer.CommandResult(0, "", "")
         if args == ("omarchy", "menu", "keybindings", "--print"):
             return installer.CommandResult(0, "SUPER + K → Keybindings\n", "")
         return installer.CommandResult(127, "", "unexpected command")
 
-    def spawn(self, args):
-        args = tuple(str(arg) for arg in args)
-        self.calls.append(args)
-        self.spawned.append(args)
-        self.clients.append({"address": "0x99", "class": "operator-key", "title": "Operator Key"})
-        return object()
 
     def sleep(self, seconds):
         self.calls.append(("sleep", seconds))
@@ -99,6 +106,8 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(parsed[0].trigger, "press, locked, repeat")
         self.assertEqual(parsed[1].trigger, "release")
         self.assertEqual(parsed[0].physical, parsed[1].physical)
+        self.assertEqual(parsed[0].dispatcher, "__lua")
+        self.assertEqual(parsed[0].arg, "opaque")
 
     def test_parses_hyprctl_switch_names_with_spaces_without_aborting_preview(self):
         parsed = installer.parse_hyprctl_binds(
@@ -212,9 +221,15 @@ class InstallBindingTests(unittest.TestCase):
             candidates=["SUPER + SHIFT + K"],
         )
         runner.binds.append(bind(64 | 1, "K", "Operator Key"))
-        installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+        installer.apply_plan(
+            plan, runner=runner, confirm=lambda _: True,
+            process_exe_resolver=lambda pid: self.destination,
+        )
         first = self.target.read_bytes()
-        installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+        installer.apply_plan(
+            plan, runner=runner, confirm=lambda _: True,
+            process_exe_resolver=lambda pid: self.destination,
+        )
         self.assertEqual(self.target.read_bytes(), first)
         self.assertEqual(first.count(installer.BEGIN_MARKER.encode()), 1)
         self.assertEqual((Path(str(self.target) + ".operator-key.bak")).read_bytes(), b"-- personal\r\n")
@@ -222,7 +237,10 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(self.destination.read_bytes(), self.source.read_bytes())
         self.assertEqual(stat.S_IMODE(self.destination.stat().st_mode), 0o755)
         self.assertIn(("hyprctl", "reload"), runner.calls)
-        self.assertIn((str(self.destination),), runner.spawned)
+        self.assertIn(
+            ("wtype", "-M", "shift", "-M", "logo", "-P", "k", "-p", "k",
+             "-m", "logo", "-m", "shift"), runner.calls,
+        )
 
     def test_refuses_malformed_duplicate_or_nested_marker_blocks(self):
         cases = [
@@ -320,7 +338,10 @@ class InstallBindingTests(unittest.TestCase):
         config_backup.write_bytes(b"keep config backup")
         binary_backup.write_bytes(b"keep binary backup")
         runner = FakeRunner(binds=[bind(64 | 1, "K", "Operator Key")])
-        installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+        installer.apply_plan(
+            plan, runner=runner, confirm=lambda _: True,
+            process_exe_resolver=lambda pid: self.destination,
+        )
         self.assertEqual(config_backup.read_bytes(), b"keep config backup")
         self.assertEqual(binary_backup.read_bytes(), b"keep binary backup")
 
@@ -441,17 +462,14 @@ class InstallBindingTests(unittest.TestCase):
         plan = installer.create_uninstall_plan(target=self.target)
         self.assertEqual(plan.destination, self.destination)
 
-    def test_yes_without_apply_is_preview_only(self):
-        before = self.target.read_bytes()
-        runner = FakeRunner()
-        with mock.patch.object(installer, "SubprocessRunner", return_value=runner):
-            result = installer.main([
-                "--target", str(self.target), "--binary", str(self.source),
-                "--destination", str(self.destination), "--candidate", "SUPER + SHIFT + K", "--yes",
-            ])
-        self.assertEqual(result, 0)
-        self.assertEqual(self.target.read_bytes(), before)
-        self.assertFalse(self.destination.exists())
+    def test_yes_option_is_removed(self):
+        with self.assertRaises(SystemExit):
+            installer.parse_args(["--yes"])
+
+    def test_non_tty_confirmation_always_fails(self):
+        with mock.patch.object(sys.stdin, "isatty", return_value=False):
+            with self.assertRaisesRegex(installer.InstallError, "interactive terminal"):
+                installer._interactive_confirmation("APPLY SUPER + SHIFT + K")
 
     def test_reload_or_launch_verification_failure_rolls_back_exact_bytes_and_binary(self):
         old_binary = b"old binary"
@@ -467,7 +485,7 @@ class InstallBindingTests(unittest.TestCase):
             runner=runner,
             candidates=["SUPER + SHIFT + K"],
         )
-        with self.assertRaisesRegex(installer.InstallError, "rolled back"):
+        with self.assertRaisesRegex(installer.InstallError, "rollback incomplete"):
             installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
         self.assertEqual(self.target.read_bytes(), original)
         self.assertEqual(self.destination.read_bytes(), old_binary)
@@ -484,8 +502,15 @@ class InstallBindingTests(unittest.TestCase):
             candidates=["SUPER + SHIFT + K"],
         )
         runner.binds.append(bind(64 | 1, "K", "Operator Key"))
-        installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
-        self.assertEqual(runner.spawned, [(str(self.destination),)])
+        installer.apply_plan(
+            plan, runner=runner, confirm=lambda _: True,
+            process_exe_resolver=lambda pid: self.destination,
+        )
+        self.assertNotIn((str(self.destination),), runner.calls)
+        self.assertIn(
+            ("wtype", "-M", "shift", "-M", "logo", "-P", "k", "-p", "k",
+             "-m", "logo", "-m", "shift"), runner.calls,
+        )
         self.assertIn(("hyprctl", "-j", "clients"), runner.calls)
         self.assertEqual(runner.calls.count(("hyprctl", "reload")), 1)
 
@@ -506,6 +531,233 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(self.target.read_bytes(), before_user)
         self.assertTrue(self.source.exists())
         self.assertFalse(self.destination.exists())
+
+    def test_wtype_argv_is_exact_and_rejects_unvalidated_chords(self):
+        self.assertEqual(
+            installer.wtype_argv("SUPER + CTRL + U"),
+            ["wtype", "-M", "ctrl", "-M", "logo", "-P", "u", "-p", "u",
+             "-m", "logo", "-m", "ctrl"],
+        )
+        with self.assertRaisesRegex(installer.InstallError, "key"):
+            installer.wtype_argv("SUPER + SHIFT + K + Q")
+
+    def test_launch_requires_new_exact_class_not_title_or_substring(self):
+        runner = FakeRunner()
+        runner.trigger_client = {
+            "address": "0x99", "class": "not-operator-key-helper",
+            "initialClass": "foot", "title": "Operator Key",
+        }
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=["SUPER + SHIFT + K"],
+        )
+        runner.binds.append(bind(65, "K", "Operator Key"))
+        with self.assertRaisesRegex(installer.InstallError, "new exact-class"):
+            installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+
+    def test_runtime_identity_is_exact_operator_key_class(self):
+        clients = installer._operator_clients(FakeRunner(clients=[
+            {"address": "exact", "class": "operator-key", "initialClass": "operator-key"},
+            {"address": "reverse-domain", "class": "com.operator-key.overlay"},
+            {"address": "title-only", "class": "foot", "title": "Operator Key"},
+            {"address": "substring", "class": "operator-key-helper"},
+        ]))
+        self.assertEqual(set(clients), {"exact"})
+
+    def test_launch_rejects_new_exact_class_client_without_pid(self):
+        runner = FakeRunner()
+        runner.trigger_client.pop("pid")
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=["SUPER + SHIFT + K"],
+        )
+        runner.binds.append(bind(65, "K", "Operator Key"))
+        with self.assertRaisesRegex(installer.InstallError, "PID"):
+            installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+
+    def test_post_reload_binding_verification_rejects_same_chord_conflict(self):
+        runner = FakeRunner()
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=["SUPER + SHIFT + K"],
+        )
+        runner.binds.extend([
+            bind(65, "K", "Operator Key"),
+            bind(65, "K", "late conflicting binding", dispatcher="exec", arg="other"),
+        ])
+        with self.assertRaisesRegex(installer.InstallError, "conflicting active binding"):
+            installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+
+    def test_launch_rejects_pid_executable_mismatch(self):
+        runner = FakeRunner()
+        runner.trigger_client["pid"] = 4242
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=["SUPER + SHIFT + K"],
+        )
+        runner.binds.append(bind(65, "K", "Operator Key"))
+        with self.assertRaisesRegex(installer.InstallError, "executable"):
+            installer.apply_plan(
+                plan, runner=runner, confirm=lambda _: True,
+                process_exe_resolver=lambda pid: Path("/wrong/binary"),
+            )
+
+    def test_launch_accepts_pid_only_when_executable_matches_destination(self):
+        runner = FakeRunner()
+        runner.trigger_client["pid"] = 4242
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=["SUPER + SHIFT + K"],
+        )
+        runner.binds.append(bind(65, "K", "Operator Key"))
+        installer.apply_plan(
+            plan, runner=runner, confirm=lambda _: True,
+            process_exe_resolver=lambda pid: self.destination,
+        )
+
+    def test_uninstall_reloads_then_requires_managed_binding_absent(self):
+        install = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
+        )
+        self.target.write_bytes(install.proposed)
+        self.destination.parent.mkdir()
+        self.destination.write_bytes(b"installed")
+        plan = installer.create_uninstall_plan(target=self.target)
+        runner = FakeRunner(binds=[bind(65, "K", "Operator Key")])
+        with self.assertRaisesRegex(installer.InstallError, "still active"):
+            installer.apply_uninstall(plan, runner=runner, confirm=lambda _: True)
+        self.assertEqual(self.target.read_bytes(), install.proposed)
+        self.assertEqual(self.destination.read_bytes(), b"installed")
+        self.assertEqual(runner.calls.count(("hyprctl", "reload")), 2)
+
+    def test_marker_substrings_and_lookalikes_are_not_managed_blocks(self):
+        content = (
+            b'local a = "-- >>> Operator Key managed binding >>>"\n'
+            b"  -- >>> Operator Key managed binding >>>\n"
+            b"-- prefix -- <<< Operator Key managed binding <<<\n"
+        )
+        block = installer.make_block("SUPER + SHIFT + K", self.destination, b"\n")
+        self.assertEqual(installer.replace_managed_block(content, block), content + block)
+        self.target.write_bytes(content)
+        with self.assertRaisesRegex(installer.InstallError, "No Operator Key"):
+            installer.create_uninstall_plan(target=self.target)
+
+    def test_exact_marker_lines_inside_lua_long_string_are_ignored(self):
+        content = (
+            b"local text = [[\n-- >>> Operator Key managed binding >>>\n"
+            b"not executable\n-- <<< Operator Key managed binding <<<\n]]\n"
+        )
+        block = installer.make_block("SUPER + SHIFT + K", self.destination, b"\n")
+        self.assertEqual(installer.replace_managed_block(content, block), content + block)
+
+    def test_strict_block_rejects_extra_content_and_multiple_exact_blocks(self):
+        good = installer.make_block("SUPER + SHIFT + K", self.destination, b"\n")
+        extra = good.replace(
+            installer.END_MARKER.encode(),
+            b"os.execute('bad')\n" + installer.END_MARKER.encode(),
+        )
+        for content in (extra, good + good):
+            with self.subTest(content=content):
+                with self.assertRaisesRegex(installer.InstallError, "managed|marker"):
+                    installer.remove_managed_block(content)
+
+    def test_apply_revalidates_exact_proposed_bytes_before_mutation(self):
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
+        )
+        from dataclasses import replace
+        tampered = replace(plan, proposed=plan.proposed + b"-- injected\n")
+        with self.assertRaisesRegex(installer.InstallError, "plan bytes"):
+            installer.apply_plan(tampered, runner=FakeRunner(), confirm=lambda _: True)
+        self.assertEqual(self.target.read_bytes(), plan.original)
+
+    def test_install_rollback_continues_after_config_restore_fails(self):
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
+        )
+        runner = FakeRunner(failures={("hyprctl", "reload"): "reload failed"})
+        original_write = installer._atomic_write
+
+        def fail_config_restore(path, data, mode):
+            if path == self.target and data == plan.original and self.target.read_bytes() == plan.proposed:
+                raise OSError("restore config failed")
+            return original_write(path, data, mode)
+
+        with mock.patch.object(installer, "_atomic_write", side_effect=fail_config_restore):
+            with self.assertRaisesRegex(installer.InstallError, "rollback incomplete.*restore config failed"):
+                installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+        self.assertFalse(self.destination.exists())
+        self.assertEqual(runner.calls.count(("hyprctl", "reload")), 2)
+
+    def test_uninstall_rollback_continues_after_config_restore_fails(self):
+        install = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
+        )
+        self.target.write_bytes(install.proposed)
+        self.destination.parent.mkdir()
+        self.destination.write_bytes(b"installed")
+        plan = installer.create_uninstall_plan(target=self.target)
+        runner = FakeRunner(failures={("hyprctl", "reload"): "reload failed"})
+        original_write = installer._atomic_write
+
+        def fail_config_restore(path, data, mode):
+            if path == self.target and data == plan.original and self.target.read_bytes() == plan.proposed:
+                raise OSError("restore config failed")
+            return original_write(path, data, mode)
+
+        with mock.patch.object(installer, "_atomic_write", side_effect=fail_config_restore):
+            with self.assertRaisesRegex(installer.InstallError, "rollback incomplete.*restore config failed"):
+                installer.apply_uninstall(plan, runner=runner, confirm=lambda _: True)
+        self.assertEqual(self.destination.read_bytes(), b"installed")
+        self.assertEqual(runner.calls.count(("hyprctl", "reload")), 2)
+
+    def test_install_rollback_reloads_after_destination_restore_fails(self):
+        self.destination.parent.mkdir()
+        self.destination.write_bytes(b"old")
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
+        )
+        runner = FakeRunner(failures={("hyprctl", "reload"): "primary reload failed"})
+        original_write = installer._atomic_write
+
+        def fail_destination_restore(path, data, mode):
+            if path == self.destination and data == b"old" and self.target.read_bytes() == plan.original:
+                raise OSError("restore destination failed")
+            return original_write(path, data, mode)
+
+        with mock.patch.object(installer, "_atomic_write", side_effect=fail_destination_restore):
+            with self.assertRaisesRegex(installer.InstallError, "restore destination failed"):
+                installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+        self.assertEqual(self.target.read_bytes(), plan.original)
+        self.assertEqual(runner.calls.count(("hyprctl", "reload")), 2)
+
+    def test_uninstall_rollback_reloads_after_destination_restore_fails(self):
+        install = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
+        )
+        self.target.write_bytes(install.proposed)
+        self.destination.parent.mkdir()
+        self.destination.write_bytes(b"installed")
+        plan = installer.create_uninstall_plan(target=self.target)
+        runner = FakeRunner(failures={("hyprctl", "reload"): "primary reload failed"})
+        original_write = installer._atomic_write
+
+        def fail_destination_restore(path, data, mode):
+            if path == self.destination and data == b"installed" and self.target.read_bytes() == plan.original:
+                raise OSError("restore destination failed")
+            return original_write(path, data, mode)
+
+        with mock.patch.object(installer, "_atomic_write", side_effect=fail_destination_restore):
+            with self.assertRaisesRegex(installer.InstallError, "restore destination failed"):
+                installer.apply_uninstall(plan, runner=runner, confirm=lambda _: True)
+        self.assertEqual(self.target.read_bytes(), plan.original)
+        self.assertEqual(runner.calls.count(("hyprctl", "reload")), 2)
 
 
 if __name__ == "__main__":

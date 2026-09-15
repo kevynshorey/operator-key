@@ -4,7 +4,7 @@ Operator Key ships a preview-first installer that adds one managed Omarchy bindi
 
 ## Requirements
 
-- Omarchy/Hyprland with `hyprctl` and `omarchy` on `PATH`
+- Omarchy/Hyprland with `hyprctl`, `omarchy`, and wtype 0.4 (`wtype` 0.4-2 on Omarchy/Arch) on `PATH`
 - Python 3.11 or newer
 - Node.js/npm and the Rust/Tauri toolchain to build Operator Key
 - The system libraries required by Tauri on your distribution
@@ -29,7 +29,7 @@ python3 scripts/install-omarchy-binding.py \
   --binary "$PWD/src-tauri/target/debug/operator-key"
 ```
 
-Preview is read-only: it does **not** change `~/.config/hypr/bindings.lua`, install a binary, reload Hyprland, or launch Operator Key. `--yes` is also harmless unless combined with `--apply`.
+Preview is read-only: it does **not** change `~/.config/hypr/bindings.lua`, install a binary, reload Hyprland, trigger a binding, or launch Operator Key.
 
 Typical output identifies the target and backup, the source and stable destination (`~/.local/bin/operator-key`), the source SHA-256, every candidate decision, and an exact block like:
 
@@ -63,13 +63,15 @@ python3 scripts/install-omarchy-binding.py \
   --apply
 ```
 
-The installer requires both `--apply` and the exact typed phrase shown at the prompt, such as `APPLY SUPER + SHIFT + K`. For reviewed automation, `--apply --yes` bypasses that prompt; it is intentionally dangerous and should only be used after a human has approved a preview produced from the same files.
+The installer requires both `--apply` and the exact typed phrase shown at the prompt, such as `APPLY SUPER + SHIFT + K`. There is no non-interactive approval option: stdin must be a TTY, and EOF, a mismatch, or a non-TTY invocation fails without applying.
 
-Apply rechecks the config, source, destination, and backup paths immediately before mutation. Symlinks and non-regular files are rejected. Existing regular backups are preserved and never silently overwritten. New files are written through same-directory temporary files, flushed, mode-set, and atomically replaced. The installer uses exact argument arrays—not a shell—to run `hyprctl reload` and the installed launcher.
+Apply regenerates and checks the exact proposed config bytes, and rechecks the config, source hash, destination hash, and backup paths immediately before mutation. It reads the written config and destination back before reload and requires the reviewed bytes and SHA-256. Symlinks and non-regular files are rejected. Existing regular backups are preserved and never silently overwritten. New files are written through same-directory temporary files, flushed, mode-set, and atomically replaced. Commands use exact argument arrays, never a shell.
 
-On success it verifies the active binding, launches the installed executable, and waits for a new Operator Key Hyprland client. That verified app instance is deliberately left running for the user; closing it with Escape or the close button exits the process so the global launcher can start a fresh instance later.
+On success it re-reads `hyprctl -j binds`, requires exactly one binding on the selected physical chord with description `Operator Key`, and rejects a late conflict. Omarchy's Lua bridge may report dispatcher `__lua` with an opaque argument, so this JSON check does **not** claim to prove the command target. Instead, the installer captures clients, runs a fixed wtype 0.4 argument sequence that presses the selected modifiers/key and releases them, then requires a new client whose `class` or `initialClass` is exactly `operator-key`. It never accepts the title, a reverse-domain identifier, or a substring, and never direct-spawns the destination as a substitute for exercising the binding.
 
-If any mutation, reload, binding check, or launch check fails, the installer restores the exact prior config and launcher bytes and modes. It reloads Hyprland after rollback whenever the config may have changed. The original config backup is `bindings.lua.operator-key.bak`; a replaced launcher is backed up as `operator-key.operator-key.bak` beside the destination.
+The new client must include a PID, and `/proc/<pid>/exe` must resolve exactly to the installed destination. A missing PID, mismatched executable, or compositor that does not route virtual-keyboard events through bindings causes verification to fail and rollback rather than producing a false success.
+
+If any mutation, reload, binding check, or end-to-end trigger check fails, rollback independently attempts config restoration, launcher restoration/removal, and (whenever config mutation was attempted) a Hyprland reload. Every rollback error is reported; one failed restoration never skips later steps. The original config backup is `bindings.lua.operator-key.bak`; a replaced launcher is backed up as `operator-key.operator-key.bak` beside the destination.
 
 ## Verify manually
 
@@ -94,7 +96,7 @@ Apply after reviewing the preview:
 python3 scripts/install-omarchy-binding.py --uninstall --apply
 ```
 
-The typed phrase is `UNINSTALL OPERATOR KEY`. Uninstall removes only the uniquely marked block and the absolute launcher destination recorded inside that block. It preserves every other byte, writes `bindings.lua.operator-key.uninstall.bak` without overwriting an existing regular backup, reloads Hyprland, and transactionally restores the config and launcher if removal fails.
+The typed phrase is `UNINSTALL OPERATOR KEY`, and a TTY is mandatory. Uninstall recognizes only a strict three-line generated block: an exact unindented begin marker, one canonical generated `o.bind(...)` line, and an exact unindented end marker, all with one newline style. Marker text inside strings/long strings, comments, indented lines, or larger lines is not managed state. Extra content, malformed exact markers, or multiple exact blocks are rejected without mutation. The destination is taken only from that validated block. After reload, uninstall re-reads `hyprctl -j binds` and requires the managed chord/description to be absent; failure runs the same best-effort complete rollback.
 
 ## Manual recovery
 

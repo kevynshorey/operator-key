@@ -54,6 +54,8 @@ KEY_ALIASES = {
     "spacebar": "space",
 }
 SAFE_PATH = re.compile(r"^/[A-Za-z0-9_./+-]+$")
+SAFE_WTYPE_KEY = re.compile(r"^[A-Za-z0-9_.:+-]+$")
+OPERATOR_KEY_CLASS = "operator-key"
 
 
 class InstallError(RuntimeError):
@@ -74,6 +76,8 @@ class Binding:
     description: str
     trigger: str
     source: str
+    dispatcher: str = ""
+    arg: str = ""
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,7 @@ class UninstallPlan:
     target: Path
     backup: Path
     destination: Path | None
+    chord: str
     original: bytes
     proposed: bytes
     target_mode: int
@@ -114,15 +119,6 @@ class SubprocessRunner:
         except (OSError, subprocess.TimeoutExpired) as error:
             return CommandResult(127, "", str(error))
         return CommandResult(completed.returncode, completed.stdout, completed.stderr)
-
-    def spawn(self, args: Sequence[str]):
-        return subprocess.Popen(
-            list(args),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
 
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
@@ -203,6 +199,8 @@ def parse_hyprctl_binds(payload: str) -> list[Binding]:
                 description=str(row.get("description") or "(no description)"),
                 trigger=_trigger(row),
                 source="hyprctl -j binds",
+                dispatcher=str(row.get("dispatcher") or ""),
+                arg=str(row.get("arg") or ""),
             )
         )
     return parsed
@@ -297,23 +295,103 @@ def validate_command_path(path: Path) -> None:
         )
 
 
-def _validate_markers(content: bytes) -> tuple[int | None, int | None]:
-    begin = BEGIN_MARKER.encode()
-    end = END_MARKER.encode()
-    begins = [match.start() for match in re.finditer(re.escape(begin), content)]
-    ends = [match.start() for match in re.finditer(re.escape(end), content)]
+def _line_parts(line: bytes) -> tuple[bytes, bytes]:
+    if line.endswith(b"\r\n"):
+        return line[:-2], b"\r\n"
+    if line.endswith(b"\n"):
+        return line[:-1], b"\n"
+    return line, b""
+
+
+def _advance_lua_long_state(body: bytes, long_end: bytes | None) -> bytes | None:
+    """Track Lua long strings/comments so marker-looking data is ignored."""
+    index = 0
+    while index < len(body):
+        if long_end is not None:
+            close = body.find(long_end, index)
+            if close < 0:
+                return long_end
+            index = close + len(long_end)
+            long_end = None
+            continue
+        if body.startswith(b"--", index):
+            opener = re.match(rb"\[(=*)\[", body[index + 2 :])
+            if opener:
+                long_end = b"]" + opener.group(1) + b"]"
+            return long_end
+        if body[index:index + 1] in (b'"', b"'"):
+            quote = body[index:index + 1]
+            index += 1
+            while index < len(body):
+                if body[index:index + 1] == b"\\":
+                    index += 2
+                elif body[index:index + 1] == quote:
+                    index += 1
+                    break
+                else:
+                    index += 1
+            continue
+        opener = re.match(rb"\[(=*)\[", body[index:])
+        if opener:
+            long_end = b"]" + opener.group(1) + b"]"
+            index += len(opener.group(0))
+            continue
+        index += 1
+    return long_end
+
+
+def _managed_block(content: bytes) -> tuple[int, int, str, Path] | None:
+    lines = content.splitlines(keepends=True)
+    offsets: list[int] = []
+    begins: list[int] = []
+    ends: list[int] = []
+    offset = 0
+    long_end: bytes | None = None
+    for index, line in enumerate(lines):
+        offsets.append(offset)
+        body, _ = _line_parts(line)
+        in_code = long_end is None
+        if in_code and body == BEGIN_MARKER.encode():
+            begins.append(index)
+        elif in_code and body == END_MARKER.encode():
+            ends.append(index)
+        long_end = _advance_lua_long_state(body, long_end)
+        offset += len(line)
     if len(begins) != len(ends) or len(begins) > 1:
         raise InstallError("Malformed or ambiguous Operator Key marker blocks")
     if not begins:
-        return None, None
-    if begins[0] >= ends[0]:
-        raise InstallError("Malformed Operator Key marker ordering")
-    line_end = content.find(b"\n", ends[0] + len(end))
-    stop = len(content) if line_end < 0 else line_end + 1
-    between = content[begins[0] + len(begin) : ends[0]]
-    if begin in between or end in between:
-        raise InstallError("Malformed nested Operator Key marker block")
-    return begins[0], stop
+        return None
+    begin_index, end_index = begins[0], ends[0]
+    if end_index != begin_index + 2:
+        raise InstallError("managed Operator Key block must contain exactly one binding line")
+    block_lines = lines[begin_index:end_index + 1]
+    parts = [_line_parts(line) for line in block_lines]
+    endings = [ending for _, ending in parts]
+    if not endings[0] or len(set(endings)) != 1:
+        raise InstallError("Managed Operator Key block must use one consistent newline style")
+    try:
+        binding_line = parts[1][0].decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise InstallError("Managed Operator Key binding is not valid UTF-8") from error
+    match = re.fullmatch(
+        r'o\.bind\("([^"\r\n]+)", "Operator Key", o\.launch\("([^"\r\n]+)"\)\)',
+        binding_line,
+    )
+    if not match:
+        raise InstallError("Managed Operator Key block does not contain the exact generated binding")
+    chord, raw_destination = match.groups()
+    if display_chord(canonicalize_chord(chord)) != chord:
+        raise InstallError("Managed Operator Key chord is not canonical")
+    destination = Path(raw_destination)
+    validate_command_path(destination)
+    start = offsets[begin_index]
+    stop = offsets[end_index] + len(lines[end_index])
+    return start, stop, chord, destination
+
+
+def _validate_markers(content: bytes) -> tuple[int | None, int | None]:
+    block = _managed_block(content)
+    return (None, None) if block is None else block[:2]
 
 
 def newline_for(content: bytes) -> bytes:
@@ -350,17 +428,8 @@ def remove_managed_block(content: bytes) -> bytes:
 
 
 def managed_chord(content: bytes) -> str | None:
-    start, stop = _validate_markers(content)
-    if start is None or stop is None:
-        return None
-    block = content[start:stop]
-    match = re.search(rb'o\.bind\("([^"]+)",\s*"Operator Key"', block)
-    if not match:
-        raise InstallError("Managed marker block does not contain the expected Operator Key binding")
-    try:
-        return display_chord(canonicalize_chord(match.group(1).decode()))
-    except UnicodeDecodeError as error:
-        raise InstallError("Managed Operator Key chord is not valid UTF-8") from error
+    block = _managed_block(content)
+    return None if block is None else block[2]
 
 
 def sha256(data: bytes) -> str:
@@ -432,8 +501,8 @@ def render_preview(plan: InstallPlan) -> str:
         "Apply verification steps:\n"
         "  1. Atomically copy the prebuilt binary and update bindings.lua\n"
         "  2. Run exact argv: hyprctl reload\n"
-        "  3. Re-read hyprctl -j binds and require the Operator Key chord\n"
-        "  4. Spawn the exact installed executable (no shell) and require a new Operator Key window\n"
+        "  3. Re-read hyprctl -j binds and require the Operator Key chord/description\n"
+        "  4. Send the exact chord with wtype (no shell) and require a new exact-class client\n"
         "  5. On any failure, restore exact prior bytes/modes and run hyprctl reload again\n"
     )
 
@@ -471,14 +540,6 @@ def _backup_if_absent(path: Path, data: bytes, mode: int, label: str) -> None:
         _atomic_write(path, data, mode)
 
 
-def _rollback_reload(runner) -> str:
-    rollback = runner.run(["hyprctl", "reload"], timeout=10)
-    if rollback.returncode == 0:
-        return ""
-    detail = rollback.stderr.strip() or rollback.stdout.strip() or rollback.returncode
-    return f"; rollback reload also failed: {detail}"
-
-
 def _successful(result: CommandResult, label: str) -> None:
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"
@@ -490,11 +551,45 @@ def _verify_binding(plan: InstallPlan, runner) -> None:
     _successful(result, "binding verification")
     physical = canonicalize_chord(plan.chord)
     bindings = parse_hyprctl_binds(result.stdout)
-    if not any(item.physical == physical and item.description == "Operator Key" for item in bindings):
+    on_chord = [item for item in bindings if item.physical == physical]
+    managed = [item for item in on_chord if item.description == "Operator Key"]
+    if not managed:
         raise InstallError(f"Active binding verification did not find Operator Key on {plan.chord}")
+    if len(on_chord) != 1:
+        details = "; ".join(
+            f"{item.description} ({item.dispatcher or 'unknown dispatcher'})" for item in on_chord
+        )
+        raise InstallError(f"Post-reload verification found a conflicting active binding: {details}")
 
 
-def _operator_windows(runner) -> set[str]:
+def _validate_plan_integrity(plan: InstallPlan, source_bytes: bytes) -> None:
+    expected_block = make_block(plan.chord, plan.destination, newline_for(plan.original))
+    expected_proposed = replace_managed_block(plan.original, expected_block)
+    if plan.block != expected_block or plan.proposed != expected_proposed:
+        raise InstallError("Install plan bytes are not the exact generated config; preview again")
+    if sha256(source_bytes) != plan.source_hash:
+        raise InstallError("Source binary changed after preview; preview again before applying")
+
+
+def wtype_argv(chord: str) -> list[str]:
+    physical = canonicalize_chord(chord)
+    if display_chord(physical) != chord:
+        raise InstallError("wtype chord must be a validated canonical candidate")
+    parts = physical.split("+")
+    modifiers, key = parts[:-1], parts[-1]
+    if not SAFE_WTYPE_KEY.fullmatch(key) or key.startswith("code:"):
+        raise InstallError(f"Binding key cannot be sent safely with wtype: {key!r}")
+    wtype_modifiers = ["logo" if modifier == "super" else modifier for modifier in modifiers]
+    argv = ["wtype"]
+    for modifier in wtype_modifiers:
+        argv.extend(("-M", modifier))
+    argv.extend(("-P", key, "-p", key))
+    for modifier in reversed(wtype_modifiers):
+        argv.extend(("-m", modifier))
+    return argv
+
+
+def _operator_clients(runner) -> dict[str, dict]:
     result = runner.run(["hyprctl", "-j", "clients"], timeout=5)
     _successful(result, "window verification")
     try:
@@ -503,35 +598,69 @@ def _operator_windows(runner) -> set[str]:
         raise InstallError(f"hyprctl returned malformed client JSON: {error}") from error
     if not isinstance(clients, list):
         raise InstallError("hyprctl client JSON must be an array")
-    matches = set()
+    matches: dict[str, dict] = {}
     for client in clients:
         if not isinstance(client, dict):
             continue
-        identity = " ".join(
-            str(client.get(field) or "") for field in ("class", "initialClass", "title", "initialTitle")
-        ).lower()
-        if "operator-key" in identity or "operator key" in identity:
-            matches.add(str(client.get("address") or identity))
+        identities = {str(client.get(field) or "") for field in ("class", "initialClass")}
+        if OPERATOR_KEY_CLASS in identities:
+            identity = str(
+                client.get("address") or client.get("stableId") or
+                f"pid:{client.get('pid')}:{json.dumps(client, sort_keys=True)}"
+            )
+            matches[identity] = client
     return matches
 
 
-def _verify_launch(plan: InstallPlan, runner, *, accept_existing: bool = False) -> None:
-    before = _operator_windows(runner)
-    if accept_existing and before:
-        return
-    try:
-        runner.spawn([str(plan.destination)])
-    except OSError as error:
-        raise InstallError(f"Could not launch installed Operator Key: {error}") from error
+def resolve_process_exe(pid: int) -> Path:
+    return Path(os.readlink(f"/proc/{pid}/exe"))
+
+
+def _verify_launch(plan: InstallPlan, runner, process_exe_resolver) -> None:
+    before = _operator_clients(runner)
+    _successful(runner.run(wtype_argv(plan.chord), timeout=5), "binding trigger")
     for _ in range(20):
-        current = _operator_windows(runner)
-        if current - before:
+        current = _operator_clients(runner)
+        for identity in current.keys() - before.keys():
+            client = current[identity]
+            pid = client.get("pid")
+            if pid is None:
+                raise InstallError("New exact-class Operator Key client did not include a PID")
+            try:
+                executable = Path(process_exe_resolver(int(pid))).resolve()
+            except (OSError, TypeError, ValueError) as error:
+                raise InstallError(f"Could not resolve new Operator Key client executable: {error}") from error
+            if executable != plan.destination.resolve():
+                raise InstallError(
+                    f"New exact-class client executable {executable} does not match {plan.destination}"
+                )
             return
         runner.sleep(0.25)
-    raise InstallError("Launch verification did not observe a new Operator Key window")
+    raise InstallError("Binding trigger did not observe a new exact-class Operator Key client")
 
 
-def apply_plan(plan: InstallPlan, *, runner, confirm: Callable[[str], bool]) -> None:
+def _rollback(actions: Sequence[tuple[str, Callable[[], None]]]) -> list[str]:
+    errors = []
+    for label, action in actions:
+        try:
+            action()
+        except Exception as error:
+            errors.append(f"{label} failed: {error}")
+    return errors
+
+
+def _raise_transaction_failure(operation: str, error: Exception, rollback_errors: list[str]) -> None:
+    if rollback_errors:
+        raise InstallError(
+            f"{operation} failed: {error}; rollback incomplete: " + "; ".join(rollback_errors)
+        ) from error
+    raise InstallError(f"{operation} failed and file changes were rolled back: {error}") from error
+
+
+def apply_plan(
+    plan: InstallPlan, *, runner, confirm: Callable[[str], bool],
+    process_exe_resolver: Callable[[int], Path] = resolve_process_exe,
+) -> None:
     phrase = f"APPLY {plan.chord}"
     if not confirm(phrase):
         raise InstallError("Confirmation declined; no files changed")
@@ -543,14 +672,13 @@ def apply_plan(plan: InstallPlan, *, runner, confirm: Callable[[str], bool]) -> 
     if current not in (plan.original, plan.proposed):
         raise InstallError("bindings.lua changed after preview; preview again before applying")
     source_bytes = plan.source.read_bytes()
-    if sha256(source_bytes) != plan.source_hash:
-        raise InstallError("Source binary changed after preview; preview again before applying")
+    _validate_plan_integrity(plan, source_bytes)
     old_destination = plan.destination.read_bytes() if destination_info else None
     old_destination_mode = stat.S_IMODE(destination_info.st_mode) if destination_info else None
     if current == plan.proposed and old_destination == source_bytes:
         _successful(runner.run(["hyprctl", "reload"], timeout=10), "Hyprland reload")
         _verify_binding(plan, runner)
-        _verify_launch(plan, runner, accept_existing=True)
+        _verify_launch(plan, runner, process_exe_resolver)
         return
     binary_backup = Path(str(plan.destination) + ".operator-key.bak")
     # Inspect every backup before creating either one, so a symlink or special
@@ -582,19 +710,33 @@ def apply_plan(plan: InstallPlan, *, runner, confirm: Callable[[str], bool]) -> 
         _atomic_write(plan.destination, source_bytes, stat.S_IMODE(source_info.st_mode) | stat.S_IXUSR)
         target_attempted = True
         _atomic_write(plan.target, plan.proposed, plan.target_mode)
+        if plan.target.read_bytes() != plan.proposed:
+            raise InstallError("Written bindings config does not match exact proposed bytes")
+        if sha256(plan.destination.read_bytes()) != plan.source_hash:
+            raise InstallError("Installed launcher hash does not match reviewed source hash")
         _successful(runner.run(["hyprctl", "reload"], timeout=10), "Hyprland reload")
         _verify_binding(plan, runner)
-        _verify_launch(plan, runner)
+        _verify_launch(plan, runner, process_exe_resolver)
     except Exception as error:
         if destination_attempted or target_attempted:
+            actions: list[tuple[str, Callable[[], None]]] = []
             if target_attempted:
-                _atomic_write(plan.target, current, stat.S_IMODE(current_info.st_mode))
+                actions.append(("config restore", lambda: _atomic_write(
+                    plan.target, current, stat.S_IMODE(current_info.st_mode)
+                )))
             if old_destination is None:
-                _unlink_regular(plan.destination, "launcher destination")
+                actions.append(("destination removal", lambda: _unlink_regular(
+                    plan.destination, "launcher destination"
+                )))
             else:
-                _atomic_write(plan.destination, old_destination, old_destination_mode or 0o700)
-            suffix = _rollback_reload(runner) if target_attempted else ""
-            raise InstallError(f"Install failed and file changes were rolled back: {error}{suffix}") from error
+                actions.append(("destination restore", lambda: _atomic_write(
+                    plan.destination, old_destination, old_destination_mode or 0o700
+                )))
+            if target_attempted:
+                actions.append(("rollback reload", lambda: _successful(
+                    runner.run(["hyprctl", "reload"], timeout=10), "Hyprland rollback reload"
+                )))
+            _raise_transaction_failure("Install", error, _rollback(actions))
         raise
 
 
@@ -603,18 +745,16 @@ def create_uninstall_plan(*, target: Path) -> UninstallPlan:
     target_info = _lstat_regular(target, "bindings target", must_exist=True)
     assert target_info is not None
     original = target.read_bytes()
-    start, stop = _validate_markers(original)
-    if start is None or stop is None:
+    managed = _managed_block(original)
+    if managed is None:
         raise InstallError("No Operator Key managed marker block is installed")
-    match = re.search(rb'o\.launch\("([^"\r\n]+)"\)', original[start:stop])
-    destination = Path(match.group(1).decode()) if match else None
-    if destination is not None:
-        validate_command_path(destination)
-        _lstat_regular(destination, "launcher destination", must_exist=False)
+    _, _, chord, destination = managed
+    _lstat_regular(destination, "launcher destination", must_exist=False)
     return UninstallPlan(
         target=target,
         backup=Path(str(target) + ".operator-key.uninstall.bak"),
         destination=destination,
+        chord=chord,
         original=original,
         proposed=remove_managed_block(original),
         target_mode=stat.S_IMODE(target_info.st_mode),
@@ -631,6 +771,15 @@ def render_uninstall_preview(plan: UninstallPlan) -> str:
         "Verification: run exact argv hyprctl reload and confirm the managed binding is absent\n"
         "Rollback: restore exact config and launcher bytes/modes, then reload, on failure\n"
     )
+
+
+def _verify_binding_absent(plan: UninstallPlan, runner) -> None:
+    result = runner.run(["hyprctl", "-j", "binds"], timeout=5)
+    _successful(result, "uninstall binding verification")
+    physical = canonicalize_chord(plan.chord)
+    bindings = parse_hyprctl_binds(result.stdout)
+    if any(item.physical == physical and item.description == "Operator Key" for item in bindings):
+        raise InstallError(f"Operator Key managed binding is still active on {plan.chord}")
 
 
 def apply_uninstall(plan: UninstallPlan, *, runner, confirm: Callable[[str], bool]) -> None:
@@ -665,23 +814,36 @@ def apply_uninstall(plan: UninstallPlan, *, runner, confirm: Callable[[str], boo
         if plan.destination is not None:
             _unlink_regular(plan.destination, "launcher destination")
         _successful(runner.run(["hyprctl", "reload"], timeout=10), "Hyprland reload")
+        _verify_binding_absent(plan, runner)
         if plan.destination is not None and _lstat_regular(
             plan.destination, "launcher destination", must_exist=False
         ) is not None:
             raise InstallError("Installed launcher still exists after uninstall")
     except Exception as error:
         if target_attempted:
-            _atomic_write(plan.target, plan.original, plan.target_mode)
+            actions: list[tuple[str, Callable[[], None]]] = [
+                ("config restore", lambda: _atomic_write(
+                    plan.target, plan.original, plan.target_mode
+                ))
+            ]
             if plan.destination is not None and old_binary is not None:
-                _atomic_write(plan.destination, old_binary, old_binary_mode or 0o700)
-            suffix = _rollback_reload(runner)
-            raise InstallError(f"Uninstall failed and file changes were rolled back: {error}{suffix}") from error
+                actions.append(("destination restore", lambda: _atomic_write(
+                    plan.destination, old_binary, old_binary_mode or 0o700
+                )))
+            elif plan.destination is not None:
+                actions.append(("destination removal", lambda: _unlink_regular(
+                    plan.destination, "launcher destination"
+                )))
+            actions.append(("rollback reload", lambda: _successful(
+                runner.run(["hyprctl", "reload"], timeout=10), "Hyprland rollback reload"
+            )))
+            _raise_transaction_failure("Uninstall", error, _rollback(actions))
         raise
 
 
 def _interactive_confirmation(expected: str) -> bool:
     if not sys.stdin.isatty():
-        raise InstallError("Apply requires an interactive terminal or explicit --yes after reviewed approval")
+        raise InstallError("Apply requires an interactive terminal and exact typed confirmation")
     typed = input(f"Type {expected!r} to continue: ")
     return typed == expected
 
@@ -699,7 +861,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--destination", type=Path, default=Path.home() / ".local/bin/operator-key")
     parser.add_argument("--candidate", action="append", dest="candidates", help="candidate chord, in preference order")
     parser.add_argument("--apply", action="store_true", help="apply only after preview and confirmation")
-    parser.add_argument("--yes", action="store_true", help="non-interactive confirmation; use only after explicit approval")
+
     parser.add_argument("--uninstall", action="store_true", help="preview/remove the managed block and installed launcher")
     return parser.parse_args(argv)
 
@@ -715,7 +877,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 apply_uninstall(
                     plan,
                     runner=runner,
-                    confirm=(lambda _: True) if args.yes else _interactive_confirmation,
+                    confirm=_interactive_confirmation,
                 )
                 print("Uninstall verified.")
             return 0
@@ -731,9 +893,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             apply_plan(
                 plan,
                 runner=runner,
-                confirm=(lambda _: True) if args.yes else _interactive_confirmation,
+                confirm=_interactive_confirmation,
             )
-            print("Install, reload, binding, and launch verification passed.")
+            print("Install, reload, and end-to-end binding verification passed.")
         return 0
     except InstallError as error:
         print(f"error: {error}", file=sys.stderr)
