@@ -7,8 +7,8 @@ describe("catalog boundary", () => {
     const result = parseCatalog(catalogJson);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.catalog.entries).toHaveLength(1302);
-      expect(result.catalog.total).toBe(1302);
+      expect(result.catalog.entries).toHaveLength(1303);
+      expect(result.catalog.total).toBe(1303);
     }
   });
 

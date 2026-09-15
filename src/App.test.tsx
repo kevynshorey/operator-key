@@ -15,7 +15,7 @@ describe("Operator Key overlay", () => {
     render(<App />);
     expect(screen.getByRole("searchbox", { name: /operator intent/i })).toHaveFocus();
     expect(screen.getByRole("radiogroup", { name: /product lanes/i })).toBeInTheDocument();
-    expect(screen.getByText(/1,302 commands ready/i)).toBeInTheDocument();
+    expect(screen.getByText(/1,303 commands ready/i)).toBeInTheDocument();
     expect(screen.getByText(/active context/i)).toBeInTheDocument();
   });
 

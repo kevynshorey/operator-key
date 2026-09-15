@@ -78,6 +78,7 @@ python3 scripts/operator_key.py review --json
 npm test
 npm run typecheck
 npm run lint
+npm run test:e2e
 python3 -m unittest discover -s tests -v
 python3 -m json.tool data/catalog.json >/dev/null
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
@@ -92,13 +93,13 @@ Build the web UI:
 npm run build
 ```
 
-Build a local debug Tauri executable without platform bundles:
+Build the standalone Tauri executable without platform bundles:
 
 ```bash
-npm run tauri build -- --debug --no-bundle
+npm run tauri -- build --no-bundle
 ```
 
-The web build intentionally embeds the complete 1,302-entry catalog for local, offline search. Vite therefore reports the catalog chunk at approximately 952 kB (approximately 146 kB gzip), above its default 500 kB advisory threshold. This is the known catalog payload rather than application-code growth; the warning remains enabled so unrelated bundle growth stays visible.
+Install only `src-tauri/target/release/operator-key`. A binary produced by plain `cargo build` loads the development URL and is not standalone. The web build intentionally embeds the complete 1,303-entry catalog for local, offline search. Vite therefore reports the catalog chunk at approximately 958 kB (approximately 148 kB gzip), above its default 500 kB advisory threshold. This is the known catalog payload rather than application-code growth; the warning remains enabled so unrelated bundle growth stays visible.
 
 ## Important behavior
 

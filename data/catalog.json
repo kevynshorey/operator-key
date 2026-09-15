@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-09-15T14:53:20.515481+00:00",
+  "generated_at": "2026-09-15T21:37:26.393206+00:00",
   "host": "omarchy",
   "versions": {
     "omarchy": "4.0.3-1",
@@ -9,12 +9,12 @@
     "codex": "0.154.0"
   },
   "counts": {
-    "omarchy": 227,
+    "omarchy": 228,
     "hermes": 707,
     "claude-code": 281,
     "codex": 87
   },
-  "total": 1302,
+  "total": 1303,
   "conflicts": [
     {
       "id": "c9f49a750c76fa88",
@@ -4418,6 +4418,30 @@
       "canonical_chord": "super+slash",
       "aliases": [],
       "description": "Monitor scaling up",
+      "context": "Omarchy/Hyprland desktop",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: omarchy menu keybindings --print",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: omarchy menu keybindings --print",
+        "version": "4.0.3-1"
+      }
+    },
+    {
+      "id": "0e437ef265a14f43",
+      "product": "omarchy",
+      "product_version": "4.0.3-1",
+      "interface": "hotkey",
+      "task_group": "help-and-reference",
+      "category": "help-and-reference",
+      "command": "SUPER + U",
+      "canonical_chord": "super+u",
+      "aliases": [],
+      "description": "Operator Key",
       "context": "Omarchy/Hyprland desktop",
       "safety_level": "green",
       "destructive": false,
