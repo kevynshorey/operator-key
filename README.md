@@ -41,6 +41,8 @@ Run the desktop overlay in Tauri development mode:
 npm run tauri dev
 ```
 
+To install a preview-first Omarchy launcher binding, follow [`docs/INSTALL.md`](docs/INSTALL.md). Preview is the default and does not change your configuration.
+
 Native copy requires `wl-copy` from `wl-clipboard`. Guarded insertion additionally requires Hyprland's `hyprctl` and `wtype`; it is not supported on other desktops. The overlay hides, captures an allowlisted terminal target, refocuses that exact Hyprland window address, and revalidates its identity before inserting. Native handoff work has a bounded deadline. The overlay is restored and refocused if target detection or insertion fails.
 
 ## Generate the catalog
