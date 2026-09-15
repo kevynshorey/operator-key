@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import tomllib
 from pathlib import Path
@@ -9,7 +10,65 @@ from pathlib import Path
 from .common import clean, entry, parse_help as parse_cli_help, run, split_markdown_cells
 
 DOCS_URL = "https://developers.openai.com/codex/developer-commands.md"
-SENSITIVE_PARTS = ("api_key", "apikey", "token", "secret", "password", "credential")
+
+MODEL_IDENTIFIER = re.compile(r"(?:gpt|codex|o[1-9])[-A-Za-z0-9._:]*", re.IGNORECASE)
+SAFE_BOOLEAN_PATHS = frozenset({
+    "allow_login_shell",
+    "analytics.enabled",
+    "check_for_update_on_startup",
+    "disable_paste_burst",
+    "feedback.enabled",
+    "hide_agent_reasoning",
+    "model_supports_reasoning_summaries",
+    "sandbox_workspace_write.exclude_slash_tmp",
+    "sandbox_workspace_write.exclude_tmpdir_env_var",
+    "sandbox_workspace_write.network_access",
+    "show_raw_agent_reasoning",
+    "tui.animations",
+    "tui.raw_output_mode",
+    "tui.show_tooltips",
+    "tui.vim_mode_default",
+    "features.apps",
+    "features.code_mode.enabled",
+    "features.context_management.experimental_mode",
+    "features.enable_request_compression",
+    "features.fast_mode",
+    "features.goals",
+    "features.hooks",
+    "features.memories",
+    "features.multi_agent",
+    "features.personality",
+    "features.prevent_idle_sleep",
+    "features.remote_plugin",
+    "features.shell_snapshot",
+    "features.shell_tool",
+    "features.skill_mcp_dependency_install",
+    "features.unified_exec",
+    "features.web_search",
+    "features.web_search_cached",
+    "features.web_search_request",
+})
+SAFE_ENUM_PATHS = {
+    "approval_policy": frozenset({"never", "on-request"}),
+    "approvals_reviewer": frozenset({"auto_review", "user"}),
+    "file_opener": frozenset({"cursor", "none", "vscode", "vscode-insiders", "windsurf"}),
+    "model_auto_compact_token_limit_scope": frozenset({"body_after_prefix", "total"}),
+    "model_reasoning_effort": frozenset({"high", "low", "medium", "minimal", "xhigh"}),
+    "model_reasoning_summary": frozenset({"auto", "concise", "detailed", "none"}),
+    "model_verbosity": frozenset({"high", "low", "medium"}),
+    "personality": frozenset({"friendly", "none", "pragmatic"}),
+    "sandbox_mode": frozenset({"danger-full-access", "read-only", "workspace-write"}),
+    "tui.alternate_screen": frozenset({"always", "auto", "never"}),
+    "tui.notification_condition": frozenset({"always", "unfocused"}),
+    "tui.notification_method": frozenset({"auto", "bel", "osc9"}),
+    "tui.resume_cwd": frozenset({"current", "session"}),
+    "web_search": frozenset({"cached", "disabled", "indexed", "live"}),
+}
+SAFE_NUMBER_PATHS = frozenset({
+    "background_terminal_max_timeout",
+    "model_auto_compact_token_limit",
+    "model_context_window",
+})
 
 
 def parse_help(text: str, product_version: str, source: str = "local: codex --help") -> list[dict]:
@@ -35,6 +94,24 @@ def _toml_value(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
+def _is_safe_config_value(path: str, value: object) -> bool:
+    """Only expose documented, non-secret scalar Codex settings."""
+    if path == "model":
+        return isinstance(value, str) and len(value) <= 128 and MODEL_IDENTIFIER.fullmatch(value) is not None
+    if path in SAFE_BOOLEAN_PATHS:
+        return isinstance(value, bool)
+    if path in SAFE_ENUM_PATHS:
+        return isinstance(value, str) and value in SAFE_ENUM_PATHS[path]
+    if path in SAFE_NUMBER_PATHS:
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            and value >= 0
+        )
+    return False
+
+
 def parse_config(text: str, product_version: str, source: str) -> list[dict]:
     try:
         document = tomllib.loads(text)
@@ -42,7 +119,7 @@ def parse_config(text: str, product_version: str, source: str) -> list[dict]:
         return []
     rows: list[dict] = []
     for key, value in _flatten(document):
-        if not key or any(part in key.lower() for part in SENSITIVE_PARTS):
+        if not key or not _is_safe_config_value(key, value):
             continue
         command = f"-c {key}={_toml_value(value)}"
         rows.append(entry("codex", "cli-flag", command, f"Configured Codex setting: {key}", source,

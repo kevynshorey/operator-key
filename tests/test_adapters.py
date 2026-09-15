@@ -84,6 +84,55 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertEqual(commands['-c model="gpt-5.6"']["provenance"]["kind"], "override")
         self.assertFalse(commands["ctrl+x"]["available"])
 
+    def test_config_omits_unknown_secret_named_scalar_values(self):
+        config = '''
+model = "gpt-5.6"
+PRIVATE_KEY = "super-private-value"
+GITHUB_PAT = "ghp_example_secret_value"
+Authorization = "Bearer example-secret-value"
+
+[features]
+web_search = true
+'''
+
+        rows = codex.parse_config(config, "0.154.0", "fixture: adversarial-config.toml")
+        serialized = repr(rows)
+
+        self.assertEqual(
+            [row["command"] for row in rows],
+            ['-c model="gpt-5.6"', "-c features.web_search=true"],
+        )
+        for sentinel in (
+            "super-private-value",
+            "ghp_example_secret_value",
+            "Bearer example-secret-value",
+        ):
+            with self.subTest(sentinel=sentinel):
+                self.assertNotIn(sentinel, serialized)
+
+    def test_config_omits_unknown_nested_list_and_url_values(self):
+        config = '''
+model = "gpt-5.6"
+unknown_nested = { payload = "nested-secret-value", items = ["list-secret-value"] }
+unknown_urls = [
+  "https://user:password@example.test/private",
+  "https://example.test/callback?token=query-secret-value",
+]
+'''
+
+        rows = codex.parse_config(config, "0.154.0", "fixture: adversarial-config.toml")
+        serialized = repr(rows)
+
+        self.assertEqual([row["command"] for row in rows], ['-c model="gpt-5.6"'])
+        for sentinel in (
+            "nested-secret-value",
+            "list-secret-value",
+            "user:password",
+            "query-secret-value",
+        ):
+            with self.subTest(sentinel=sentinel):
+                self.assertNotIn(sentinel, serialized)
+
 
 if __name__ == "__main__":
     unittest.main()
