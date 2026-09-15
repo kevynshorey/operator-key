@@ -194,15 +194,12 @@ impl CaptureFile {
     fn read_bounded(&self) -> Result<String, String> {
         let mut file = File::open(&self.path)
             .map_err(|error| format!("could not open process capture file: {error}"))?;
-        let truncated = file
-            .metadata()
-            .map_err(|error| format!("could not inspect process capture file: {error}"))?
-            .len()
-            > MAX_CAPTURE_BYTES as u64;
-        let mut bytes = Vec::with_capacity(MAX_CAPTURE_BYTES.min(8 * 1024));
-        Read::take(&mut file, MAX_CAPTURE_BYTES as u64)
+        let mut bytes = Vec::with_capacity((MAX_CAPTURE_BYTES + 1).min(8 * 1024));
+        Read::take(&mut file, (MAX_CAPTURE_BYTES + 1) as u64)
             .read_to_end(&mut bytes)
             .map_err(|error| format!("could not read process capture file: {error}"))?;
+        let truncated = bytes.len() > MAX_CAPTURE_BYTES;
+        bytes.truncate(MAX_CAPTURE_BYTES);
         let mut output = String::from_utf8_lossy(&bytes).into_owned();
         if truncated {
             output.push_str(OUTPUT_TRUNCATED_MARKER);
@@ -247,11 +244,44 @@ fn restore_window(
     focus()
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum ChildPoll<T> {
+    Exited(T),
+    TimedOutAfterExit,
+    TimedOutRunning,
+}
+
+fn poll_child_until<T>(
+    deadline: Instant,
+    mut try_wait: impl FnMut() -> Result<Option<T>, String>,
+    mut now: impl FnMut() -> Instant,
+    mut sleep: impl FnMut(Duration),
+) -> Result<ChildPoll<T>, String> {
+    loop {
+        match try_wait()? {
+            Some(status) => {
+                return Ok(if now() >= deadline {
+                    ChildPoll::TimedOutAfterExit
+                } else {
+                    ChildPoll::Exited(status)
+                });
+            }
+            None => {
+                let observed_at = now();
+                if observed_at >= deadline {
+                    return Ok(ChildPoll::TimedOutRunning);
+                }
+                sleep(POLL_INTERVAL.min(deadline.saturating_duration_since(observed_at)));
+            }
+        }
+    }
+}
+
 fn run_spawned_child(
     mut child: Child,
     program: &str,
     input: Option<Vec<u8>>,
-    timeout: Duration,
+    deadline: Instant,
     capture: ProcessCapture,
 ) -> Result<ProcessOutput, String> {
     if input
@@ -263,7 +293,6 @@ fn run_spawned_child(
         return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
     }
 
-    let deadline = Instant::now() + timeout;
     if let Some(bytes) = input {
         let mut stdin = match child.stdin.take() {
             Some(stdin) => stdin,
@@ -281,35 +310,36 @@ fn run_spawned_child(
         drop(stdin);
     }
 
-    let status: ExitStatus = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if Instant::now() < deadline => {
-                thread::sleep(
-                    POLL_INTERVAL.min(deadline.saturating_duration_since(Instant::now())),
-                );
-            }
-            Ok(None) => {
-                let primary = format!("{program} timed out after {} ms", timeout.as_millis());
-                let cleanup = terminate_and_reap(&mut child, program).err();
-                return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
-            }
-            Err(error) => {
-                let primary = format!("could not wait for {program}: {error}");
-                let cleanup = terminate_and_reap(&mut child, program).err();
-                return Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")));
-            }
+    let poll = poll_child_until(
+        deadline,
+        || {
+            child
+                .try_wait()
+                .map_err(|error| format!("could not wait for {program}: {error}"))
+        },
+        Instant::now,
+        thread::sleep,
+    );
+    match poll {
+        Ok(ChildPoll::Exited(status)) => capture.output(status),
+        Ok(ChildPoll::TimedOutAfterExit) => Err(format!("{program} timed out")),
+        Ok(ChildPoll::TimedOutRunning) => {
+            let primary = format!("{program} timed out");
+            let cleanup = terminate_and_reap(&mut child, program).err();
+            Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")))
         }
-    };
-    capture.output(status)
+        Err(primary) => {
+            let cleanup = terminate_and_reap(&mut child, program).err();
+            Err(cleanup.map_or(primary.clone(), |error| format!("{primary}; {error}")))
+        }
+    }
 }
 
 fn process_output(
     program: &str,
     args: &[&str],
-    timeout: Duration,
+    deadline: Instant,
 ) -> Result<ProcessOutput, String> {
-    let deadline = Instant::now() + timeout;
     let capture = ProcessCapture::new()?;
     let child = Command::new(program)
         .args(args)
@@ -318,27 +348,20 @@ fn process_output(
         .stderr(capture.stderr.stdio()?)
         .spawn()
         .map_err(|error| format!("could not start {program}: {error}"))?;
-    run_spawned_child(
-        child,
-        program,
-        None,
-        deadline.saturating_duration_since(Instant::now()),
-        capture,
-    )
+    run_spawned_child(child, program, None, deadline, capture)
 }
 
 fn process_input(
     program: &str,
     args: &[&str],
     input: &[u8],
-    timeout: Duration,
+    deadline: Instant,
 ) -> Result<ProcessOutput, String> {
     if input.len() > MAX_NATIVE_STDIN_BYTES {
         return Err(format!(
             "{program} input exceeds {MAX_NATIVE_STDIN_BYTES} byte native limit"
         ));
     }
-    let deadline = Instant::now() + timeout;
     let capture = ProcessCapture::new()?;
     let child = Command::new(program)
         .args(args)
@@ -347,24 +370,19 @@ fn process_input(
         .stderr(capture.stderr.stdio()?)
         .spawn()
         .map_err(|error| format!("could not start {program}: {error}"))?;
-    run_spawned_child(
-        child,
-        program,
-        Some(input.to_vec()),
-        deadline.saturating_duration_since(Instant::now()),
-        capture,
-    )
+    run_spawned_child(child, program, Some(input.to_vec()), deadline, capture)
 }
 
 struct NativeClipboard;
 
 impl ClipboardWriter for NativeClipboard {
     fn write_text(&self, text: &str) -> Result<(), String> {
+        let deadline = Instant::now() + NATIVE_DEADLINE;
         let output = process_input(
             "wl-copy",
             &["--type", "text/plain;charset=utf-8"],
             text.as_bytes(),
-            NATIVE_DEADLINE,
+            deadline,
         )?;
         if output.success {
             Ok(())
@@ -381,15 +399,6 @@ impl ClipboardWriter for NativeClipboard {
 struct NativeInsertionEnvironment {
     window: tauri::WebviewWindow,
     deadline: Instant,
-}
-
-impl NativeInsertionEnvironment {
-    fn remaining(&self) -> Result<Duration, String> {
-        self.deadline
-            .checked_duration_since(Instant::now())
-            .filter(|duration| !duration.is_zero())
-            .ok_or_else(|| "insertion deadline elapsed".into())
-    }
 }
 
 impl InsertionEnvironment for NativeInsertionEnvironment {
@@ -417,11 +426,11 @@ impl InsertionEnvironment for NativeInsertionEnvironment {
     }
 
     fn output(&self, program: &str, args: &[&str]) -> Result<ProcessOutput, String> {
-        process_output(program, args, self.remaining()?)
+        process_output(program, args, self.deadline)
     }
 
     fn input(&self, program: &str, args: &[&str], stdin: &[u8]) -> Result<ProcessOutput, String> {
-        process_input(program, args, stdin, self.remaining()?)
+        process_input(program, args, stdin, self.deadline)
     }
 }
 
@@ -1031,6 +1040,23 @@ mod tests {
         assert_eq!(&*environment.calls.borrow(), &["hide", "restore"]);
     }
 
+    #[test]
+    fn terminal_status_observation_respects_the_absolute_deadline_boundary() {
+        let deadline = Instant::now();
+
+        let before = poll_child_until(
+            deadline,
+            || Ok(Some(7)),
+            || deadline - Duration::from_nanos(1),
+            |_| {},
+        )
+        .unwrap();
+        assert_eq!(before, ChildPoll::Exited(7));
+
+        let at_boundary = poll_child_until(deadline, || Ok(Some(7)), || deadline, |_| {}).unwrap();
+        assert_eq!(at_boundary, ChildPoll::TimedOutAfterExit);
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn child_timeout_kills_and_reaps_the_process() {
@@ -1044,8 +1070,14 @@ mod tests {
             .unwrap();
         let pid = child.id();
 
-        let error = run_spawned_child(child, "sleep", None, Duration::from_millis(20), capture)
-            .unwrap_err();
+        let error = run_spawned_child(
+            child,
+            "sleep",
+            None,
+            Instant::now() + Duration::from_millis(20),
+            capture,
+        )
+        .unwrap_err();
 
         assert!(error.contains("timed out"));
         assert!(!std::path::Path::new(&format!("/proc/{pid}")).exists());
@@ -1059,7 +1091,7 @@ mod tests {
         let error = process_output(
             "sh",
             &["-c", "sleep 1 & exec sleep 30"],
-            Duration::from_millis(30),
+            Instant::now() + Duration::from_millis(30),
         )
         .unwrap_err();
 
@@ -1079,7 +1111,7 @@ mod tests {
             "/operator-key-test-program-does-not-exist",
             &[],
             &input,
-            Duration::from_secs(1),
+            Instant::now() + Duration::from_secs(1),
         )
         .unwrap_err();
 
@@ -1100,11 +1132,11 @@ mod tests {
     }
 
     #[test]
-    fn captured_output_is_bounded_and_reports_truncation() {
+    fn captured_output_reads_only_one_overflow_byte_and_reports_truncation() {
         let mut capture = CaptureFile::new("bounded-test").unwrap();
         capture
             .file
-            .write_all(&vec![b'x'; MAX_CAPTURE_BYTES + 1])
+            .write_all(&vec![b'x'; MAX_CAPTURE_BYTES + 4 * 1024])
             .unwrap();
 
         let output = capture.read_bounded().unwrap();
@@ -1113,6 +1145,7 @@ mod tests {
             output.len(),
             MAX_CAPTURE_BYTES + OUTPUT_TRUNCATED_MARKER.len()
         );
+        assert!(output[..MAX_CAPTURE_BYTES].bytes().all(|byte| byte == b'x'));
         assert!(output.ends_with(OUTPUT_TRUNCATED_MARKER));
     }
 
@@ -1125,7 +1158,7 @@ mod tests {
                 "-c",
                 "printf stdout-value; printf ' stderr-value\\n' >&2; exit 7",
             ],
-            Duration::from_secs(1),
+            Instant::now() + Duration::from_secs(1),
         )
         .unwrap();
 
