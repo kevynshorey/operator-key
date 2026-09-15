@@ -192,6 +192,15 @@ select:focus-visible,
 .conflict-panel p { margin: 3px 0 0; color: #c8b993; font-size: 9px; line-height: 1.4; }
 .availability-panel { justify-content: space-between; border-color: rgba(255,93,71,.55); }
 .availability-panel strong { color: var(--red); }
+.action-warning { display: grid; gap: 4px; margin-top: 9px; padding: 9px 10px; border: 1px solid var(--red); background: rgba(255,93,71,.09); color: #ffd2ca; font-family: var(--mono); font-size: 10px; line-height: 1.4; }
+.action-warning strong { color: var(--red); text-transform: uppercase; letter-spacing: .07em; }
+.action-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 10px; }
+.action-panel button { min-height: 34px; padding: 7px 9px; border: 1px solid var(--cyan); border-radius: 1px; background: #132126; color: var(--white); font-family: var(--mono); font-size: 10px; }
+.action-panel button + button { border-color: var(--amber); background: #211d14; }
+.action-panel button:disabled { border-color: var(--graphite-600); background: var(--graphite-800); color: var(--steel); cursor: not-allowed; }
+.action-panel kbd { margin-left: 7px; color: var(--cyan); font-size: 9px; }
+.action-panel p { flex: 1 0 100%; margin: 0; color: var(--amber); font-family: var(--mono); font-size: 9px; }
+.action-panel small { flex: 1 0 100%; color: var(--muted); font-family: var(--mono); font-size: 9px; line-height: 1.4; }
 
 .alternatives { flex: 0 0 auto; border-top: 1px solid var(--graphite-600); }
 .alternative-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--etched); }
@@ -243,6 +252,9 @@ select:focus-visible,
 .large-text .alternative-grid strong { font-size: 14px; }
 .large-text .alternative-grid small { font-size: 13px; }
 .large-text .alternative-grid em { font-size: 14px; }
+.large-text .action-panel button { min-height: 44px; font-size: 13px; }
+.large-text .action-panel small { font-size: 13px; }
+.large-text .action-warning { font-size: 13px; }
 .large-text .action-status { font-size: 13px; }
 .large-text .status-footer { min-height: 42px; font-size: 13px; }
 

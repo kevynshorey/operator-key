@@ -16,9 +16,10 @@ It builds a version-aware catalog from the installed Omarchy, Hermes Agent, Clau
 - Product, task, interface, and safety filters
 - Keyboard result navigation, product tabs, conflict telemetry, and large-text mode
 - Tauri 2 desktop shell configured as a local, always-on-top overlay
+- Catalog-validated clipboard copy and guarded terminal insertion
 - Deterministic Python and TypeScript tests
 
-This milestone is reference-only: pressing Enter reports a copy placeholder, and no native copy, insert, or command execution action is wired. Those actions begin in Task 6.
+Press Enter to copy the selected catalog command. On Hyprland/Wayland, Shift+Enter can insert an available, non-red shell command or CLI flag into an allowlisted terminal. Insertion types literal text only: it does not send Enter or execute the command. Ctrl/Meta+Enter remains disabled.
 
 ## Install and develop
 
@@ -39,6 +40,8 @@ Run the desktop overlay in Tauri development mode:
 ```bash
 npm run tauri dev
 ```
+
+Native copy requires `wl-copy` from `wl-clipboard`. Guarded insertion additionally requires Hyprland's `hyprctl` and `wtype`; it is not supported on other desktops. The overlay hides before checking the newly active window, inserts only when its exact class or initial class is allowlisted as a terminal, and restores itself if target detection or insertion fails.
 
 ## Generate the catalog
 
@@ -97,4 +100,4 @@ The web build intentionally embeds the complete 1,302-entry catalog for local, o
 
 ## Important behavior
 
-The catalog distinguishes hotkeys, slash commands, shell commands, and CLI flags. Every record includes product version, task group, context, safety level, availability, and provenance. Red actions are reference-only in the planned UI and must never execute without explicit confirmation.
+The catalog distinguishes hotkeys, slash commands, shell commands, and CLI flags. Every record includes product version, task group, context, safety level, availability, and provenance. Red actions are copy-only. Operator Key has no command-execution action.

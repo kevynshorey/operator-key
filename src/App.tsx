@@ -15,6 +15,12 @@ import {
 } from "./catalog";
 import { createSearchIndex, searchCatalog } from "./search";
 import { hideOverlay, type HideOverlay } from "./overlay";
+import {
+  getActionAvailability,
+  nativeActions,
+  type ActionAvailability,
+  type OperatorActions,
+} from "./actions";
 
 const PRODUCT_LABELS: Record<Product, string> = {
   omarchy: "Omarchy",
@@ -42,6 +48,12 @@ interface AppProps {
   loading?: boolean;
   catalogData?: unknown;
   hideOverlay?: HideOverlay;
+  actions?: OperatorActions;
+}
+
+interface ActionStatus {
+  kind: "status" | "alert";
+  message: string;
 }
 
 function KeyChord({ entry }: { entry: CatalogEntry }) {
@@ -137,7 +149,21 @@ function ShellState({ kind, message, onClose }: { kind: "status" | "alert"; mess
   );
 }
 
-function DetailCard({ entry, catalog }: { entry: CatalogEntry; catalog: Catalog }) {
+function DetailCard({
+  entry,
+  catalog,
+  availability,
+  actionPending,
+  onCopy,
+  onInsert,
+}: {
+  entry: CatalogEntry;
+  catalog: Catalog;
+  availability: ActionAvailability;
+  actionPending: boolean;
+  onCopy: () => void;
+  onInsert: () => void;
+}) {
   const conflicts = catalog.conflicts.filter((conflict) => entry.conflict_ids.includes(conflict.id));
   return (
     <article className="detail-card" aria-labelledby="active-command-heading">
@@ -183,11 +209,32 @@ function DetailCard({ entry, catalog }: { entry: CatalogEntry; catalog: Catalog 
           <span>{entry.provenance.status}</span>
         </aside>
       )}
+      {availability.warning && (
+        <aside className="action-warning" role="alert">
+          <strong>Danger action warning</strong>
+          <span>{availability.warning}</span>
+        </aside>
+      )}
+      <section className="action-panel" aria-label="Selection actions">
+        <button type="button" disabled={actionPending} onClick={onCopy}>
+          Copy command <kbd>Enter</kbd>
+        </button>
+        <button
+          type="button"
+          disabled={actionPending || !availability.insert}
+          title={availability.insertReason}
+          onClick={onInsert}
+        >
+          Insert into confirmed terminal <kbd>Shift+Enter</kbd>
+        </button>
+        {availability.insertReason && <p>{availability.insertReason}</p>}
+        <small>Insertion types literal text only. Operator Key never sends Enter or executes it.</small>
+      </section>
     </article>
   );
 }
 
-export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay }: AppProps) {
+export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay, actions: injectedActions }: AppProps) {
   const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
   const searchIndex = useMemo(
     () => parsed.ok ? createSearchIndex(parsed.catalog.entries) : undefined,
@@ -199,11 +246,13 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const [task, setTask] = useState<TaskGroup>();
   const [safety, setSafety] = useState<SafetyLevel>();
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [actionStatus, setActionStatus] = useState("");
+  const [actionStatus, setActionStatus] = useState<ActionStatus>();
+  const [actionPending, setActionPending] = useState(false);
   const [largeText, setLargeText] = useState(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const resultRefs = useRef(new Map<string, HTMLLIElement>());
   const dismissOverlay = injectedHideOverlay ?? hideOverlay;
+  const operatorActions = injectedActions ?? nativeActions;
   const setResultRef = useCallback((entryId: string, node: HTMLLIElement | null) => {
     if (node) resultRefs.current.set(entryId, node);
     else resultRefs.current.delete(entryId);
@@ -237,12 +286,40 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const selectProduct = (value?: Product) => {
     setProduct(value);
     setSelectedIndex(0);
-    setActionStatus("");
+    setActionStatus(undefined);
   };
 
-  const invokePlaceholder = () => {
-    if (!selected) return;
-    setActionStatus(`Copy is not connected yet — ${selected.command} remained idle.`);
+  const actionErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
+
+  const copySelected = async () => {
+    if (!selected || actionPending) return;
+    setActionPending(true);
+    try {
+      await operatorActions.copy(selected);
+      setActionStatus({ kind: "status", message: `Copied “${selected.command}” to the clipboard.` });
+    } catch (error) {
+      setActionStatus({ kind: "alert", message: `Copy failed: ${actionErrorMessage(error)}` });
+    } finally {
+      setActionPending(false);
+    }
+  };
+
+  const insertSelected = async () => {
+    if (!selected || actionPending) return;
+    const availability = getActionAvailability(selected);
+    if (!availability.insert) {
+      setActionStatus({ kind: "status", message: availability.insertReason ?? "Terminal insertion is unavailable." });
+      return;
+    }
+    setActionPending(true);
+    try {
+      await operatorActions.insert(selected);
+      setActionStatus({ kind: "status", message: `Inserted “${selected.command}” without executing it.` });
+    } catch (error) {
+      setActionStatus({ kind: "alert", message: `Insert failed: ${actionErrorMessage(error)}` });
+    } finally {
+      setActionPending(false);
+    }
   };
 
   const handleSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -254,7 +331,13 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
       setSelectedIndex((boundedIndex - 1 + results.length) % results.length);
     } else if (event.key === "Enter") {
       event.preventDefault();
-      invokePlaceholder();
+      if (event.ctrlKey || event.metaKey) {
+        setActionStatus({ kind: "status", message: "Execution is disabled. Ctrl+Enter performs no action." });
+      } else if (event.shiftKey) {
+        void insertSelected();
+      } else {
+        void copySelected();
+      }
     }
   };
 
@@ -289,7 +372,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
             aria-activedescendant={selected ? `result-${selected.id}` : undefined}
             value={query}
             placeholder="What do you need to do?"
-            onChange={(event) => { setQuery(event.target.value); setSelectedIndex(0); setActionStatus(""); }}
+            onChange={(event) => { setQuery(event.target.value); setSelectedIndex(0); setActionStatus(undefined); }}
             onKeyDown={handleSearchKey}
           />
           <kbd className="escape-key">ESC</kbd>
@@ -370,7 +453,16 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
           </aside>
 
           <section className="command-stage">
-            {selected && <DetailCard entry={selected} catalog={parsed.catalog} />}
+            {selected && (
+              <DetailCard
+                entry={selected}
+                catalog={parsed.catalog}
+                availability={getActionAvailability(selected)}
+                actionPending={actionPending}
+                onCopy={() => { void copySelected(); }}
+                onInsert={() => { void insertSelected(); }}
+              />
+            )}
             <section className="alternatives" aria-label="Alternatives">
               <div className="lane-heading"><span>ALTERNATIVES</span><strong>{alternatives.length.toString().padStart(2, "0")}</strong></div>
               <div className="alternative-grid">
@@ -388,12 +480,13 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         </section>
       )}
 
-      {actionStatus && <div className="action-status" role="status">{actionStatus}</div>}
+      {actionStatus && <div className={`action-status action-${actionStatus.kind}`} role={actionStatus.kind}>{actionStatus.message}</div>}
       <footer className="status-footer">
         <span>{parsed.catalog.total.toLocaleString()} commands ready</span>
         <span><b>{results.length}</b> shown</span>
         <span><kbd>↑</kbd><kbd>↓</kbd> select</span>
-        <span><kbd>ENTER</kbd> · COPY (WIRING NEXT)</span>
+        <span><kbd>ENTER</kbd> · COPY</span>
+        <span><kbd>SHIFT+ENTER</kbd> · GUARDED INSERT</span>
         <span className="execution-lock">● EXECUTION DISABLED</span>
       </footer>
     </main>

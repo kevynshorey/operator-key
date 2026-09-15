@@ -29,10 +29,16 @@ describe("responsive and accessible style contract", () => {
       ".masthead", ".product-tabs button", ".task-chips button", ".select-filters label",
       ".select-filters select", ".lane-heading", ".result-chord", ".safety-label",
       ".telemetry-grid dt", ".telemetry-grid dd", ".alternative-grid span",
-      ".alternative-grid small", ".alternative-grid em", ".status-footer",
+      ".alternative-grid small", ".alternative-grid em", ".action-panel button", ".action-panel small",
+      ".action-warning", ".status-footer",
     ]) {
       expect(css, `${selector} needs a large-text rule`).toContain(`.large-text ${selector}`);
     }
+  });
+
+  it("visibly distinguishes warnings and disabled insertion controls", () => {
+    expect(css).toMatch(/\.action-warning\s*\{[^}]*border[^}]*var\(--red\)/);
+    expect(css).toMatch(/\.action-panel button:disabled\s*\{[^}]*cursor:\s*not-allowed/);
   });
 
   it("reflows large text at narrow supported widths instead of squeezing content", () => {

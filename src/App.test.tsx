@@ -83,13 +83,60 @@ describe("Operator Key overlay", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/no matching command/i);
   });
 
-  it("exposes placeholder copy behavior without native execution", async () => {
+  it("copies the selected catalog command with Enter", async () => {
     const user = userEvent.setup();
-    render(<App />);
-    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Ctrl+B");
+    const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
+    render(<App actions={actions} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes chat");
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("status")).toHaveTextContent(/copy is not connected/i);
-    expect(screen.queryByText(/executed/i)).not.toBeInTheDocument();
+    expect(actions.copy).toHaveBeenCalledOnce();
+    expect(actions.copy.mock.calls[0][0]).toMatchObject({ command: "hermes chat" });
+    expect(actions.insert).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(/copied/i);
+  });
+
+  it("inserts a terminal-compatible selection only with Shift+Enter", async () => {
+    const user = userEvent.setup();
+    const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
+    render(<App actions={actions} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes chat");
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(actions.insert).toHaveBeenCalledOnce();
+    expect(actions.insert.mock.calls[0][0]).toMatchObject({ command: "hermes chat" });
+    expect(actions.copy).not.toHaveBeenCalled();
+  });
+
+  it("keeps Ctrl+Enter execution disabled without invoking either action", async () => {
+    const user = userEvent.setup();
+    const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
+    render(<App actions={actions} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes chat");
+    await user.keyboard("{Control>}{Enter}{/Control}");
+    expect(actions.copy).not.toHaveBeenCalled();
+    expect(actions.insert).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(/execution.*disabled/i);
+  });
+
+  it("shows red commands as explicitly warned and copy-only", async () => {
+    const user = userEvent.setup();
+    const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
+    render(<App actions={actions} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes logout");
+    expect(screen.getByRole("alert")).toHaveTextContent(/danger|red/i);
+    expect(screen.getByRole("button", { name: /insert into confirmed terminal/i })).toBeDisabled();
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(actions.insert).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(/copy-only/i);
+  });
+
+  it("reports native copy failures without implying success", async () => {
+    const user = userEvent.setup();
+    const actions = { copy: vi.fn().mockRejectedValue(new Error("clipboard unavailable")), insert: vi.fn() };
+    render(<App actions={actions} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes chat");
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/clipboard unavailable/i);
+    expect(screen.queryByText(/^copied/i)).not.toBeInTheDocument();
   });
 
   it("moves across the product single-select group with the keyboard and filters results", async () => {
