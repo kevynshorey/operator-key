@@ -27,7 +27,7 @@ installer = load_installer()
 
 
 def bind(modmask, key, description, *, release=False, locked=False, repeat=False,
-         dispatcher="__lua", arg="opaque"):
+         dispatcher="__lua", arg="42"):
     return {
         "modmask": modmask,
         "key": key,
@@ -64,7 +64,7 @@ class FakeRunner:
             return installer.CommandResult(0, json.dumps(self.clients), "")
         if args == ("hyprctl", "reload"):
             return installer.CommandResult(0, "ok", "")
-        if args and args[0] == "wtype":
+        if args == ("hyprctl", "dispatch", "__lua", "42"):
             client = dict(self.trigger_client)
             existing = {item.get("address") for item in self.clients}
             if client.get("address") in existing:
@@ -107,7 +107,7 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(parsed[1].trigger, "release")
         self.assertEqual(parsed[0].physical, parsed[1].physical)
         self.assertEqual(parsed[0].dispatcher, "__lua")
-        self.assertEqual(parsed[0].arg, "opaque")
+        self.assertEqual(parsed[0].arg, "42")
 
     def test_parses_hyprctl_switch_names_with_spaces_without_aborting_preview(self):
         parsed = installer.parse_hyprctl_binds(
@@ -193,6 +193,8 @@ class InstallBindingTests(unittest.TestCase):
         self.assertIn("SUPER + K: rejected", preview)
         self.assertIn(f"SHA-256: {hashlib.sha256(self.source.read_bytes()).hexdigest()}", preview)
         self.assertIn("hyprctl reload", preview)
+        self.assertIn("validated __lua dispatcher", preview)
+        self.assertNotIn("wtype", preview)
         self.assertIn(expected_block.rstrip(), preview)
         self.assertEqual(self.target.read_bytes(), before)
         self.assertFalse(self.destination.exists())
@@ -238,9 +240,9 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(self.destination.stat().st_mode), 0o755)
         self.assertIn(("hyprctl", "reload"), runner.calls)
         self.assertIn(
-            ("wtype", "-M", "shift", "-M", "logo", "-P", "k", "-p", "k",
-             "-m", "logo", "-m", "shift"), runner.calls,
+            ("hyprctl", "dispatch", "__lua", "42"), runner.calls,
         )
+        self.assertFalse(any(call and call[0] == "wtype" for call in runner.calls))
 
     def test_refuses_malformed_duplicate_or_nested_marker_blocks(self):
         cases = [
@@ -508,9 +510,9 @@ class InstallBindingTests(unittest.TestCase):
         )
         self.assertNotIn((str(self.destination),), runner.calls)
         self.assertIn(
-            ("wtype", "-M", "shift", "-M", "logo", "-P", "k", "-p", "k",
-             "-m", "logo", "-m", "shift"), runner.calls,
+            ("hyprctl", "dispatch", "__lua", "42"), runner.calls,
         )
+        self.assertFalse(any(call and call[0] == "wtype" for call in runner.calls))
         self.assertIn(("hyprctl", "-j", "clients"), runner.calls)
         self.assertEqual(runner.calls.count(("hyprctl", "reload")), 1)
 
@@ -532,14 +534,69 @@ class InstallBindingTests(unittest.TestCase):
         self.assertTrue(self.source.exists())
         self.assertFalse(self.destination.exists())
 
-    def test_wtype_argv_is_exact_and_rejects_unvalidated_chords(self):
-        self.assertEqual(
-            installer.wtype_argv("SUPER + CTRL + U"),
-            ["wtype", "-M", "ctrl", "-M", "logo", "-P", "u", "-p", "u",
-             "-m", "logo", "-m", "ctrl"],
+    def test_binding_verification_returns_the_unique_managed_binding(self):
+        runner = FakeRunner(binds=[bind(65, "K", "Operator Key", arg="987")])
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=["SUPER + SHIFT + K"],
         )
-        with self.assertRaisesRegex(installer.InstallError, "key"):
-            installer.wtype_argv("SUPER + SHIFT + K + Q")
+        verified = installer._verify_binding(plan, runner)
+        self.assertEqual((verified.dispatcher, verified.arg), ("__lua", "987"))
+
+    def test_dispatcher_argv_is_exact_and_rejects_untrusted_active_data(self):
+        valid = installer.Binding(
+            "SUPER + SHIFT + K", "shift+super+k", "Operator Key", "press", "test",
+            "__lua", "987654321",
+        )
+        self.assertEqual(
+            installer.dispatcher_argv(valid),
+            ["hyprctl", "dispatch", "__lua", "987654321"],
+        )
+        invalid = [
+            ("exec", "42"), ("__lua", "0"), ("__lua", "-1"),
+            ("__lua", "42; exec bad"), ("__lua", " 42"),
+            ("__lua", "1" * 20), ("__lua", "9" * 19),
+        ]
+        for dispatcher, arg in invalid:
+            with self.subTest(dispatcher=dispatcher, arg=arg):
+                binding = installer.Binding(
+                    valid.chord, valid.physical, valid.description, valid.trigger,
+                    valid.source, dispatcher, arg,
+                )
+                with self.assertRaisesRegex(installer.InstallError, "dispatcher|argument"):
+                    installer.dispatcher_argv(binding)
+
+    def test_invalid_dispatcher_or_arg_rolls_back_without_triggering(self):
+        for dispatcher, arg in (("exec", "42"), ("__lua", "42; bad")):
+            with self.subTest(dispatcher=dispatcher, arg=arg):
+                self.target.write_bytes(b"-- personal\r\n")
+                self.destination.unlink(missing_ok=True)
+                runner = FakeRunner()
+                plan = installer.create_plan(
+                    target=self.target, source=self.source, destination=self.destination,
+                    runner=runner, candidates=["SUPER + SHIFT + K"],
+                )
+                runner.binds.append(bind(65, "K", "Operator Key", dispatcher=dispatcher, arg=arg))
+                with self.assertRaisesRegex(installer.InstallError, "dispatcher|argument"):
+                    installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+                self.assertEqual(self.target.read_bytes(), plan.original)
+                self.assertFalse(self.destination.exists())
+                self.assertFalse(any(call[:2] == ("hyprctl", "dispatch") for call in runner.calls))
+                self.assertFalse(any(call and call[0] == "wtype" for call in runner.calls))
+
+    def test_failed_active_dispatch_rolls_back(self):
+        dispatch = ("hyprctl", "dispatch", "__lua", "42")
+        runner = FakeRunner(failures={dispatch: "dispatcher failed"})
+        plan = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=["SUPER + SHIFT + K"],
+        )
+        runner.binds.append(bind(65, "K", "Operator Key"))
+        with self.assertRaisesRegex(installer.InstallError, "binding trigger failed"):
+            installer.apply_plan(plan, runner=runner, confirm=lambda _: True)
+        self.assertIn(dispatch, runner.calls)
+        self.assertEqual(self.target.read_bytes(), plan.original)
+        self.assertFalse(self.destination.exists())
 
     def test_launch_requires_new_exact_class_not_title_or_substring(self):
         runner = FakeRunner()

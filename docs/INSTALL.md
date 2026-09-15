@@ -4,7 +4,7 @@ Operator Key ships a preview-first installer that adds one managed Omarchy bindi
 
 ## Requirements
 
-- Omarchy/Hyprland with `hyprctl`, `omarchy`, and wtype 0.4 (`wtype` 0.4-2 on Omarchy/Arch) on `PATH`
+- Omarchy/Hyprland with `hyprctl` and `omarchy` on `PATH`
 - Python 3.11 or newer
 - Node.js/npm and the Rust/Tauri toolchain to build Operator Key
 - The system libraries required by Tauri on your distribution
@@ -67,9 +67,11 @@ The installer requires both `--apply` and the exact typed phrase shown at the pr
 
 Apply regenerates and checks the exact proposed config bytes, and rechecks the config, source hash, destination hash, and backup paths immediately before mutation. It reads the written config and destination back before reload and requires the reviewed bytes and SHA-256. Symlinks and non-regular files are rejected. Existing regular backups are preserved and never silently overwritten. New files are written through same-directory temporary files, flushed, mode-set, and atomically replaced. Commands use exact argument arrays, never a shell.
 
-On success it re-reads `hyprctl -j binds`, requires exactly one binding on the selected physical chord with description `Operator Key`, and rejects a late conflict. Omarchy's Lua bridge may report dispatcher `__lua` with an opaque argument, so this JSON check does **not** claim to prove the command target. Instead, the installer captures clients, runs a fixed wtype 0.4 argument sequence that presses the selected modifiers/key and releases them, then requires a new client whose `class` or `initialClass` is exactly `operator-key`. It never accepts the title, a reverse-domain identifier, or a substring, and never direct-spawns the destination as a substitute for exercising the binding.
+On success it re-reads `hyprctl -j binds`, requires exactly one binding on the selected physical chord with description `Operator Key`, and rejects a late conflict. Omarchy's Lua bridge reports this active binding with dispatcher `__lua` and a numeric callback argument. The installer requires that exact dispatcher and a bounded, strictly positive decimal argument; unexpected or unsafe active data fails closed. It captures clients, then invokes the registered callback with the exact no-shell argument array `hyprctl dispatch __lua <validated-arg>`. This exercises the action attached to the installed active binding without relying on synthetic keyboard routing or direct-spawning the destination.
 
-The new client must include a PID, and `/proc/<pid>/exe` must resolve exactly to the installed destination. A missing PID, mismatched executable, or compositor that does not route virtual-keyboard events through bindings causes verification to fail and rollback rather than producing a false success.
+The dispatcher command must succeed and produce a new client whose `class` or `initialClass` is exactly `operator-key`; the title, reverse-domain identifiers, and substrings do not count. The new client must include a PID, and `/proc/<pid>/exe` must resolve exactly to the installed destination. An invalid dispatcher record, failed dispatch, missing PID, or mismatched executable causes verification to fail and rollback rather than producing a false success.
+
+`wtype` is not an installer verification dependency. It is required only for Operator Key's optional guarded terminal-insertion runtime feature described in the README.
 
 If any mutation, reload, binding check, or end-to-end trigger check fails, rollback independently attempts config restoration, launcher restoration/removal, and (whenever config mutation was attempted) a Hyprland reload. Every rollback error is reported; one failed restoration never skips later steps. The original config backup is `bindings.lua.operator-key.bak`; a replaced launcher is backed up as `operator-key.operator-key.bak` beside the destination.
 

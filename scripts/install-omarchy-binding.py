@@ -53,7 +53,7 @@ KEY_ALIASES = {
     "spacebar": "space",
 }
 SAFE_PATH = re.compile(r"^/[A-Za-z0-9_./+-]+$")
-SAFE_WTYPE_KEY = re.compile(r"^[A-Za-z0-9_.:+-]+$")
+SAFE_LUA_DISPATCH_ARG = re.compile(r"^[1-9][0-9]{0,18}$")
 OPERATOR_KEY_CLASS = "operator-key"
 
 
@@ -502,8 +502,8 @@ def render_preview(plan: InstallPlan) -> str:
         "Apply verification steps:\n"
         "  1. Atomically copy the prebuilt binary and update bindings.lua\n"
         "  2. Run exact argv: hyprctl reload\n"
-        "  3. Re-read hyprctl -j binds and require the Operator Key chord/description\n"
-        "  4. Send the exact chord with wtype (no shell) and require a new exact-class client\n"
+        "  3. Re-read hyprctl -j binds and require one exact Operator Key chord/description\n"
+        "  4. Invoke its validated __lua dispatcher with exact argv (no shell) and require a new exact-class client\n"
         "  5. On any failure, restore exact prior bytes/modes and run hyprctl reload again\n"
     )
 
@@ -568,7 +568,7 @@ def _successful(result: CommandResult, label: str) -> None:
         raise InstallError(f"{label} failed: {detail}")
 
 
-def _verify_binding(plan: InstallPlan, runner) -> None:
+def _verify_binding(plan: InstallPlan, runner) -> Binding:
     result = runner.run(["hyprctl", "-j", "binds"], timeout=5)
     _successful(result, "binding verification")
     physical = canonicalize_chord(plan.chord)
@@ -582,6 +582,7 @@ def _verify_binding(plan: InstallPlan, runner) -> None:
             f"{item.description} ({item.dispatcher or 'unknown dispatcher'})" for item in on_chord
         )
         raise InstallError(f"Post-reload verification found a conflicting active binding: {details}")
+    return managed[0]
 
 
 def _validate_plan_integrity(plan: InstallPlan, source_bytes: bytes) -> None:
@@ -593,22 +594,17 @@ def _validate_plan_integrity(plan: InstallPlan, source_bytes: bytes) -> None:
         raise InstallError("Source binary changed after preview; preview again before applying")
 
 
-def wtype_argv(chord: str) -> list[str]:
-    physical = canonicalize_chord(chord)
-    if display_chord(physical) != chord:
-        raise InstallError("wtype chord must be a validated canonical candidate")
-    parts = physical.split("+")
-    modifiers, key = parts[:-1], parts[-1]
-    if not SAFE_WTYPE_KEY.fullmatch(key) or key.startswith("code:"):
-        raise InstallError(f"Binding key cannot be sent safely with wtype: {key!r}")
-    wtype_modifiers = ["logo" if modifier == "super" else modifier for modifier in modifiers]
-    argv = ["wtype"]
-    for modifier in wtype_modifiers:
-        argv.extend(("-M", modifier))
-    argv.extend(("-P", key, "-p", key))
-    for modifier in reversed(wtype_modifiers):
-        argv.extend(("-m", modifier))
-    return argv
+def dispatcher_argv(binding: Binding) -> list[str]:
+    if binding.dispatcher != "__lua":
+        raise InstallError(
+            f"Refusing unexpected active binding dispatcher {binding.dispatcher!r}"
+        )
+    if (
+        not SAFE_LUA_DISPATCH_ARG.fullmatch(binding.arg)
+        or int(binding.arg) > (1 << 63) - 1
+    ):
+        raise InstallError("Refusing unsafe active __lua dispatcher argument")
+    return ["hyprctl", "dispatch", "__lua", binding.arg]
 
 
 def _operator_clients(runner) -> dict[str, dict]:
@@ -638,9 +634,10 @@ def resolve_process_exe(pid: int) -> Path:
     return Path(os.readlink(f"/proc/{pid}/exe"))
 
 
-def _verify_launch(plan: InstallPlan, runner, process_exe_resolver) -> None:
+def _verify_launch(plan: InstallPlan, binding: Binding, runner, process_exe_resolver) -> None:
+    trigger_argv = dispatcher_argv(binding)
     before = _operator_clients(runner)
-    _successful(runner.run(wtype_argv(plan.chord), timeout=5), "binding trigger")
+    _successful(runner.run(trigger_argv, timeout=5), "binding trigger")
     for _ in range(20):
         current = _operator_clients(runner)
         for identity in current.keys() - before.keys():
@@ -699,8 +696,8 @@ def apply_plan(
     old_destination_mode = stat.S_IMODE(destination_info.st_mode) if destination_info else None
     if current == plan.proposed and old_destination == source_bytes:
         _successful(runner.run(["hyprctl", "reload"], timeout=10), "Hyprland reload")
-        _verify_binding(plan, runner)
-        _verify_launch(plan, runner, process_exe_resolver)
+        binding = _verify_binding(plan, runner)
+        _verify_launch(plan, binding, runner, process_exe_resolver)
         return
     binary_backup = Path(str(plan.destination) + ".operator-key.bak")
     # Inspect every backup before creating either one, so a symlink or special
@@ -737,8 +734,8 @@ def apply_plan(
         if sha256(plan.destination.read_bytes()) != plan.source_hash:
             raise InstallError("Installed launcher hash does not match reviewed source hash")
         _successful(runner.run(["hyprctl", "reload"], timeout=10), "Hyprland reload")
-        _verify_binding(plan, runner)
-        _verify_launch(plan, runner, process_exe_resolver)
+        binding = _verify_binding(plan, runner)
+        _verify_launch(plan, binding, runner, process_exe_resolver)
     except Exception as error:
         if destination_attempted or target_attempted:
             actions: list[tuple[str, Callable[[], None]]] = []
