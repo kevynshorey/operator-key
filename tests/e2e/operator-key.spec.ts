@@ -99,7 +99,7 @@ test("keyboard selection scrolls, copy works, and Ctrl+Enter is inert", async ({
 
   await search(page, "hermes status");
   await input.press("Enter");
-  await expect(page.getByRole("status")).toContainText("Copied");
+  await expect(page.locator(".action-status")).toContainText("Copied");
   let calls = await operatorActionCalls(page);
   expect(calls).toEqual([{ cmd: "copy_catalog_command", args: expect.objectContaining({ command: "hermes status" }) }]);
 
@@ -151,7 +151,7 @@ test("Luna structures a sentence into exact ordered catalog commands without exe
   expect(await operatorActionCalls(page)).toHaveLength(0);
 
   await input.press("Enter");
-  await expect(page.getByRole("status")).toContainText("Copied");
+  await expect(page.locator(".action-status")).toContainText("Copied");
   expect(await operatorActionCalls(page)).toEqual([
     { cmd: "copy_catalog_command", args: expect.objectContaining({ entryId: "16fe16d89f85e6a8", command: "hermes status" }) },
   ]);

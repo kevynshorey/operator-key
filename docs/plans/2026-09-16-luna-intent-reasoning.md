@@ -18,7 +18,7 @@
 
 **Steps:**
 1. Write RED tests for exact-first ordering, any-term semantic rescue, product/task diversity, filtering, stable dedupe, and 220-ID ceiling.
-2. Add closed TypeScript contracts for Spark status, request, response, recommendations, confidence, and a native/browser reasoner interface.
+2. Add closed TypeScript contracts for Luna status, request, response, recommendations, confidence, and a native/browser reasoner interface.
 3. Implement the deterministic candidate pool and browser/native reasoner adapters.
 4. Run focused Vitest and typecheck.
 

@@ -261,6 +261,7 @@ function IntentStructure({ activePlan, onReturn }: { activePlan: ActiveIntentPla
   const { plan, recommendations } = activePlan;
   return (
     <section className="intent-structure" role="region" aria-labelledby="intent-structure-heading">
+      <p className="sr-only" role="status" aria-live="polite">Luna reasoning complete with {recommendations.length} ordered {recommendations.length === 1 ? "command" : "commands"}.</p>
       <div className="intent-structure-header">
         <div>
           <span className="eyebrow">LUNA STRUCTURE / {plan.model}</span>
@@ -375,6 +376,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   useEffect(() => {
     const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (controlsLocked) return;
       event.preventDefault();
       if (runtime === "web") {
         setQuery("");
@@ -387,7 +389,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
     };
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [clearReasoning, dismissOverlay, runtime]);
+  }, [clearReasoning, controlsLocked, dismissOverlay, runtime]);
 
   useEffect(() => {
     if (!selected) return;
@@ -515,6 +517,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
       ? "Checking Luna status…"
       : sparkStatus?.message ?? "Luna status unavailable.";
   const sparkDisabled = runtime !== "native" || !query.trim() || controlsLocked || sparkStatusPending || !sparkStatus?.available || !sparkStatus.loggedIn;
+  const lunaStatusMessage = reasoningPending ? "Luna reasoning in progress…" : sparkUnavailableReason;
 
   return (
     <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}${query.trim() ? " has-query" : ""}`} data-testid="operator-shell">
@@ -555,12 +558,12 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
           <kbd className="escape-key">ESC</kbd>
         </label>
         <div className="intent-composer-actions">
-          <button type="button" className="spark-button" aria-label="Reason with Luna" disabled={sparkDisabled} onClick={() => { void reasonAboutIntent(); }}>
+          <button type="button" className="spark-button" aria-label="Reason with Luna" aria-describedby="luna-availability" disabled={sparkDisabled} onClick={() => { void reasonAboutIntent(); }}>
             <span aria-hidden="true">✦</span> {reasoningPending ? "Reasoning…" : "Reason with Luna"} <kbd>ALT+ENTER</kbd>
           </button>
           <div className="spark-copy">
             <p>Reasoning sends the entered intent and bounded command fields shown in the local catalog to OpenAI through local Codex; never source paths, provenance, files, secrets, terminal contents, or history.</p>
-            <small className={sparkStatus?.available && sparkStatus.loggedIn && runtime === "native" ? "spark-ready" : ""}>{sparkUnavailableReason}</small>
+            <small id="luna-availability" aria-live="polite" aria-atomic="true" className={!reasoningPending && sparkStatus?.available && sparkStatus.loggedIn && runtime === "native" ? "spark-ready" : ""}>{lunaStatusMessage}</small>
           </div>
           {reasoningError && <p className="spark-error" role="alert">{reasoningError}</p>}
         </div>

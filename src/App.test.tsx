@@ -305,10 +305,14 @@ describe("Operator Key overlay", () => {
     await waitFor(() => expect(screen.getByText(/luna ready/i)).toBeInTheDocument());
     expect(reasoner.status).toHaveBeenCalledOnce();
     expect(reasoner.reason).not.toHaveBeenCalled();
+    const lunaButton = screen.getByRole("button", { name: /reason with luna/i });
+    expect(lunaButton).toHaveAttribute("aria-describedby", "luna-availability");
+    expect(document.getElementById("luna-availability")).toHaveAttribute("aria-live", "polite");
+    expect(document.getElementById("luna-availability")).toHaveAttribute("aria-atomic", "true");
     expect(screen.getByText(/bounded command fields shown in the local catalog.*never source paths, provenance, files, secrets, terminal contents, or history/i)).toBeInTheDocument();
   });
 
-  it("disables Spark in the browser and explains the native companion requirement", async () => {
+  it("disables Luna in the browser and explains the native companion requirement", async () => {
     const reasoner = nativeReasoner();
     render(<App runtime="web" intentReasoner={reasoner} />);
     const button = screen.getByRole("button", { name: /reason with luna/i });
@@ -348,12 +352,13 @@ describe("Operator Key overlay", () => {
     );
   });
 
-  it("locks query, filters, results, and existing actions while Spark is pending without copying or inserting", async () => {
+  it("locks every interaction including Escape while Luna is pending without copying or inserting", async () => {
     const user = userEvent.setup();
     let finishReasoning: ((plan: SparkIntentPlan) => void) | undefined;
     const reasoner = nativeReasoner({ reason: vi.fn(() => new Promise<SparkIntentPlan>((resolve) => { finishReasoning = resolve; })) });
     const actions = { copy: vi.fn(), insert: vi.fn() };
-    render(<App runtime="native" intentReasoner={reasoner} actions={actions} />);
+    const hideOverlay = vi.fn();
+    render(<App runtime="native" intentReasoner={reasoner} actions={actions} hideOverlay={hideOverlay} />);
     const input = screen.getByRole("searchbox", { name: /operator intent/i });
     await user.type(input, "hermes status");
     await screen.findByText(/luna ready/i);
@@ -370,9 +375,14 @@ describe("Operator Key overlay", () => {
     expect(screen.getByRole("button", { name: /close operator key/i })).toBeDisabled();
     expect(actions.copy).not.toHaveBeenCalled();
     expect(actions.insert).not.toHaveBeenCalled();
+    expect(document.getElementById("luna-availability")).toHaveTextContent(/reasoning in progress/i);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(hideOverlay).not.toHaveBeenCalled();
+    expect(input).toHaveValue("hermes status");
 
     finishReasoning?.(sparkPlan());
     await screen.findByRole("region", { name: /intent structure/i });
+    expect(screen.getByText(/luna reasoning complete with 2 ordered commands/i)).toHaveAttribute("role", "status");
   });
 
   it("renders trusted catalog commands in recommendation order with assumptions and gaps", async () => {
