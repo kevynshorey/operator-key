@@ -1,10 +1,10 @@
 # Operator Key Web Design Direction
 
-**Status:** REVIEW
+**Status:** APPROVED
 
-**production_approved:** false
+**production_approved:** true
 
-**Installation:** This branch is a review build and is not installed.
+**Installation:** The approved build was installed and end-to-end verified on 2026-09-16.
 
 ## Selected direction
 

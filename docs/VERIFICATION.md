@@ -1,13 +1,13 @@
 # Verification evidence
 
-Verified on 2026-09-15 against source commit `20a141b2a4adf30db5b394448bc9345d6a6e3110` on Omarchy 4.0.3-1.
+Verified on 2026-09-16 against application-bearing source commit `24b19c8c4757826230dffaafd2db5da9c7e765fc` on Omarchy 4.0.3-1.
 
 ## Installed launcher
 
 - Physical shortcut: `SUPER + U` (Command + U on the connected Apple keyboard)
 - Managed binding: `o.bind("SUPER + U", "Operator Key", o.launch("/home/kevo/.local/bin/operator-key"))`
 - Installed path: `/home/kevo/.local/bin/operator-key`
-- Release SHA-256: `287f5853ea58b82ce64cfe8c379fd8f8393bba8c6232dbcf0046136c3036cb62`
+- Release SHA-256: `7a4297de42da9c7632119ea0bc72ab14413cbc9ef3619ba1b9cdaad09a6168d7`
 - Source and installed hashes matched exactly.
 - The installer observed a new `operator-key` client after the physical shortcut press and verified `/proc/<pid>/exe` resolved exactly to the installed path.
 - Live readback showed one `Operator Key` binding at modifier mask 64, key `U`.
@@ -32,8 +32,8 @@ The generated catalog passed the checked-in schema and JSON parsing.
 
 All gates ran from the repository root:
 
-- Vitest: 52/52 passed across 6 files
-- Playwright: 5/5 passed with system Chromium
+- Vitest: 63/63 passed across 7 files
+- Playwright: 8/8 passed with system Chromium; the constrained local host used the documented explicit `/dev/shm` opt-in
 - Python: 92/92 passed
 - Rust: 26/26 passed
 - TypeScript typecheck: passed
@@ -43,7 +43,7 @@ All gates ran from the repository root:
 - Production Tauri no-bundle build: passed
 - `git diff --check`: passed
 
-The Vite production build emitted the documented embedded-catalog advisory: approximately 958.81 kB minified and 148.15 kB gzip. This is non-blocking and expected for the complete local-first catalog.
+- The Vite production build emitted the documented embedded-catalog advisory: approximately 960.92 kB minified and 148.85 kB gzip. This is non-blocking and expected for the complete local-first catalog.
 
 ## Browser workflows
 
@@ -58,6 +58,11 @@ Playwright verified:
 - Green terminal insertion behavior through the mocked browser-native boundary
 - Red `hermes logout` remaining warned and copy-only
 - Operability at 820×560 with large-text mode
+- Browser-only copy behavior with native insertion unavailable
+- 390×844 touch targets of at least 44×44 in populated and empty states
+- Genuine horizontal overflow and end affordance for product and task rails
+- Full `/code-review`, `/claude-api`, `/doctor`, and `/bug` descriptions above the initial mobile fold
+- Keyboard selection scrolling only the result list while the page remains at scroll position zero
 
 ## Native workflows
 
@@ -71,6 +76,7 @@ The compositor-level native smoke used exact argv with a disposable Foot termina
 - Temporary terminal, tmux, and Operator Key processes were cleaned up
 - The prior clipboard value and focused window were restored when available
 - No new WebKitWebProcess core dump appeared during the successful release smoke
+- The installed binary hash matched the reviewed release artifact exactly after installation
 
 A smoke attempted while the install-verification window was intentionally still open could not hand focus back to the disposable terminal because the existing always-on-top Operator Key window remained present. After closing that verification window, the same installed-artifact smoke passed. Normal use is one overlay instance at a time.
 
@@ -78,5 +84,6 @@ A smoke attempted while the install-verification window was intentionally still 
 
 - `0e114df579bdc39e38b1a524e595510808ade4d1` — WebKit-safe result reconciliation and pending-state accessibility: independently approved with no findings.
 - `1de630ee56e915c0d44d00be818cdd8687a592ab` — current Hyprland Lua focus dispatcher with strict address validation and target revalidation: independently approved with no blocking findings.
+- `24b19c8c4757826230dffaafd2db5da9c7e765fc` — browser-safe Operator Deck and mobile ergonomics: exact-snapshot specification and code-quality/security reviews both passed with no findings.
 
-No remote push was performed.
+The approved branch was fast-forwarded into local `main`. No remote is configured, so no remote push or hosted deployment was performed.
