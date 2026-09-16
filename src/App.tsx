@@ -301,7 +301,13 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
 
   useEffect(() => {
     if (!selected) return;
-    resultRefs.current.get(selected.id)?.scrollIntoView?.({ block: "nearest" });
+    const row = resultRefs.current.get(selected.id);
+    const list = row?.parentElement;
+    if (!row || !list) return;
+    const rowBounds = row.getBoundingClientRect();
+    const listBounds = list.getBoundingClientRect();
+    if (rowBounds.top < listBounds.top) list.scrollTop -= listBounds.top - rowBounds.top;
+    else if (rowBounds.bottom > listBounds.bottom) list.scrollTop += rowBounds.bottom - listBounds.bottom;
   }, [selected, results]);
 
   if (loading) return <ShellState runtime={runtime} kind="status" message="Loading command catalog…" onClose={() => { if (runtime === "native") void dismissOverlay(); }} />;
@@ -383,7 +389,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const alternatives = results.filter((_, index) => index !== boundedIndex).slice(0, 3);
 
   return (
-    <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}`} data-testid="operator-shell">
+    <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}${query.trim() ? " has-query" : ""}`} data-testid="operator-shell">
       <Header runtime={runtime} largeText={largeText} onLargeText={() => setLargeText((value) => !value)} onClose={() => {
         if (runtime === "native") void dismissOverlay();
         else { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); setSelectedIndex(0); setActionStatus(undefined); }
@@ -414,7 +420,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
           <kbd className="escape-key">ESC</kbd>
         </label>
 
-        <div className="product-tabs" role="radiogroup" aria-label="Product lanes">
+        <div className="product-tabs" role="radiogroup" aria-label="Product lanes" data-scroll-affordance="horizontal">
           {PRODUCT_TABS.map((tab, index) => {
             const active = product === tab.value;
             const count = tab.value ? parsed.catalog.counts[tab.value] : parsed.catalog.total;
@@ -438,7 +444,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         </div>
 
         <div className="control-rail">
-          <div className="task-chips" aria-label="Task filters">
+          <div className="task-chips" aria-label="Task filters" data-scroll-affordance="horizontal">
             <button type="button" disabled={actionPending} className={!task ? "is-active" : ""} aria-pressed={!task} onClick={() => { if (!actionPending) { setTask(undefined); setSelectedIndex(0); } }}>Any task</button>
             {TASK_GROUPS.map((taskName) => (
               <button type="button" disabled={actionPending} key={taskName} className={task === taskName ? "is-active" : ""} aria-pressed={task === taskName} onClick={() => { if (!actionPending) { setTask(task === taskName ? undefined : taskName); setSelectedIndex(0); } }}>
@@ -472,24 +478,6 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         </section>
       ) : (
         <section className="workspace-grid">
-          <aside className="result-lane" aria-label="Search results">
-            <div className="lane-heading"><span>MATCHES</span><strong>{results.length.toString().padStart(2, "0")}</strong></div>
-            <ul id="result-list" role="listbox" aria-label="Command results" aria-busy={actionPending}>
-              {results.map(({ entry }, index) => (
-                <ResultRow
-                  key={entry.id}
-                  entry={entry}
-                  active={index === boundedIndex}
-                  position={index + 1}
-                  total={results.length}
-                  disabled={false}
-                  onSelect={() => { if (!actionPending) setSelectedIndex(index); }}
-                  setRowRef={setResultRef}
-                />
-              ))}
-            </ul>
-          </aside>
-
           <section className="command-stage">
             {selected && (
               <DetailCard
@@ -515,6 +503,24 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
               </div>
             </section>
           </section>
+
+          <aside className="result-lane" aria-label="Search results">
+            <div className="lane-heading"><span>MATCHES</span><strong>{results.length.toString().padStart(2, "0")}</strong></div>
+            <ul id="result-list" role="listbox" aria-label="Command results" aria-busy={actionPending}>
+              {results.map(({ entry }, index) => (
+                <ResultRow
+                  key={entry.id}
+                  entry={entry}
+                  active={index === boundedIndex}
+                  position={index + 1}
+                  total={results.length}
+                  disabled={false}
+                  onSelect={() => { if (!actionPending) setSelectedIndex(index); }}
+                  setRowRef={setResultRef}
+                />
+              ))}
+            </ul>
+          </aside>
         </section>
       )}
 

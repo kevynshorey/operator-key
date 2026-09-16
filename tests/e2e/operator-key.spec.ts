@@ -134,8 +134,66 @@ test("[web] browser deck copies safely, gates insertion, and responds at desktop
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   await expect(page.getByRole("option", { selected: true })).toBeVisible();
-  const controls = page.locator(".product-tabs button, .task-chips button, .close-overlay");
-  for (let index = 0; index < Math.min(await controls.count(), 6); index += 1) {
-    expect((await controls.nth(index).boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  const assertTouchTargets = async () => {
+    const controls = page.locator("button, input:not([type=hidden]), select");
+    for (let index = 0; index < await controls.count(); index += 1) {
+      const box = await controls.nth(index).boundingBox();
+      if (!box) continue;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+  };
+  await assertTouchTargets();
+  await input.fill("no matching command sentinel query");
+  await expect(page.getByRole("heading", { name: "No matching command" })).toBeVisible();
+  await assertTouchTargets();
+});
+
+test("[web] mobile keyboard navigation scrolls only the result list", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const input = page.getByRole("searchbox", { name: "Operator intent" });
+  await input.fill("review");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const resultList = page.getByRole("listbox", { name: "Command results" });
+  const initialListScroll = await resultList.evaluate((element) => element.scrollTop);
+  for (let index = 0; index < 8; index += 1) await input.press("ArrowDown");
+  await expect.poll(() => resultList.evaluate((element) => element.scrollTop)).toBeGreaterThan(initialListScroll);
+  expect(await page.evaluate(() => ({ windowY: window.scrollY, documentY: document.documentElement.scrollTop }))).toEqual({ windowY: 0, documentY: 0 });
+});
+
+test("[web] 390px deck exposes rail affordances and the dominant recommendation above the fold", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const input = page.getByRole("searchbox", { name: "Operator intent" });
+  await input.fill("review code");
+
+  const productRail = page.getByRole("radiogroup", { name: "Product lanes" });
+  const taskRail = page.getByLabel("Task filters");
+  await expect(productRail).toHaveAttribute("data-scroll-affordance", "horizontal");
+  await expect(taskRail).toHaveAttribute("data-scroll-affordance", "horizontal");
+  for (const rail of [productRail, taskRail]) {
+    const metrics = await rail.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        overflowX: style.overflowX,
+        paddingRight: Number.parseFloat(style.paddingRight),
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+      };
+    });
+    expect(metrics.overflowX).toBe("auto");
+    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+    expect(metrics.paddingRight).toBeGreaterThanOrEqual(32);
   }
+
+  for (const [query, heading] of [["review code", "/code-review"], ["/claude-api", "/claude-api"], ["/doctor", "/doctor"], ["/bug", "/bug"]] as const) {
+    await input.fill(query);
+    await expect(page.getByRole("heading", { name: heading, exact: true })).toBeInViewport();
+    await expect(page.locator(".detail-card .safety-pill")).toBeInViewport();
+    await expect(page.locator(".detail-description")).toBeInViewport();
+    const descriptionBox = await page.locator(".detail-description").boundingBox();
+    expect(descriptionBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(844);
+    expect((descriptionBox?.y ?? 0) + (descriptionBox?.height ?? 0)).toBeLessThanOrEqual(844);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 });

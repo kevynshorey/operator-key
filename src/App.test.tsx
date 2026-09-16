@@ -1,14 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import App from "./App";
-
-const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
-
-afterEach(() => {
-  if (originalScrollIntoView) Object.defineProperty(Element.prototype, "scrollIntoView", originalScrollIntoView);
-  else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
-});
 
 describe("Operator Key overlay", () => {
   it("renders the keyboard-first search shell and catalog status", () => {
@@ -50,28 +43,42 @@ describe("Operator Key overlay", () => {
     }
   });
 
-  it("keeps the keyboard-active result visible as selection changes", async () => {
-    const scrolledIds: string[] = [];
-    const scrollIntoView = vi.fn(function (this: Element, options?: ScrollIntoViewOptions) {
-      scrolledIds.push(`${this.id}:${options?.block}`);
-    });
-    Object.defineProperty(Element.prototype, "scrollIntoView", {
-      configurable: true,
-      value: scrollIntoView,
-    });
-    const user = userEvent.setup();
-    render(<App />);
+  it("keeps keyboard selection inside the result scroller without moving the page", async () => {
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+    const scrollIntoView = vi.fn();
+    const originalBounds = Element.prototype.getBoundingClientRect;
+    let bounds: ReturnType<typeof vi.spyOn> | undefined;
 
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
-    scrollIntoView.mockClear();
-    scrolledIds.length = 0;
-    const search = screen.getByRole("searchbox", { name: /operator intent/i });
-    await user.type(search, "review code");
-    await user.keyboard("{ArrowDown}");
+    try {
+      Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
+      bounds = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+        if (this.id === "result-list") return DOMRect.fromRect({ x: 0, y: 0, width: 320, height: 100 });
+        if (this.getAttribute("role") === "option") {
+          const position = Number(this.getAttribute("aria-posinset") ?? "1");
+          const y = (position - 1) * 52 - (this.parentElement?.scrollTop ?? 0);
+          return DOMRect.fromRect({ x: 0, y, width: 320, height: 52 });
+        }
+        return originalBounds.call(this);
+      });
 
-    const active = screen.getByRole("option", { selected: true });
-    await waitFor(() => expect(scrolledIds.at(-1)).toBe(`${active.id}:nearest`));
-    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+      const user = userEvent.setup();
+      render(<App />);
+      const resultList = screen.getByRole("listbox", { name: /command results/i });
+      const search = screen.getByRole("searchbox", { name: /operator intent/i });
+      await user.type(search, "review code");
+      await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}");
+      await waitFor(() => expect(resultList.scrollTop).toBeGreaterThan(0));
+      const downwardScroll = resultList.scrollTop;
+
+      await user.keyboard("{ArrowUp}{ArrowUp}{ArrowUp}");
+      await waitFor(() => expect(resultList.scrollTop).toBeLessThan(downwardScroll));
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(window.scrollY).toBe(0);
+    } finally {
+      bounds?.mockRestore();
+      if (originalScrollIntoView) Object.defineProperty(Element.prototype, "scrollIntoView", originalScrollIntoView);
+      else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    }
   });
 
   it("dismisses once with Escape from controls outside the search input", async () => {

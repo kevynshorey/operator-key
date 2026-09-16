@@ -1,5 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
+const useNativeSharedMemory = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.OPERATOR_KEY_PLAYWRIGHT_USE_DEV_SHM === "1";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -10,7 +12,10 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:4173",
     browserName: "chromium",
-    launchOptions: { executablePath: "/usr/bin/chromium" },
+    launchOptions: {
+      executablePath: "/usr/bin/chromium",
+      ...(useNativeSharedMemory ? { ignoreDefaultArgs: ["--disable-dev-shm-usage"] } : {}),
+    },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

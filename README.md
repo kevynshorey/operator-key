@@ -95,6 +95,8 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
+Playwright keeps its portable shared-memory default. On a local Omarchy host where `/tmp` is constrained but `/dev/shm` has sufficient capacity, opt in explicitly with `OPERATOR_KEY_PLAYWRIGHT_USE_DEV_SHM=1 npm run test:e2e`.
+
 See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for the exact installed artifact, catalog counts, browser coverage, and native copy/insertion evidence.
 
 ## Build
