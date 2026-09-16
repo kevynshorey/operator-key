@@ -120,6 +120,16 @@ select:focus-visible,
 .search-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--white); font-family: var(--display); font-size: clamp(25px, 3vw, 38px); font-stretch: condensed; font-weight: 700; letter-spacing: .01em; }
 .search-field input::placeholder { color: #8f999e; opacity: 1; }
 .search-field input::-webkit-search-cancel-button { display: none; }
+.intent-composer-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 14px; padding: 8px 12px; border-bottom: 1px solid var(--etched); background: linear-gradient(90deg, rgba(49,215,232,.045), transparent 55%); }
+.spark-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 7px 11px; border: 1px solid var(--cyan); border-radius: 1px; background: #142328; color: var(--white); font-family: var(--mono); font-size: 10px; font-weight: 750; letter-spacing: .045em; text-transform: uppercase; box-shadow: inset 0 0 0 1px rgba(49,215,232,.08); }
+.spark-button:hover:not(:disabled) { background: #193138; box-shadow: 0 0 18px rgba(49,215,232,.12), inset 0 0 0 1px rgba(49,215,232,.2); }
+.spark-button > span { color: var(--cyan); font-size: 15px; }
+.spark-button kbd { padding: 3px 5px; border: 1px solid #557077; background: #0b1215; color: var(--cyan); font-size: 8px; }
+.spark-copy { min-width: 0; }
+.spark-copy p { margin: 0; color: #b8c2c1; font-size: 10px; line-height: 1.35; }
+.spark-copy small { display: block; margin-top: 3px; color: var(--amber); font-family: var(--mono); font-size: 9px; line-height: 1.3; }
+.spark-copy small.spark-ready { color: var(--green); }
+.spark-error { grid-column: 1 / -1; margin: 0; padding: 6px 8px; border-left: 2px solid var(--red); background: rgba(255,93,71,.08); color: #ffd2ca; font-family: var(--mono); font-size: 10px; }
 .escape-key, .status-footer kbd { border: 1px solid var(--graphite-600); border-bottom-color: #67747b; border-radius: 2px; background: var(--graphite-800); color: var(--muted); font-family: var(--mono); font-size: 10px; box-shadow: 0 2px 0 #060809; }
 .escape-key { padding: 5px 7px; }
 
@@ -172,7 +182,31 @@ select:focus-visible,
 .safety-red { color: var(--red); }
 
 .command-stage { display: grid; grid-column: 2; grid-row: 1; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; min-height: 0; padding: 14px 16px 0; overflow: hidden; }
-.detail-card { min-height: 0; overflow-y: auto; padding: 3px 2px 10px; }
+.command-scroll { min-height: 0; overflow-y: auto; padding: 3px 2px 10px; scrollbar-color: var(--graphite-600) var(--graphite-950); }
+.detail-card { min-height: 0; padding: 3px 2px 10px; }
+.intent-structure { margin: 0 0 15px; border: 1px solid #385d65; background: linear-gradient(135deg, rgba(49,215,232,.07), rgba(8,11,13,.5) 45%); }
+.intent-structure-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 11px; border-bottom: 1px solid rgba(49,215,232,.22); }
+.intent-structure-header h2 { margin: 3px 0 0; color: var(--white); font-family: var(--display); font-size: 24px; line-height: 1; letter-spacing: .035em; }
+.intent-structure-header button { flex: 0 0 auto; min-height: 34px; padding: 6px 9px; border: 1px solid var(--graphite-600); background: #11191c; color: var(--cyan); font-family: var(--mono); font-size: 9px; text-transform: uppercase; }
+.intent-summary { margin: 0; padding: 10px 11px; color: #e2e4dd; font-size: 12px; line-height: 1.45; }
+.intent-context { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border-top: 1px solid var(--etched); border-bottom: 1px solid var(--etched); background: var(--etched); }
+.intent-context > div { min-width: 0; padding: 8px 10px; background: rgba(13,18,21,.94); color: var(--muted); font-size: 10px; line-height: 1.4; }
+.intent-context strong { display: block; margin-bottom: 4px; color: var(--cyan); font-family: var(--mono); font-size: 9px; letter-spacing: .065em; text-transform: uppercase; }
+.intent-context ul { margin: 0; padding-left: 16px; }
+.intent-steps { margin: 0; padding: 0; list-style: none; }
+.intent-steps li { display: grid; grid-template-columns: 28px minmax(100px, .8fr) minmax(150px, 1.4fr) auto; align-items: center; gap: 9px; min-height: 54px; padding: 7px 10px; border-bottom: 1px solid rgba(168,185,191,.12); }
+.intent-steps li:last-child { border-bottom: 0; }
+.step-number { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--cyan); color: var(--cyan); font-family: var(--mono); font-size: 11px; font-weight: 800; }
+.step-command, .step-reason, .step-signals { min-width: 0; }
+.step-command span, .step-command strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-command span { color: var(--cyan); font-family: var(--mono); font-size: 8px; text-transform: uppercase; }
+.step-command strong { margin-top: 3px; color: var(--white); font-family: var(--mono); font-size: 11px; }
+.step-reason p { margin: 0 0 3px; color: #d5d8d2; font-size: 10px; line-height: 1.3; }
+.step-reason small { color: var(--steel); font-size: 9px; }
+.step-signals { display: grid; justify-items: end; gap: 5px; }
+.confidence { color: #bdc6c5; font-family: var(--mono); font-size: 8px; text-transform: uppercase; white-space: nowrap; }
+.confidence-high { color: var(--green); }
+.confidence-low { color: var(--amber); }
 .detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .eyebrow { color: var(--cyan); font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .07em; }
 .safety-pill { flex: 0 0 auto; padding: 4px 7px; border: 1px solid currentColor; font-family: var(--mono); font-size: 10px; font-style: normal; text-transform: uppercase; letter-spacing: .035em; }
@@ -327,7 +361,7 @@ body:has(.runtime-web) { background: #0b0e10; }
 @media (max-width: 620px) {
   body:has(.runtime-web) { min-width: 0; }
   .runtime-web { width: 100%; min-height: 100vh; margin: 0; border-right: 0; border-left: 0; box-shadow: none; }
-  .runtime-web .masthead { min-height: 56px; }
+  .runtime-web .masthead { min-height: 44px; }
   .runtime-web .wordmark-index { display: none; }
   .runtime-web .text-mode { min-height: 44px; }
   .web-hero { display: block; padding: 18px 16px; }
@@ -335,8 +369,12 @@ body:has(.runtime-web) { background: #0b0e10; }
   .web-hero h1 { font-size: 29px; line-height: 1.08; }
   .web-hero > b { display: inline-block; margin-top: 14px; }
   .runtime-web .search-field { height: 52px; padding-inline: 14px; }
-  .runtime-web .search-field input { min-height: 44px; }
+  .runtime-web .search-field input { min-height: 44px; font-size: 24px; }
   .runtime-web .search-index, .runtime-web .escape-key { display: none; }
+  .runtime-web .intent-composer-actions { grid-template-columns: 1fr; gap: 4px; padding: 6px 14px; }
+  .runtime-web .spark-button { width: 100%; min-height: 44px; }
+  .runtime-web .spark-copy p { font-size: 8.5px; line-height: 1.1; }
+  .runtime-web .spark-copy small { margin-top: 2px; font-size: 8px; line-height: 1.1; }
   .runtime-web .product-tabs { grid-template-columns: repeat(5, minmax(96px, 1fr)); padding-right: 32px; }
   .runtime-web .task-chips { padding-right: 32px; }
   .runtime-web .product-tabs button, .runtime-web .task-chips button, .runtime-web .select-filters label { min-height: 44px; }
@@ -344,10 +382,17 @@ body:has(.runtime-web) { background: #0b0e10; }
   .runtime-web .select-filters label { justify-content: space-between; min-width: 0; }
   .runtime-web .select-filters select { min-height: 44px; max-width: 100px; }
   .runtime-web .workspace-grid { display: flex; flex-direction: column; }
-  .runtime-web .command-stage { min-height: 0; padding: 8px 14px 0; overflow: visible; }
+  .runtime-web .command-stage { min-height: 0; padding: 0 14px; overflow: visible; }
+  .runtime-web .command-scroll { overflow: visible; }
   .runtime-web .result-lane { height: auto; }
   .runtime-web .result-lane ul { height: auto; max-height: 208px; }
   .runtime-web .detail-card { overflow: visible; }
+  .runtime-web .intent-structure-header { align-items: flex-start; }
+  .runtime-web .intent-structure-header button { min-height: 44px; }
+  .runtime-web .intent-context { grid-template-columns: 1fr; }
+  .runtime-web .intent-steps li { grid-template-columns: 30px minmax(0, 1fr); padding-block: 10px; }
+  .runtime-web .step-reason, .runtime-web .step-signals { grid-column: 2; }
+  .runtime-web .step-signals { display: flex; justify-content: flex-start; align-items: center; gap: 12px; }
   .runtime-web .detail-card h2 { font-size: 32px; }
   .runtime-web .detail-description { font-size: 13px; line-height: 1.45; }
   .runtime-web .key-trace kbd { min-width: 44px; height: 44px; }

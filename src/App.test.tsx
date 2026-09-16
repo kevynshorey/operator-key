@@ -1,7 +1,36 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import catalogJson from "../data/catalog.json";
 import App from "./App";
+import { parseCatalog } from "./catalog";
+import { buildIntentCandidateIds, type IntentReasoner, type SparkIntentPlan } from "./intent";
+import { createSearchIndex, searchCatalog } from "./search";
+
+const CHAT_ID = "bba8772153ddeadc";
+const STATUS_ID = "16fe16d89f85e6a8";
+
+function sparkPlan(overrides: Partial<SparkIntentPlan> = {}): SparkIntentPlan {
+  return {
+    model: "gpt-5.6-luna",
+    summary: "Inspect the agent, then open an interactive session.",
+    assumptions: ["Codex CLI is authenticated."],
+    gaps: ["The target workspace is not specified."],
+    recommendations: [
+      { entryId: STATUS_ID, sequence: 1, purpose: "Check agent health.", inputHint: "No input required.", confidence: "high" },
+      { entryId: CHAT_ID, sequence: 2, purpose: "Start the session.", inputHint: "Continue with the workspace goal.", confidence: "medium" },
+    ],
+    ...overrides,
+  };
+}
+
+function nativeReasoner(overrides: Partial<IntentReasoner> = {}): IntentReasoner {
+  return {
+    status: vi.fn().mockResolvedValue({ available: true, loggedIn: true, model: "gpt-5.6-luna", message: "Luna ready." }),
+    reason: vi.fn().mockResolvedValue(sparkPlan()),
+    ...overrides,
+  };
+}
 
 describe("Operator Key overlay", () => {
   it("renders the keyboard-first search shell and catalog status", () => {
@@ -204,7 +233,7 @@ describe("Operator Key overlay", () => {
     expect(screen.getByLabelText(/safety filter/i)).toBeDisabled();
     expect(screen.getAllByRole("radio").every((control) => control.hasAttribute("disabled"))).toBe(true);
     expect(screen.getByRole("listbox", { name: /command results/i })).toHaveAttribute("aria-busy", "true");
-    expect(screen.getAllByRole("option").every((option) => option.getAttribute("aria-disabled") === "false")).toBe(true);
+    expect(screen.getAllByRole("option").every((option) => option.getAttribute("aria-disabled") === "true")).toBe(true);
     expect(screen.getAllByRole("button", { name: /task/i }).every((control) => control.hasAttribute("disabled"))).toBe(true);
 
     finishCopy?.();
@@ -248,7 +277,7 @@ describe("Operator Key overlay", () => {
     expect(await screen.findByText(/binding conflict/i)).toBeInTheDocument();
     expect(screen.getByText(/safety level/i)).toBeInTheDocument();
     expect(screen.getByText(/version/i)).toBeInTheDocument();
-    expect(screen.getByText(/provenance/i)).toBeInTheDocument();
+    expect(screen.getByText("Provenance", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /alternatives/i })).toBeInTheDocument();
   });
 
@@ -267,5 +296,179 @@ describe("Operator Key overlay", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/loading command catalog/i);
     rerender(<App catalogData={{ entries: [] }} />);
     expect(screen.getByRole("alert")).toHaveTextContent(/catalog is missing schema_version/i);
+  });
+
+  it("checks native Luna status on mount without reasoning automatically", async () => {
+    const reasoner = nativeReasoner();
+    render(<App runtime="native" intentReasoner={reasoner} />);
+    expect(screen.getByText(/checking luna status/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/luna ready/i)).toBeInTheDocument());
+    expect(reasoner.status).toHaveBeenCalledOnce();
+    expect(reasoner.reason).not.toHaveBeenCalled();
+    expect(screen.getByText(/bounded command fields shown in the local catalog.*never source paths, provenance, files, secrets, terminal contents, or history/i)).toBeInTheDocument();
+  });
+
+  it("disables Spark in the browser and explains the native companion requirement", async () => {
+    const reasoner = nativeReasoner();
+    render(<App runtime="web" intentReasoner={reasoner} />);
+    const button = screen.getByRole("button", { name: /reason with luna/i });
+    expect(button).toBeDisabled();
+    expect(screen.getAllByText(/native operator key companion/i).length).toBeGreaterThan(0);
+    expect(reasoner.reason).not.toHaveBeenCalled();
+  });
+
+  it("shows signed-out native status and keeps reasoning disabled", async () => {
+    const reasoner = nativeReasoner({
+      status: vi.fn().mockResolvedValue({ available: true, loggedIn: false, model: "gpt-5.6-luna", message: "Sign in with Codex CLI to continue." }),
+    });
+    const user = userEvent.setup();
+    render(<App runtime="native" intentReasoner={reasoner} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Open an interactive Hermes session after checking status.");
+    expect(await screen.findByText(/sign in with codex cli/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reason with luna/i })).toBeDisabled();
+  });
+
+  it("reasons only on Alt+Enter and sends the exact bounded candidate IDs", async () => {
+    const user = userEvent.setup();
+    const reasoner = nativeReasoner();
+    render(<App runtime="native" intentReasoner={reasoner} />);
+    const input = screen.getByRole("searchbox", { name: /operator intent/i });
+    const intent = "Open an interactive Hermes session after checking status.";
+    await user.type(input, intent);
+    await screen.findByText(/luna ready/i);
+    await user.keyboard("{Alt>}{Enter}{/Alt}");
+
+    const parsed = parseCatalog(catalogJson);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const localResults = searchCatalog(createSearchIndex(parsed.catalog.entries), intent, {}, 50);
+    expect(reasoner.reason).toHaveBeenCalledWith(
+      intent,
+      buildIntentCandidateIds(parsed.catalog.entries, intent, {}, localResults),
+    );
+  });
+
+  it("locks query, filters, results, and existing actions while Spark is pending without copying or inserting", async () => {
+    const user = userEvent.setup();
+    let finishReasoning: ((plan: SparkIntentPlan) => void) | undefined;
+    const reasoner = nativeReasoner({ reason: vi.fn(() => new Promise<SparkIntentPlan>((resolve) => { finishReasoning = resolve; })) });
+    const actions = { copy: vi.fn(), insert: vi.fn() };
+    render(<App runtime="native" intentReasoner={reasoner} actions={actions} />);
+    const input = screen.getByRole("searchbox", { name: /operator intent/i });
+    await user.type(input, "hermes status");
+    await screen.findByText(/luna ready/i);
+    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+
+    expect(input).toBeDisabled();
+    expect(screen.getByRole("button", { name: /reason with luna/i })).toBeDisabled();
+    expect(screen.getByLabelText(/interface filter/i)).toBeDisabled();
+    expect(screen.getByLabelText(/safety filter/i)).toBeDisabled();
+    expect(screen.getByRole("listbox", { name: /command results/i })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("option").every((option) => option.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(screen.getByRole("button", { name: /copy command/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /large text/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /close operator key/i })).toBeDisabled();
+    expect(actions.copy).not.toHaveBeenCalled();
+    expect(actions.insert).not.toHaveBeenCalled();
+
+    finishReasoning?.(sparkPlan());
+    await screen.findByRole("region", { name: /intent structure/i });
+  });
+
+  it("renders trusted catalog commands in recommendation order with assumptions and gaps", async () => {
+    const user = userEvent.setup();
+    const reasoner = nativeReasoner();
+    render(<App runtime="native" intentReasoner={reasoner} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Check status then start chat.");
+    await screen.findByText(/luna ready/i);
+    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+
+    const structure = await screen.findByRole("region", { name: /intent structure/i });
+    expect(structure).toHaveTextContent("gpt-5.6-luna");
+    expect(structure).toHaveTextContent("Inspect the agent, then open an interactive session.");
+    expect(structure).toHaveTextContent("Codex CLI is authenticated.");
+    expect(structure).toHaveTextContent("The target workspace is not specified.");
+    expect(structure).toHaveTextContent("Check agent health.");
+    expect(structure).toHaveTextContent("No input required.");
+    expect(structure).toHaveTextContent(/high/i);
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(2);
+    expect(options[0]).toHaveTextContent("hermes status");
+    expect(options[1]).toHaveTextContent("hermes chat");
+    expect(screen.getByRole("heading", { name: "hermes status", level: 2 })).toBeInTheDocument();
+  });
+
+  it("fails closed when Spark returns an unknown catalog ID", async () => {
+    const user = userEvent.setup();
+    const reasoner = nativeReasoner({
+      reason: vi.fn().mockResolvedValue(sparkPlan({ recommendations: [{ entryId: "model-invented-command", sequence: 1, purpose: "Unsafe invention", inputHint: "", confidence: "high" }] })),
+    });
+    render(<App runtime="native" intentReasoner={reasoner} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Do a made-up thing.");
+    await screen.findByText(/luna ready/i);
+    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/unknown.*model-invented-command/i);
+    expect(screen.queryByText("Unsafe invention")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
+  });
+
+  it("surfaces provider errors without implying a plan exists", async () => {
+    const user = userEvent.setup();
+    const reasoner = nativeReasoner({ reason: vi.fn().mockRejectedValue(new Error("Codex request timed out")) });
+    render(<App runtime="native" intentReasoner={reasoner} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Check status.");
+    await screen.findByText(/luna ready/i);
+    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/codex request timed out/i);
+    expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["product", () => screen.getByRole("radio", { name: /hermes/i })],
+    ["task", () => screen.getByRole("button", { name: /^parallel agents$/i })],
+    ["interface", () => screen.getByLabelText(/interface filter/i)],
+    ["safety", () => screen.getByLabelText(/safety filter/i)],
+  ])("clears a stale plan when the %s filter changes", async (kind, getControl) => {
+    const user = userEvent.setup();
+    render(<App runtime="native" intentReasoner={nativeReasoner()} />);
+    const input = screen.getByRole("searchbox", { name: /operator intent/i });
+    await user.type(input, "Check status then chat.");
+    await screen.findByText(/luna ready/i);
+    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    expect(await screen.findByRole("region", { name: /intent structure/i })).toBeInTheDocument();
+
+    const control = getControl();
+    if (kind === "interface") await user.selectOptions(control, "shell-command");
+    else if (kind === "safety") await user.selectOptions(control, "green");
+    else await user.click(control);
+    expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
+  });
+
+  it("clears stale plan and errors on query changes", async () => {
+    const user = userEvent.setup();
+    const reasoner = nativeReasoner();
+    render(<App runtime="native" intentReasoner={reasoner} />);
+    const input = screen.getByRole("searchbox", { name: /operator intent/i });
+    await user.type(input, "Check status then chat.");
+    await screen.findByText(/luna ready/i);
+    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByRole("region", { name: /intent structure/i });
+    await user.type(input, " now");
+    expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
+  });
+
+  it("returns to local search while preserving the entered outcome", async () => {
+    const user = userEvent.setup();
+    render(<App runtime="native" intentReasoner={nativeReasoner()} />);
+    const input = screen.getByRole("searchbox", { name: /operator intent/i });
+    const intent = "hermes";
+    await user.type(input, intent);
+    await screen.findByText(/luna ready/i);
+    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByRole("region", { name: /intent structure/i });
+    await user.click(screen.getByRole("button", { name: /return to local search/i }));
+    expect(input).toHaveValue(intent);
+    expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("option").length).toBeGreaterThan(2);
   });
 });
