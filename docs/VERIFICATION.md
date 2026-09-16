@@ -1,8 +1,19 @@
 # Verification evidence
 
-Verified on 2026-09-16 against application-bearing source commit `24b19c8c4757826230dffaafd2db5da9c7e765fc` on Omarchy 4.0.3-1.
+Verified on 2026-09-16 against Luna application-bearing source commit `a9ff3d3ab0f0f16c7d77573f824d539fb140cc01` on Omarchy 4.0.3-1.
 
-## Installed launcher
+## Luna intent reasoning release candidate
+
+- Selected model: `gpt-5.6-luna` through authenticated Codex CLI `0.154.0`.
+- The operator must explicitly choose `Reason with Luna` or press `Alt+Enter`; typing never invokes the provider.
+- Provider-bound data is limited to the entered intent and bounded catalog fields. Source paths, provenance, files, secrets, terminal contents, configuration, and history are excluded.
+- The Codex process runs ephemerally in a private workspace with a root-deny permission profile, tool surfaces disabled, closed schema output, a hard deadline, and process-group cleanup.
+- A real authenticated Luna call passed through `reason_about_intent_with`, returned a schema-valid plan, and selected only the two supplied exact catalog IDs.
+- Independent exact-snapshot security/correctness review passed commit `52f1eeb456cc5ea2d6d9b0ccd2762fa1ceb12544`; the subsequent accessibility remediation is commit `a9ff3d3ab0f0f16c7d77573f824d539fb140cc01`.
+- Release artifact: `src-tauri/target/release/operator-key`
+- Release-candidate SHA-256: `6f0afb8b745b16609833ac0b54dce6da280079821bd7c5ceab4cffac1fea4c40`
+
+## Installed baseline before Luna cutover
 
 - Physical shortcut: `SUPER + U` (Command + U on the connected Apple keyboard)
 - Managed binding: `o.bind("SUPER + U", "Operator Key", o.launch("/home/kevo/.local/bin/operator-key"))`
@@ -32,18 +43,19 @@ The generated catalog passed the checked-in schema and JSON parsing.
 
 All gates ran from the repository root:
 
-- Vitest: 63/63 passed across 7 files
-- Playwright: 8/8 passed with system Chromium; the constrained local host used the documented explicit `/dev/shm` opt-in
+- Vitest: 89/89 passed across 8 files
+- Playwright: 9/9 passed with system Chromium
 - Python: 92/92 passed
-- Rust: 26/26 passed
+- Rust: 46/46 passed, plus a separate authenticated live Luna test pass
 - TypeScript typecheck: passed
 - ESLint: passed with zero warnings
 - Cargo formatting: passed
 - Cargo check: passed
+- Cargo Clippy (`--all-targets --all-features -D warnings`): passed
 - Production Tauri no-bundle build: passed
 - `git diff --check`: passed
 
-- The Vite production build emitted the documented embedded-catalog advisory: approximately 960.92 kB minified and 148.85 kB gzip. This is non-blocking and expected for the complete local-first catalog.
+- The Vite production build emitted the documented embedded-catalog advisory: approximately 969.10 kB minified and 151.18 kB gzip. This is non-blocking and expected for the complete local-first catalog.
 
 ## Browser workflows
 
@@ -63,6 +75,9 @@ Playwright verified:
 - Genuine horizontal overflow and end affordance for product and task rails
 - Full `/code-review`, `/claude-api`, `/doctor`, and `/bug` descriptions above the initial mobile fold
 - Keyboard selection scrolling only the result list while the page remains at scroll position zero
+- Explicit Luna invocation with exact bounded candidate IDs and no automatic provider call
+- Ordered catalog-bound plan rendering with assumptions, gaps, confidence, purpose, input hints, and safety
+- Pending-state lock including Escape, live availability/progress announcements, stale-plan clearing, and return to local search
 
 ## Native workflows
 
@@ -77,6 +92,7 @@ The compositor-level native smoke used exact argv with a disposable Foot termina
 - The prior clipboard value and focused window were restored when available
 - No new WebKitWebProcess core dump appeared during the successful release smoke
 - The installed binary hash matched the reviewed release artifact exactly after installation
+- The Luna release candidate independently passed the same exact-copy and guarded-unsubmitted-insertion smoke from its release artifact path
 
 A smoke attempted while the install-verification window was intentionally still open could not hand focus back to the disposable terminal because the existing always-on-top Operator Key window remained present. After closing that verification window, the same installed-artifact smoke passed. Normal use is one overlay instance at a time.
 
@@ -85,5 +101,7 @@ A smoke attempted while the install-verification window was intentionally still 
 - `0e114df579bdc39e38b1a524e595510808ade4d1` — WebKit-safe result reconciliation and pending-state accessibility: independently approved with no findings.
 - `1de630ee56e915c0d44d00be818cdd8687a592ab` — current Hyprland Lua focus dispatcher with strict address validation and target revalidation: independently approved with no blocking findings.
 - `24b19c8c4757826230dffaafd2db5da9c7e765fc` — browser-safe Operator Deck and mobile ergonomics: exact-snapshot specification and code-quality/security reviews both passed with no findings.
+- `52f1eeb456cc5ea2d6d9b0ccd2762fa1ceb12544` — Luna-assisted intent reasoning, root-deny Codex boundary, catalog-bound plans, and live provider proof: exact-snapshot security/correctness review passed with no findings.
+- `a9ff3d3ab0f0f16c7d77573f824d539fb140cc01` — strict pending lock, assistive announcements, and Luna documentation normalization.
 
-The approved branch was fast-forwarded into local `main`. No remote is configured, so no remote push or hosted deployment was performed.
+The Luna release candidate is awaiting final commit-bound accessibility review before fast-forwarding local `main` and installing the exact reviewed artifact. No remote is configured, so no remote push or hosted deployment is applicable.
