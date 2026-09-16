@@ -17,10 +17,12 @@ import { createSearchIndex, searchCatalog } from "./search";
 import { hideOverlay, type HideOverlay } from "./overlay";
 import {
   getActionAvailability,
+  createBrowserActions,
   nativeActions,
   type ActionAvailability,
   type OperatorActions,
 } from "./actions";
+import { detectRuntime, type OperatorRuntime } from "./runtime";
 
 const PRODUCT_LABELS: Record<Product, string> = {
   omarchy: "Omarchy",
@@ -49,6 +51,7 @@ interface AppProps {
   catalogData?: unknown;
   hideOverlay?: HideOverlay;
   actions?: OperatorActions;
+  runtime?: OperatorRuntime;
 }
 
 interface ActionStatus {
@@ -117,7 +120,7 @@ function ResultRow({ entry, active, position, total, disabled, onSelect, setRowR
   );
 }
 
-function Header({ largeText, onLargeText, onClose }: { largeText: boolean; onLargeText: () => void; onClose: () => void }) {
+function Header({ largeText, onLargeText, onClose, runtime }: { largeText: boolean; onLargeText: () => void; onClose: () => void; runtime: OperatorRuntime }) {
   return (
     <header className="masthead">
       <div className="wordmark" aria-label="Operator Key">
@@ -126,22 +129,22 @@ function Header({ largeText, onLargeText, onClose }: { largeText: boolean; onLar
       </div>
       <div className="system-readout">
         <span><i className="signal-light" /> LOCAL CATALOG</span>
-        <span>NO EXECUTION PATH</span>
+        <span>{runtime === "web" ? "WEB DECK · COPY ONLY" : "NO EXECUTION PATH"}</span>
         <button type="button" className="text-mode" aria-pressed={largeText} onClick={onLargeText}>
           <span aria-hidden="true">Aa</span> Large text
         </button>
-        <button type="button" className="close-overlay" aria-label="Close Operator Key" onClick={onClose}>
-          <span aria-hidden="true">×</span>
+        <button type="button" className="close-overlay" aria-label={runtime === "web" ? "Reset search" : "Close Operator Key"} onClick={onClose}>
+          <span aria-hidden="true">{runtime === "web" ? "↺" : "×"}</span>
         </button>
       </div>
     </header>
   );
 }
 
-function ShellState({ kind, message, onClose }: { kind: "status" | "alert"; message: string; onClose: () => void }) {
+function ShellState({ kind, message, onClose, runtime }: { kind: "status" | "alert"; message: string; onClose: () => void; runtime: OperatorRuntime }) {
   return (
     <main className="state-shell" data-testid="operator-shell">
-      <Header largeText={false} onLargeText={() => undefined} onClose={onClose} />
+      <Header runtime={runtime} largeText={false} onLargeText={() => undefined} onClose={onClose} />
       <section className="state-panel" role={kind}>
         <span className="state-code">SYSTEM / CATALOG</span>
         <h1>{message}</h1>
@@ -237,7 +240,7 @@ function DetailCard({
   );
 }
 
-export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay, actions: injectedActions }: AppProps) {
+export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime }: AppProps) {
   const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
   const searchIndex = useMemo(
     () => parsed.ok ? createSearchIndex(parsed.catalog.entries) : undefined,
@@ -255,8 +258,9 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const [largeText, setLargeText] = useState(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const resultRefs = useRef(new Map<string, HTMLLIElement>());
+  const runtime = injectedRuntime ?? detectRuntime();
   const dismissOverlay = injectedHideOverlay ?? hideOverlay;
-  const operatorActions = injectedActions ?? nativeActions;
+  const operatorActions = injectedActions ?? (runtime === "native" ? nativeActions : createBrowserActions());
   const setResultRef = useCallback((entryId: string, node: HTMLLIElement | null) => {
     if (node) resultRefs.current.set(entryId, node);
     else resultRefs.current.delete(entryId);
@@ -283,19 +287,25 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
     const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      void dismissOverlay();
+      if (runtime === "web") {
+        setQuery("");
+        setSelectedIndex(0);
+        setActionStatus(undefined);
+      } else {
+        void dismissOverlay();
+      }
     };
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [dismissOverlay]);
+  }, [dismissOverlay, runtime]);
 
   useEffect(() => {
     if (!selected) return;
     resultRefs.current.get(selected.id)?.scrollIntoView?.({ block: "nearest" });
   }, [selected, results]);
 
-  if (loading) return <ShellState kind="status" message="Loading command catalog…" onClose={() => { void dismissOverlay(); }} />;
-  if (!parsed.ok) return <ShellState kind="alert" message={parsed.error} onClose={() => { void dismissOverlay(); }} />;
+  if (loading) return <ShellState runtime={runtime} kind="status" message="Loading command catalog…" onClose={() => { if (runtime === "native") void dismissOverlay(); }} />;
+  if (!parsed.ok) return <ShellState runtime={runtime} kind="alert" message={parsed.error} onClose={() => { if (runtime === "native") void dismissOverlay(); }} />;
 
   const selectProduct = (value?: Product) => {
     if (actionPending) return;
@@ -321,7 +331,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
 
   const insertSelected = async () => {
     if (!actionSelection || actionPending) return;
-    const availability = getActionAvailability(actionSelection);
+    const availability = getActionAvailability(actionSelection, runtime);
     if (!availability.insert) {
       setActionStatus({ kind: "status", message: availability.insertReason ?? "Terminal insertion is unavailable." });
       return;
@@ -373,8 +383,16 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const alternatives = results.filter((_, index) => index !== boundedIndex).slice(0, 3);
 
   return (
-    <main className={`operator-shell${largeText ? " large-text" : ""}`} data-testid="operator-shell">
-      <Header largeText={largeText} onLargeText={() => setLargeText((value) => !value)} onClose={() => { void dismissOverlay(); }} />
+    <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}`} data-testid="operator-shell">
+      <Header runtime={runtime} largeText={largeText} onLargeText={() => setLargeText((value) => !value)} onClose={() => {
+        if (runtime === "native") void dismissOverlay();
+        else { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); setSelectedIndex(0); setActionStatus(undefined); }
+      }} />
+
+      {runtime === "web" && <section className="web-hero" aria-label="Operator Key promise">
+        <div><span>LOCAL COMMAND INSTRUMENT / {parsed.catalog.total.toLocaleString()} ENTRIES</span><h1>You remember the task. <strong>Operator Key remembers the keys.</strong></h1></div>
+        <b>WEB DECK · COPY ONLY</b>
+      </section>}
 
       <section className="search-deck" aria-label="Command search controls">
         <label className="search-field">
@@ -477,7 +495,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
               <DetailCard
                 entry={selected}
                 catalog={parsed.catalog}
-                availability={getActionAvailability(selected)}
+                availability={getActionAvailability(selected, runtime)}
                 actionPending={actionPending}
                 onCopy={() => { void copySelected(); }}
                 onInsert={() => { void insertSelected(); }}
@@ -506,8 +524,8 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         <span><b>{results.length}</b> shown</span>
         <span><kbd>↑</kbd><kbd>↓</kbd> select</span>
         <span><kbd>ENTER</kbd> · COPY</span>
-        <span><kbd>SHIFT+ENTER</kbd> · GUARDED INSERT</span>
-        <span className="execution-lock">● EXECUTION DISABLED</span>
+        <span>{runtime === "native" ? <><kbd>SHIFT+ENTER</kbd> · GUARDED INSERT</> : "LOCAL-ONLY · COPY-ONLY"}</span>
+        <span className="execution-lock">{runtime === "native" ? "● EXECUTION DISABLED" : "● NATIVE COMPANION REQUIRED FOR INSERTION"}</span>
       </footer>
     </main>
   );

@@ -1,7 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
 declare global {
-  interface Window { __operatorKeyInvocations: Array<{ cmd: string; args: Record<string, unknown> }>; }
+  interface Window {
+    __operatorKeyInvocations: Array<{ cmd: string; args: Record<string, unknown> }>;
+    __operatorKeyClipboard: string[];
+  }
 }
 
 async function search(page: Page, query: string) {
@@ -10,9 +13,12 @@ async function search(page: Page, query: string) {
   return page.getByRole("option", { selected: true });
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  const webMode = testInfo.title.includes("[web]");
   await page.addInitScript(() => {
     window.__operatorKeyInvocations = [];
+  });
+  if (!webMode) await page.addInitScript(() => {
     Object.defineProperty(window, "__TAURI_INTERNALS__", {
       configurable: true,
       value: {
@@ -20,6 +26,13 @@ test.beforeEach(async ({ page }) => {
           window.__operatorKeyInvocations.push({ cmd, args });
         },
       },
+    });
+  });
+  if (webMode) await page.addInitScript(() => {
+    window.__operatorKeyClipboard = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (text: string) => { window.__operatorKeyClipboard.push(text); } },
     });
   });
   await page.goto("/");
@@ -104,4 +117,25 @@ test("820x560 large-text mode remains operable and accessible", async ({ page })
   await expect(page.getByText("EXECUTION DISABLED", { exact: false })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("[web] browser deck copies safely, gates insertion, and responds at desktop/mobile", async ({ page }) => {
+  expect(await page.evaluate(() => "__TAURI_INTERNALS__" in window)).toBe(false);
+  const input = page.getByRole("searchbox", { name: "Operator intent" });
+  await input.fill("review code");
+  await input.press("Enter");
+  await expect(page.getByRole("heading", { name: "/code-review" })).toBeVisible();
+  expect(await page.evaluate(() => window.__operatorKeyClipboard)).toEqual(["/code-review"]);
+  const insert = page.getByRole("button", { name: /Insert into confirmed terminal/ });
+  await expect(insert).toBeDisabled();
+  await expect(page.getByText(/Install\/open the native Operator Key companion/)).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.getByRole("heading", { name: "/code-review" })).toBeInViewport();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await expect(page.getByRole("option", { selected: true })).toBeVisible();
+  const controls = page.locator(".product-tabs button, .task-chips button, .close-overlay");
+  for (let index = 0; index < Math.min(await controls.count(), 6); index += 1) {
+    expect((await controls.nth(index).boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  }
 });

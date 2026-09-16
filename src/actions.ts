@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { CatalogEntry, InterfaceType } from "./catalog";
+import type { OperatorRuntime } from "./runtime";
 
 const TERMINAL_INTERFACES: ReadonlySet<InterfaceType> = new Set(["shell-command", "cli-flag"]);
 
@@ -17,7 +18,23 @@ export interface OperatorActions {
 
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
-export function getActionAvailability(entry: CatalogEntry): ActionAvailability {
+type BrowserNavigator = {
+  clipboard?: {
+    writeText(text: string): Promise<void>;
+  };
+};
+
+export const WEB_INSERT_REASON = "Install/open the native Operator Key companion to insert into a confirmed terminal.";
+
+export function getActionAvailability(entry: CatalogEntry, runtime: OperatorRuntime = "native"): ActionAvailability {
+  if (runtime === "web") {
+    return {
+      copy: true,
+      insert: false,
+      insertReason: WEB_INSERT_REASON,
+      warning: entry.safety_level === "red" ? "Danger-level (red) command: review carefully. Copy only; terminal insertion is disabled." : undefined,
+    };
+  }
   if (entry.safety_level === "red") {
     return {
       copy: true,
@@ -40,6 +57,39 @@ export function createNativeActions(nativeInvoke: Invoke = invoke): OperatorActi
   return {
     copy: (entry) => nativeInvoke<void>("copy_catalog_command", payload(entry)),
     insert: (entry) => nativeInvoke<void>("insert_catalog_command", payload(entry)),
+  };
+}
+
+export function createBrowserActions(
+  browserNavigator: BrowserNavigator = navigator,
+  browserDocument: Document = document,
+): OperatorActions {
+  return {
+    async copy(entry) {
+      try {
+        if (!browserNavigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+        await browserNavigator.clipboard.writeText(entry.command);
+        return;
+      } catch {
+        const textarea = browserDocument.createElement("textarea");
+        textarea.value = entry.command;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        browserDocument.body.append(textarea);
+        textarea.select();
+        try {
+          if (typeof browserDocument.execCommand !== "function" || !browserDocument.execCommand("copy")) {
+            throw new Error("Clipboard copy is unavailable in this browser.");
+          }
+        } finally {
+          textarea.remove();
+        }
+      }
+    },
+    async insert() {
+      throw new Error(WEB_INSERT_REASON);
+    },
   };
 }
 

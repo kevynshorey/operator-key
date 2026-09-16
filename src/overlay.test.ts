@@ -21,7 +21,7 @@ describe("overlay dismissal", () => {
   it("closes the Tauri process so a global launcher remains reusable", async () => {
     Object.defineProperty(window, "__TAURI_INTERNALS__", {
       configurable: true,
-      value: {},
+      value: { invoke() {} },
     });
 
     await hideOverlay();
@@ -32,6 +32,17 @@ describe("overlay dismissal", () => {
 
   it("is a no-op in the browser preview", async () => {
     await hideOverlay();
+    expect(windowHandle.close).not.toHaveBeenCalled();
+  });
+
+  it("does not trust a partial Tauri-shaped global", async () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", {
+      configurable: true,
+      value: {},
+    });
+
+    await hideOverlay();
+
     expect(windowHandle.close).not.toHaveBeenCalled();
   });
 });

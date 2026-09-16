@@ -77,7 +77,7 @@ describe("Operator Key overlay", () => {
   it("dismisses once with Escape from controls outside the search input", async () => {
     const user = userEvent.setup();
     const hideOverlay = vi.fn();
-    render(<App hideOverlay={hideOverlay} />);
+    render(<App runtime="native" hideOverlay={hideOverlay} />);
 
     screen.getByRole("button", { name: /large text/i }).focus();
     await user.keyboard("{Escape}");
@@ -91,9 +91,29 @@ describe("Operator Key overlay", () => {
   it("offers an accessible visible close control", async () => {
     const user = userEvent.setup();
     const hideOverlay = vi.fn();
-    render(<App hideOverlay={hideOverlay} />);
+    render(<App runtime="native" hideOverlay={hideOverlay} />);
     await user.click(screen.getByRole("button", { name: /close operator key/i }));
     expect(hideOverlay).toHaveBeenCalledOnce();
+  });
+
+  it("clears web search with Escape and Reset without invoking the native overlay", async () => {
+    const user = userEvent.setup();
+    const hideOverlay = vi.fn();
+    render(<App runtime="web" hideOverlay={hideOverlay} />);
+    const search = screen.getByRole("searchbox", { name: /operator intent/i });
+    await user.type(search, "review code");
+    await user.keyboard("{Escape}");
+    expect(search).toHaveValue("");
+    await user.click(screen.getByRole("button", { name: /reset search/i }));
+    expect(hideOverlay).not.toHaveBeenCalled();
+  });
+
+  it("identifies the browser deck and disables insertion with a companion explanation", () => {
+    render(<App runtime="web" />);
+    expect(screen.getAllByText(/web deck · copy only/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/you remember the task/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /insert into confirmed terminal/i })).toBeDisabled();
+    expect(screen.getByText(/install\/open the native operator key companion/i)).toBeInTheDocument();
   });
 
   it("provides filters and an explicit empty state", async () => {
@@ -119,7 +139,7 @@ describe("Operator Key overlay", () => {
   it("inserts a terminal-compatible selection only with Shift+Enter", async () => {
     const user = userEvent.setup();
     const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
-    render(<App actions={actions} />);
+    render(<App runtime="native" actions={actions} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes chat");
     await user.keyboard("{Shift>}{Enter}{/Shift}");
     expect(actions.insert).toHaveBeenCalledOnce();
@@ -141,7 +161,7 @@ describe("Operator Key overlay", () => {
   it("shows red commands as explicitly warned and copy-only", async () => {
     const user = userEvent.setup();
     const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
-    render(<App actions={actions} />);
+    render(<App runtime="native" actions={actions} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes logout");
     expect(await screen.findByRole("alert")).toHaveTextContent(/danger|red/i);
     expect(screen.getByRole("button", { name: /insert into confirmed terminal/i })).toBeDisabled();
@@ -187,7 +207,7 @@ describe("Operator Key overlay", () => {
 
   it("associates the disabled insertion explanation with the control", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<App runtime="native" />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes logout");
 
     const insert = screen.getByRole("button", { name: /insert into confirmed terminal/i });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CatalogEntry } from "./catalog";
-import { createNativeActions, getActionAvailability } from "./actions";
+import { createBrowserActions, createNativeActions, getActionAvailability } from "./actions";
 
 function entry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
@@ -26,6 +26,12 @@ function entry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
 }
 
 describe("action availability", () => {
+  it("disables every insertion in web mode with the native companion reason", () => {
+    const availability = getActionAvailability(entry(), "web");
+    expect(availability.insert).toBe(false);
+    expect(availability.insertReason).toBe("Install/open the native Operator Key companion to insert into a confirmed terminal.");
+  });
+
   it("allows copy for every selected catalog entry", () => {
     expect(getActionAvailability(entry({ available: false, safety_level: "red" })).copy).toBe(true);
   });
@@ -78,5 +84,32 @@ describe("native action bridge", () => {
       entryId: selected.id,
       command: selected.command,
     });
+  });
+});
+
+describe("browser action bridge", () => {
+  it("copies with the Clipboard API", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    await createBrowserActions({ clipboard: { writeText } }, document).copy(entry());
+    expect(writeText).toHaveBeenCalledWith("hermes help");
+  });
+
+  it("falls back to a temporary textarea when Clipboard API copy fails", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, "execCommand", { configurable: true, value: execCommand });
+    await createBrowserActions({ clipboard: { writeText } }, document).copy(entry());
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    expect(document.querySelector("textarea")).toBeNull();
+  });
+
+  it("reports failure when neither browser copy path succeeds and cleans up the fallback", async () => {
+    Object.defineProperty(document, "execCommand", { configurable: true, value: vi.fn().mockReturnValue(false) });
+    await expect(createBrowserActions({}, document).copy(entry())).rejects.toThrow(/clipboard/i);
+    expect(document.querySelector("textarea")).toBeNull();
+  });
+
+  it("never inserts from a browser", async () => {
+    await expect(createBrowserActions({}, document).insert(entry())).rejects.toThrow(/native Operator Key companion/i);
   });
 });

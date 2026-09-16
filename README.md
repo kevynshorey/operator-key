@@ -29,11 +29,21 @@ Install the pinned frontend dependencies:
 npm install
 ```
 
-Run the browser UI:
+Run the browser-safe Operator Deck preview (bound to localhost only):
 
 ```bash
-npm run dev
+npm run dev -- --host 127.0.0.1
 ```
+
+The browser preview detects web mode automatically. It searches the checked-in local catalog and copies literal command text; it does not call cloud services, inspect secrets or configuration, access a terminal, insert text, or execute commands.
+
+| Capability | Browser preview | Native companion |
+|---|---:|---:|
+| Local catalog search and filters | Yes | Yes |
+| Copy selected command | Browser clipboard + safe fallback | Native validated copy |
+| Insert into confirmed terminal | No | Guarded eligible commands only |
+| Execute or send Enter | Never | Never |
+| Escape / top-right control | Clear/reset search | Close overlay |
 
 Run the desktop overlay in Tauri development mode:
 
