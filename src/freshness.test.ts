@@ -223,6 +223,95 @@ describe("freshness summary", () => {
     expect(notice.detail).toMatch(/newer releases exist/i);
     expect(notice.detail).not.toMatch(/as of the last online check/i);
   });
+
+  // A downloaded GitHub repo ships someone else's catalog. On a machine with none of the
+  // tools installed, every entry describes a computer the operator has never seen, and
+  // saying "your catalog is out of date" would be actively misleading.
+  it("says plainly when the catalog describes a different machine", () => {
+    const summary = summarizeFreshness(
+      report({
+        products: {
+          omarchy: {
+            installed: "unknown",
+            installed_here: false,
+            drift: "unknown",
+            upstream_status: "not-installed",
+            catalog_built_from: "4.0.3-1",
+            catalog_matches_installed: false,
+          },
+          hermes: {
+            installed: "unknown",
+            installed_here: false,
+            drift: "unknown",
+            upstream_status: "not-installed",
+            catalog_built_from: "0.21.3",
+            catalog_matches_installed: false,
+          },
+        },
+      }),
+      NOW,
+    );
+    expect(highestLevel(summary)).toBe("attention");
+    expect(summary.notices).toHaveLength(1);
+    expect(summary.notices[0].headline).toMatch(/describes a different machine/i);
+    expect(summary.notices[0].detail).toMatch(/build_catalog/i);
+  });
+
+  it("does not call an absent tool out of date", () => {
+    const summary = summarizeFreshness(
+      report({
+        products: {
+          hermes: {
+            installed: "0.21.3",
+            drift: "unknown",
+            upstream_status: "no-public-feed",
+            catalog_built_from: "0.21.3",
+            catalog_matches_installed: true,
+          },
+          omarchy: {
+            installed: "unknown",
+            installed_here: false,
+            drift: "unknown",
+            upstream_status: "not-installed",
+            catalog_built_from: "4.0.3-1",
+            catalog_matches_installed: false,
+          },
+        },
+      }),
+      NOW,
+    );
+    expect(summary.notices.some((n) => /out of date for omarchy/i.test(n.headline))).toBe(false);
+    const notice = summary.notices.find((n) => /not installed here/i.test(n.headline));
+    expect(notice).toBeDefined();
+    expect(notice!.level).toBe("info");
+  });
+
+  it("does not report upstream drift for a tool that is not installed", () => {
+    const summary = summarizeFreshness(
+      report({
+        products: {
+          hermes: {
+            installed: "0.21.3",
+            drift: "unknown",
+            upstream_status: "no-public-feed",
+            catalog_built_from: "0.21.3",
+            catalog_matches_installed: true,
+          },
+          codex: {
+            installed: "unknown",
+            installed_here: false,
+            latest: "rust-v0.155.1",
+            drift: "behind",
+            upstream_status: "not-installed",
+            catalog_built_from: "0.154.0",
+            catalog_matches_installed: false,
+          },
+        },
+      }),
+      NOW,
+    );
+    expect(summary.notices.some((n) => /behind upstream/i.test(n.headline))).toBe(false);
+  });
 });
 
 describe("freshness parsing", () => {

@@ -95,6 +95,58 @@ class ReportBuilding(unittest.TestCase):
         self.assertEqual(record["last_known_drift"], "behind")
         self.assertEqual(record["latest"], "rust-v0.155.1")
 
+
+    def test_absent_tools_are_not_reported_as_stale(self):
+        # A downloaded repo ships someone else's catalog. Telling an operator their
+        # catalog is "out of date" for a tool they never installed is misleading.
+        with mock.patch.object(check_updates, "installed_versions", return_value={
+            "omarchy": "unknown", "hermes": "0.21.3",
+        }), mock.patch.object(check_updates, "catalog_metadata", return_value={
+            "versions": {"omarchy": "4.0.3-1", "hermes": "0.21.3"},
+        }):
+            with tempfile.TemporaryDirectory() as tmp:
+                report = check_updates.build_report(offline=True, output=Path(tmp) / "f.json")
+
+        omarchy = report["products"]["omarchy"]
+        self.assertFalse(omarchy["installed_here"])
+        self.assertFalse(omarchy["catalog_matches_installed"])
+        self.assertEqual(omarchy["upstream_status"], "not-installed")
+
+        hermes = report["products"]["hermes"]
+        self.assertTrue(hermes["installed_here"])
+        self.assertTrue(hermes["catalog_matches_installed"])
+
+    def test_absent_tools_cost_no_network_requests(self):
+        calls = []
+
+        def spy(url, headers=None, timeout=20):
+            calls.append(url)
+            return 0, b"", {}
+
+        with mock.patch.object(check_updates, "installed_versions", return_value={"omarchy": "unknown"}), \
+             mock.patch.object(check_updates, "catalog_metadata", return_value={"versions": {}}), \
+             mock.patch.object(check_updates, "http_get", spy):
+            with tempfile.TemporaryDirectory() as tmp:
+                check_updates.build_report(output=Path(tmp) / "f.json")
+
+        self.assertEqual([c for c in calls if "releases" in c or "tags" in c], [])
+
+    def test_summary_distinguishes_absent_from_stale(self):
+        report = {
+            "checked_at": "2026-09-21T00:00:00+00:00",
+            "catalog_generated_at": "2026-09-15T00:00:00+00:00",
+            "products": {
+                "omarchy": {"installed": "unknown", "installed_here": False,
+                            "catalog_matches_installed": False, "drift": "unknown"},
+                "hermes": {"installed": "0.21.3", "installed_here": True,
+                           "catalog_matches_installed": True, "drift": "unknown"},
+            },
+            "docs": {},
+        }
+        text = check_updates.summarize(report)
+        self.assertIn("not installed", text)
+        self.assertNotIn("STALE", text)
+
     def test_unreachable_upstream_reports_unknown_not_current(self):
         with mock.patch.object(check_updates, "installed_versions", return_value={"codex": "0.154.0"}), \
              mock.patch.object(check_updates, "catalog_metadata", return_value={"versions": {}}), \

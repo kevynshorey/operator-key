@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-09-15T21:37:26.393206+00:00",
+  "generated_at": "2026-09-21T21:42:39.559485+00:00",
   "host": "omarchy",
   "versions": {
     "omarchy": "4.0.3-1",
@@ -10,8 +10,8 @@
   },
   "counts": {
     "omarchy": 228,
-    "hermes": 707,
-    "claude-code": 281,
+    "hermes": 706,
+    "claude-code": 282,
     "codex": 87
   },
   "total": 1303,
@@ -5948,6 +5948,30 @@
       }
     },
     {
+      "id": "a07c73b7a8ef373a",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "shell-command",
+      "task_group": "development",
+      "category": "development",
+      "command": "hermes codex-runtime",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Manage the optional codex app-server runtime (migrate",
+      "context": "Shell",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes --help",
+        "version": "0.21.3"
+      }
+    },
+    {
       "id": "93e01db106aef569",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -7052,6 +7076,30 @@
       }
     },
     {
+      "id": "d9668e697d751719",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "shell-command",
+      "task_group": "models-and-performance",
+      "category": "models-and-performance",
+      "command": "hermes usage",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Show account rate-limit windows (the /usage block)",
+      "context": "Shell",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes --help",
+        "version": "0.21.3"
+      }
+    },
+    {
       "id": "51b7acb209054215",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -7412,30 +7460,6 @@
       }
     },
     {
-      "id": "28fd48f0ac4ca2ab",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "help-and-reference",
-      "category": "help-and-reference",
-      "command": "-z / --oneshot",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "One-shot mode: send a single prompt and print ONLY the",
-      "context": "hermes shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes --help",
-        "version": "0.21.3"
-      }
-    },
-    {
       "id": "7e63fec0507ec0ec",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -7446,30 +7470,6 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "One-shot mode only: after the run, write a JSON usage",
-      "context": "hermes shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "feb4f155578e6d9c",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "models-and-performance",
-      "category": "models-and-performance",
-      "command": "-m / --model",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Model override for this invocation (e.g.",
       "context": "hermes shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -7518,30 +7518,6 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Reasoning effort for this invocation: none, minimal,",
-      "context": "hermes shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "9154465fc564ddfc",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "sessions-and-navigation",
-      "category": "sessions-and-navigation",
-      "command": "--resume / -r",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Resume a previous session by ID or title, or pass",
       "context": "hermes shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -7652,30 +7628,6 @@
       }
     },
     {
-      "id": "c8a64ef1e297ebc0",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "context-and-memory",
-      "category": "context-and-memory",
-      "command": "--skills / -s",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Preload one or more skills for the session (repeat",
-      "context": "hermes shell invocation",
-      "safety_level": "red",
-      "destructive": true,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes --help",
-        "version": "0.21.3"
-      }
-    },
-    {
       "id": "7722170ca4f12e36",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -7724,7 +7676,7 @@
       }
     },
     {
-      "id": "2db4c8eb7b8ce0e4",
+      "id": "53c735aaa5e8571d",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -7733,7 +7685,7 @@
       "command": "--ignore-user-config",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Ignore ~/.hermes/config.yaml and fall back to built-in",
+      "description": "Ignore ~/.hermes/profiles/portfolio/config.yaml and",
       "context": "hermes shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -7892,30 +7844,6 @@
       }
     },
     {
-      "id": "97439b66c2c81252",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "development",
-      "category": "development",
-      "command": "-q / --query",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Query to run. On a real TTY the prompt seeds an",
-      "context": "hermes chat shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes chat --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes chat --help",
-        "version": "0.21.3"
-      }
-    },
-    {
       "id": "19e7045298c72bfb",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -7988,30 +7916,6 @@
       }
     },
     {
-      "id": "63555531c75f5c68",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "models-and-performance",
-      "category": "models-and-performance",
-      "command": "-m / --model",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Model to use (e.g., anthropic/claude-sonnet-4)",
-      "context": "hermes chat shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes chat --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes chat --help",
-        "version": "0.21.3"
-      }
-    },
-    {
       "id": "2537e4a0eff3e440",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -8025,30 +7929,6 @@
       "context": "hermes chat shell invocation",
       "safety_level": "green",
       "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes chat --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes chat --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "0bb005a85c1c814a",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "context-and-memory",
-      "category": "context-and-memory",
-      "command": "-s / --skills",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Preload one or more skills for the session (repeat",
-      "context": "hermes chat shell invocation",
-      "safety_level": "red",
-      "destructive": true,
       "available": true,
       "conflict_ids": [],
       "source": "local: hermes chat --help",
@@ -8372,7 +8252,7 @@
       }
     },
     {
-      "id": "cb8c3f96716d1492",
+      "id": "849d1a6a6077c1f9",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -8381,7 +8261,7 @@
       "command": "--ignore-user-config",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Ignore ~/.hermes/config.yaml and fall back to built-in",
+      "description": "Ignore ~/.hermes/profiles/portfolio/config.yaml and",
       "context": "hermes chat shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -9332,6 +9212,30 @@
       }
     },
     {
+      "id": "68b8bf6612c7c924",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "shell-command",
+      "task_group": "help-and-reference",
+      "category": "help-and-reference",
+      "command": "hermes migrate relay",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Convert legacy HERMES_NEMO_RELAY_ATIF_*/ATOF_* exporter vars",
+      "context": "Shell",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes migrate --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes migrate --help",
+        "version": "0.21.3"
+      }
+    },
+    {
       "id": "1e85ec8aa8072ba9",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -9352,6 +9256,54 @@
         "kind": "default",
         "status": "active",
         "source": "local: hermes migrate --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "ec797ad81be6467c",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "shell-command",
+      "task_group": "system-and-hardware",
+      "category": "system-and-hardware",
+      "command": "hermes codex-runtime migrate",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Regenerate the hermes-managed block in codex's config.toml",
+      "context": "Shell",
+      "safety_level": "amber",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes codex-runtime --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes codex-runtime --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "a87bac327d1d60eb",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "cli-flag",
+      "task_group": "help-and-reference",
+      "category": "help-and-reference",
+      "command": "-h / --help",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "show this help message and exit",
+      "context": "hermes codex-runtime shell invocation",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes codex-runtime --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes codex-runtime --help",
         "version": "0.21.3"
       }
     },
@@ -10244,78 +10196,6 @@
       }
     },
     {
-      "id": "77eb3c91ef736199",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "help-and-reference",
-      "category": "help-and-reference",
-      "command": "-t / --to",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Delivery target. Format: 'platform' (home channel),",
-      "context": "hermes send shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes send --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes send --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "4b4e568f9a630b6e",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "development",
-      "category": "development",
-      "command": "-f / --file",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Read message body from PATH (text only). Use '-' to",
-      "context": "hermes send shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes send --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes send --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "bd5c1e207a50c3a9",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "help-and-reference",
-      "category": "help-and-reference",
-      "command": "-s / --subject",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Prepend a subject/header line before the message body.",
-      "context": "hermes send shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes send --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes send --help",
-        "version": "0.21.3"
-      }
-    },
-    {
       "id": "a9c7e71ff87044ba",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -10952,30 +10832,6 @@
       "description": "Run a job on the next scheduler tick",
       "context": "Shell",
       "safety_level": "amber",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes cron --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes cron --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "f164ec4fb8e99d64",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "shell-command",
-      "task_group": "help-and-reference",
-      "category": "help-and-reference",
-      "command": "hermes cron resnap",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Adopt the current global inference resolution for",
-      "context": "Shell",
-      "safety_level": "green",
       "destructive": false,
       "available": true,
       "conflict_ids": [],
@@ -12284,7 +12140,7 @@
       }
     },
     {
-      "id": "e8e36c76032dff3b",
+      "id": "05a91933bec9ef2f",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "shell-command",
@@ -12293,7 +12149,7 @@
       "command": "hermes kanban edit",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Edit recovery fields on an already-completed task",
+      "description": "Edit task fields or recovery fields on an already-",
       "context": "Shell",
       "safety_level": "amber",
       "destructive": false,
@@ -13892,30 +13748,6 @@
       }
     },
     {
-      "id": "948e98e20b757dad",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "development",
-      "category": "development",
-      "command": "-o / --output",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Output path for the zip file (default: ~/hermes-",
-      "context": "hermes backup shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes backup --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes backup --help",
-        "version": "0.21.3"
-      }
-    },
-    {
       "id": "0723c40b48a4babc",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -13926,54 +13758,6 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Quick snapshot: only critical state files (config,",
-      "context": "hermes backup shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes backup --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes backup --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "328bc40bd3c53337",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "help-and-reference",
-      "category": "help-and-reference",
-      "command": "-l / --label",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Label for the snapshot (only used with --quick)",
-      "context": "hermes backup shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes backup --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes backup --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "a99ea5360af7148e",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "help-and-reference",
-      "category": "help-and-reference",
-      "command": "-k / --keep",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "After a full backup, delete older hermes-backup-*.zip",
       "context": "hermes backup shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -14070,30 +13854,6 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Delete the entire checkpoint base (all /rollback history)",
-      "context": "Shell",
-      "safety_level": "red",
-      "destructive": true,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes checkpoints --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes checkpoints --help",
-        "version": "0.21.3"
-      }
-    },
-    {
-      "id": "1bec340fe01efa8c",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "shell-command",
-      "task_group": "help-and-reference",
-      "category": "help-and-reference",
-      "command": "hermes checkpoints clear-legacy",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Delete only the legacy-/ archives from v1 migration",
       "context": "Shell",
       "safety_level": "red",
       "destructive": true,
@@ -14310,6 +14070,30 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Skip confirmation prompts",
+      "context": "hermes import-agent shell invocation",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes import-agent --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes import-agent --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "9e5da5df608646c0",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "cli-flag",
+      "task_group": "development",
+      "category": "development",
+      "command": "--sync",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Re-import every previously imported source whose files",
       "context": "hermes import-agent shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -17372,6 +17156,30 @@
       }
     },
     {
+      "id": "dadaa3b059eab348",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "shell-command",
+      "task_group": "help-and-reference",
+      "category": "help-and-reference",
+      "command": "hermes sessions set-journal-mode",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Convert state.db between journal_mode=WAL and DELETE",
+      "context": "Shell",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes sessions --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes sessions --help",
+        "version": "0.21.3"
+      }
+    },
+    {
       "id": "d1f85c3ec882f41f",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -17382,6 +17190,30 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Re-stamp gateway sessions that lost their routing",
+      "context": "Shell",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes sessions --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes sessions --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "342d4e1c27babb19",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "shell-command",
+      "task_group": "development",
+      "category": "development",
+      "command": "hermes sessions repair-profiles",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Settle session/routing state that landed under the",
       "context": "Shell",
       "safety_level": "green",
       "destructive": false,
@@ -17708,6 +17540,78 @@
       }
     },
     {
+      "id": "5969ea8cb5dd31c8",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "cli-flag",
+      "task_group": "help-and-reference",
+      "category": "help-and-reference",
+      "command": "-h / --help",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "show this help message and exit",
+      "context": "hermes usage shell invocation",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes usage --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes usage --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "3c15118b41c1be35",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "cli-flag",
+      "task_group": "models-and-performance",
+      "category": "models-and-performance",
+      "command": "--provider",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Provider to query (default: the configured model",
+      "context": "hermes usage shell invocation",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes usage --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes usage --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "8dcb0cb985dc95df",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "cli-flag",
+      "task_group": "help-and-reference",
+      "category": "help-and-reference",
+      "command": "--json",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Print one JSON document instead of the human-readable",
+      "context": "hermes usage shell invocation",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes usage --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes usage --help",
+        "version": "0.21.3"
+      }
+    },
+    {
       "id": "f0e6ab475b33127c",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -17972,7 +17876,7 @@
       }
     },
     {
-      "id": "2cb6d912d47b291a",
+      "id": "a6d96ca0a1bd32da",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -17981,7 +17885,7 @@
       "command": "--gateway",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Gateway mode: use file-based IPC for prompts instead of",
+      "description": "Gateway mode: use file-based IPC for prompts instead",
       "context": "hermes update shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -17996,7 +17900,7 @@
       }
     },
     {
-      "id": "4b1f9b1a06fabf21",
+      "id": "e09297a4b419b041",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -18005,7 +17909,7 @@
       "command": "--check",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Check whether an update is available without installing",
+      "description": "Check whether an update is available without",
       "context": "hermes update shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -18020,7 +17924,7 @@
       }
     },
     {
-      "id": "3c6e1fcd6c2e2f8f",
+      "id": "91bcda634088e8d9",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -18029,7 +17933,7 @@
       "command": "--plan",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Show the update plan and exit without changing anything:",
+      "description": "Show the update plan and exit without changing",
       "context": "hermes update shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -18044,7 +17948,31 @@
       }
     },
     {
-      "id": "87bdbf12176ddd32",
+      "id": "5fdb69904a334ec0",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "cli-flag",
+      "task_group": "sessions-and-navigation",
+      "category": "sessions-and-navigation",
+      "command": "--list-venv-holders",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Print the processes the Windows venv-holder guard",
+      "context": "hermes update shell invocation",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes update --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes update --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "55cb0a3ce066ef10",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -18053,7 +17981,7 @@
       "command": "--no-backup",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Skip ALL pre-update backups for this run (both the quick",
+      "description": "Skip ALL pre-update backups for this run (both the",
       "context": "hermes update shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -18116,7 +18044,7 @@
       }
     },
     {
-      "id": "b62feb2d481fe9a7",
+      "id": "72c392e02f23c9c4",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -18125,7 +18053,7 @@
       "command": "--keep-stash",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Do NOT re-apply local changes after the update. Uncommitted",
+      "description": "Do NOT re-apply local changes after the update.",
       "context": "hermes update shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -18140,7 +18068,7 @@
       }
     },
     {
-      "id": "cbd0fa08fa6a6841",
+      "id": "de77f3e98ba8379d",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -18149,7 +18077,7 @@
       "command": "--branch",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Update against this branch instead of the default (main).",
+      "description": "Update against this branch instead of the default",
       "context": "hermes update shell invocation",
       "safety_level": "amber",
       "destructive": false,
@@ -18212,7 +18140,7 @@
       }
     },
     {
-      "id": "01bd88620f7cfca7",
+      "id": "a7a27cef8ad1d8bb",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -18221,10 +18149,34 @@
       "command": "--force-venv",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Windows: mutate the venv even while other processes are",
+      "description": "Windows: mutate the venv even while other processes",
       "context": "hermes update shell invocation",
       "safety_level": "red",
       "destructive": true,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes update --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes update --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "5e87051e266d79ef",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "cli-flag",
+      "task_group": "development",
+      "category": "development",
+      "command": "--no-gateway-restart",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Update code and dependencies but skip the final",
+      "context": "hermes update shell invocation",
+      "safety_level": "amber",
+      "destructive": false,
       "available": true,
       "conflict_ids": [],
       "source": "local: hermes update --help",
@@ -18726,6 +18678,54 @@
       "canonical_chord": "",
       "aliases": [],
       "description": "Rename a profile ('default': sets a display name; id",
+      "context": "Shell",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes profile --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes profile --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "42387ca73e1247ed",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "shell-command",
+      "task_group": "development",
+      "category": "development",
+      "command": "hermes profile purge-identity",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Retry a deleted profile's session/routing identity",
+      "context": "Shell",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "local: hermes profile --help",
+      "provenance": {
+        "kind": "default",
+        "status": "active",
+        "source": "local: hermes profile --help",
+        "version": "0.21.3"
+      }
+    },
+    {
+      "id": "6152a4f2eb9be0f2",
+      "product": "hermes",
+      "product_version": "0.21.3",
+      "interface": "shell-command",
+      "task_group": "development",
+      "category": "development",
+      "command": "hermes profile migrate-identity",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "Retry a renamed profile's session/routing identity",
       "context": "Shell",
       "safety_level": "green",
       "destructive": false,
@@ -19652,30 +19652,6 @@
       }
     },
     {
-      "id": "8fb0460a058abf85",
-      "product": "hermes",
-      "product_version": "0.21.3",
-      "interface": "cli-flag",
-      "task_group": "help-and-reference",
-      "category": "help-and-reference",
-      "command": "-n / --lines",
-      "canonical_chord": "",
-      "aliases": [],
-      "description": "Number of lines to show (default: 50)",
-      "context": "hermes logs shell invocation",
-      "safety_level": "green",
-      "destructive": false,
-      "available": true,
-      "conflict_ids": [],
-      "source": "local: hermes logs --help",
-      "provenance": {
-        "kind": "default",
-        "status": "active",
-        "source": "local: hermes logs --help",
-        "version": "0.21.3"
-      }
-    },
-    {
       "id": "62acf486c564ae32",
       "product": "hermes",
       "product_version": "0.21.3",
@@ -19700,7 +19676,7 @@
       }
     },
     {
-      "id": "452ef8abb00448af",
+      "id": "9378f47673284e49",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "cli-flag",
@@ -19709,7 +19685,7 @@
       "command": "--level",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Minimum log level to show (DEBUG, INFO, WARNING, ERROR)",
+      "description": "Minimum log level to show (DEBUG, INFO, WARNING,",
       "context": "hermes logs shell invocation",
       "safety_level": "green",
       "destructive": false,
@@ -19883,11 +19859,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -19909,11 +19885,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -19933,11 +19909,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -19957,11 +19933,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -19981,11 +19957,11 @@
       "destructive": true,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20005,11 +19981,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20029,11 +20005,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20053,11 +20029,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20079,11 +20055,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20103,11 +20079,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20127,11 +20103,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20151,37 +20127,37 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
     {
-      "id": "88e691bbd6032463",
+      "id": "4acca157227d39f6",
       "product": "hermes",
       "product_version": "0.21.3",
       "interface": "slash-command",
-      "task_group": "review-and-verify",
+      "task_group": "help-and-reference",
       "category": "Session",
       "command": "/branch",
       "canonical_chord": "",
       "aliases": [
         "/fork"
       ],
-      "description": "Branch the current session (explore a different path)",
+      "description": "Branch the current session (new thread on Discord/Telegram/Slack/Matrix; --here stays here)",
       "context": "Hermes interactive session",
       "safety_level": "green",
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20201,11 +20177,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20227,11 +20203,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20251,11 +20227,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20277,11 +20253,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20301,11 +20277,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20325,11 +20301,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20349,11 +20325,11 @@
       "destructive": true,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20373,11 +20349,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20397,11 +20373,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20421,11 +20397,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20445,11 +20421,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20469,11 +20445,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20495,11 +20471,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20522,11 +20498,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20548,11 +20524,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20572,11 +20548,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20596,11 +20572,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20622,11 +20598,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20646,11 +20622,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20670,11 +20646,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20696,11 +20672,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20720,11 +20696,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20744,11 +20720,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20768,11 +20744,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20792,11 +20768,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20816,11 +20792,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20842,11 +20818,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20866,11 +20842,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20890,11 +20866,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20916,11 +20892,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20940,11 +20916,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20964,11 +20940,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -20988,11 +20964,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21012,11 +20988,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21038,11 +21014,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21062,11 +21038,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21088,11 +21064,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21112,11 +21088,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21138,11 +21114,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21162,11 +21138,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21186,11 +21162,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21210,11 +21186,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21234,11 +21210,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21258,11 +21234,11 @@
       "destructive": true,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21282,11 +21258,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21306,11 +21282,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21330,11 +21306,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21354,11 +21330,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21378,11 +21354,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21402,11 +21378,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21426,11 +21402,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21450,11 +21426,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21474,11 +21450,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21498,11 +21474,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21522,11 +21498,11 @@
       "destructive": true,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21546,11 +21522,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21570,11 +21546,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21594,11 +21570,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21620,11 +21596,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21644,11 +21620,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21668,11 +21644,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21692,11 +21668,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21718,11 +21694,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21744,11 +21720,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21768,11 +21744,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21792,11 +21768,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21816,11 +21792,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21842,11 +21818,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21868,11 +21844,11 @@
       "destructive": true,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21892,11 +21868,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21916,11 +21892,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21940,11 +21916,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21964,11 +21940,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -21988,11 +21964,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22012,11 +21988,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22036,11 +22012,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22062,11 +22038,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22086,11 +22062,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22110,11 +22086,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22134,11 +22110,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22160,11 +22136,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22184,11 +22160,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22208,11 +22184,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22232,11 +22208,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22256,11 +22232,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22280,11 +22256,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22306,11 +22282,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22330,11 +22306,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -22356,11 +22332,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+      "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
       "provenance": {
         "kind": "default",
         "status": "active",
-        "source": "local source: /home/kevo/.hermes/hermes-agent/hermes_cli/commands.py",
+        "source": "local source: ~/.hermes/hermes-agent/hermes_cli/commands.py",
         "version": "0.21.3"
       }
     },
@@ -24387,7 +24363,7 @@
       }
     },
     {
-      "id": "b073ae1627b60ede",
+      "id": "068414757f429697",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "slash-command",
@@ -24396,7 +24372,7 @@
       "command": "/autofix-pr",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Spawn a Claude Code on the web session that watches the current branch's PR and pushes fixes when CI fails or reviewers leave comments. Detects the open PR from your checked-out branch with gh pr view; to watch a different PR, check out its branch first. By default the cloud session is told to fix every CI failure and review comment; pass a prompt to give it different instructions, for example /autofix-pr only fix lint and type errors. Requires the gh CLI and access to Claude Code on the web",
+      "description": "Spawn a cloud session that watches the current branch's PR and pushes fixes when CI fails or reviewers leave comments. Detects the open PR from your checked-out branch with gh pr view; to watch a different PR, check out its branch first. By default the cloud session is told to fix every CI failure and review comment; pass a prompt to give it different instructions, for example /autofix-pr only fix lint and type errors. Requires the gh CLI and access to cloud sessions",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24699,7 +24675,7 @@
       }
     },
     {
-      "id": "5fe1800eef4ff6cb",
+      "id": "111472405ed964b5",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "slash-command",
@@ -24708,7 +24684,7 @@
       "command": "/config",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Open the Settings interface to adjust theme, model, output style, and other preferences. From v2.1.181, pass one or more key=value pairs to set a setting directly without opening the interface, for example /config thinking=false. From v2.1.182, named shorthand keys are also accepted, such as /config theme=dark or /config model=sonnet. The key=value form also works in non-interactive mode (-p) and from the Claude mobile app via Remote Control. The key=value form can't turn on a setting that needs your confirmation in the panel, such as autoContinueAtUsageLimit, though it can turn one off. Run /config --help to list the keys it accepts. Alias: /settings",
+      "description": "Open the Settings interface to adjust theme, model, output style, and other preferences. Pass one or more key=value pairs to set a setting directly without opening the interface, for example /config thinking=false, /config theme=dark, or /config model=sonnet. The key=value form also works in non-interactive mode (-p) and from the Claude mobile app via Remote Control. The key=value form can't turn on a setting that needs your confirmation in the panel, such as autoContinueAtUsageLimit, though it can turn one off. Run /config --help to list the keys it accepts. Alias: /settings",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -24867,16 +24843,16 @@
       }
     },
     {
-      "id": "c1c3a1e11dbd9615",
+      "id": "e43fd7fae7cb636d",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "slash-command",
-      "task_group": "review-and-verify",
+      "task_group": "parallel-agents",
       "category": "All commands",
       "command": "/design",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Skill. Draft UI mockups, screen flows, landing pages, or posters as artboards on one canvas, published as an artifact that runs a research preview of Claude Design's editor, for example /design a settings screen for a mobile banking app. Where saving is enabled for your account, you edit the artboards on the canvas and save to publish a new version; otherwise you view the draft and export it as PNG or PDF. Requires a session where artifacts are available and Claude Code v2.1.234 or later. Available on the Anthropic API. On Amazon Bedrock, Google Cloud's Agent Platform, Microsoft Foundry, and Claude Platform on AWS, artifacts aren't available, so the command is unavailable there",
+      "description": "Skill. Draft UI mockups, screen flows, landing pages, or posters as artboards on one canvas, published as a Design artifact, for example /design a settings screen for a mobile banking app. You edit the artboards in a desktop browser, and your edits save automatically. You can export each artboard as PNG or PDF. Requires a session where artifacts are available and Claude Code v2.1.265 or later. Available on the Anthropic API. On Amazon Bedrock, Google Cloud's Agent Platform, Microsoft Foundry, and Claude Platform on AWS, artifacts aren't available, so the command is unavailable there",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -25659,6 +25635,30 @@
       }
     },
     {
+      "id": "fbc0dc0f5a144840",
+      "product": "claude-code",
+      "product_version": "2.1.272",
+      "interface": "slash-command",
+      "task_group": "sessions-and-navigation",
+      "category": "All commands",
+      "command": "/output-style",
+      "canonical_chord": "",
+      "aliases": [],
+      "description": "List output styles or switch to one, for example /output-style concise. See Change your output style. Requires Claude Code v2.1.269 or later",
+      "context": "claude-code interactive terminal",
+      "safety_level": "green",
+      "destructive": false,
+      "available": true,
+      "conflict_ids": [],
+      "source": "official: https://code.claude.com/docs/en/commands.md",
+      "provenance": {
+        "kind": "official",
+        "status": "active",
+        "source": "official: https://code.claude.com/docs/en/commands.md",
+        "version": "2.1.272"
+      }
+    },
+    {
       "id": "36b6e06ed060cfd3",
       "product": "claude-code",
       "product_version": "2.1.272",
@@ -25995,16 +25995,16 @@
       }
     },
     {
-      "id": "3606f8d9e9d06103",
+      "id": "98d05048ba701a08",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "slash-command",
-      "task_group": "parallel-agents",
+      "task_group": "help-and-reference",
       "category": "All commands",
       "command": "/remote-env",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Choose the default environment for cloud agents",
+      "description": "Choose the default cloud environment for cloud sessions you start from the CLI",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -26571,7 +26571,7 @@
       }
     },
     {
-      "id": "82b05cd0e09e5dcc",
+      "id": "9cbbe7f79e5c8d80",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "slash-command",
@@ -26580,7 +26580,7 @@
       "command": "/teleport",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Pull a Claude Code on the web session into this terminal. Opens a picker, then fetches the branch and conversation. Also available as /tp. Requires a claude.ai subscription",
+      "description": "Pull a cloud session into this terminal. Opens a picker, then fetches the branch and conversation. Also available as /tp. Requires a claude.ai subscription",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -26667,7 +26667,7 @@
       }
     },
     {
-      "id": "97ea40bb7f383471",
+      "id": "724ae2b119bf6475",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "slash-command",
@@ -26676,7 +26676,7 @@
       "command": "/ultraplan",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Removed. Use plan mode instead. Previously sent a planning task to a Claude Code on the web session for review in your browser",
+      "description": "Removed. Use plan mode instead. Previously sent a planning task to a cloud session for review in your browser",
       "context": "claude-code interactive terminal",
       "safety_level": "red",
       "destructive": true,
@@ -26859,7 +26859,7 @@
       }
     },
     {
-      "id": "140fbbd55e495f86",
+      "id": "292042d817a772b3",
       "product": "claude-code",
       "product_version": "2.1.272",
       "interface": "slash-command",
@@ -26868,7 +26868,7 @@
       "command": "/web-setup",
       "canonical_chord": "",
       "aliases": [],
-      "description": "Connect your GitHub account to Claude Code on the web using your local gh CLI credentials",
+      "description": "Connect your GitHub account for cloud sessions using your local gh CLI credentials",
       "context": "claude-code interactive terminal",
       "safety_level": "green",
       "destructive": false,
@@ -29546,11 +29546,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local: /home/kevo/.claude/skills/diagnose-crash/SKILL.md",
+      "source": "local: ~/.claude/skills/diagnose-crash/SKILL.md",
       "provenance": {
         "kind": "custom",
         "status": "active",
-        "source": "local: /home/kevo/.claude/skills/diagnose-crash/SKILL.md",
+        "source": "local: ~/.claude/skills/diagnose-crash/SKILL.md",
         "version": "2.1.272"
       }
     },
@@ -29570,11 +29570,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local: /home/kevo/.claude/skills/omarchy/SKILL.md",
+      "source": "local: ~/.claude/skills/omarchy/SKILL.md",
       "provenance": {
         "kind": "custom",
         "status": "active",
-        "source": "local: /home/kevo/.claude/skills/omarchy/SKILL.md",
+        "source": "local: ~/.claude/skills/omarchy/SKILL.md",
         "version": "2.1.272"
       }
     },
@@ -31658,11 +31658,11 @@
       "destructive": false,
       "available": true,
       "conflict_ids": [],
-      "source": "local: /home/kevo/.codex/config.toml",
+      "source": "local: ~/.codex/config.toml",
       "provenance": {
         "kind": "override",
         "status": "active",
-        "source": "local: /home/kevo/.codex/config.toml",
+        "source": "local: ~/.codex/config.toml",
         "version": "0.154.0"
       }
     }

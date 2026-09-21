@@ -5,7 +5,7 @@ import ast
 import re
 from pathlib import Path
 
-from .common import entry, parse_help as parse_cli_help, read_optional_text, run
+from .common import entry, parse_help as parse_cli_help, read_optional_text, run, portable_path
 
 HERMES_KEYS = [
     ("Enter", "Submit the current prompt"),
@@ -123,7 +123,7 @@ def collect(product_version: str, *, install_dir: Path | None = None,
     registry = install_dir / "hermes_cli" / "commands.py"
     registry_text = read_optional_text(registry)
     if registry_text is not None:
-        rows += parse_registry(registry_text, product_version, f"local source: {registry}")
+        rows += parse_registry(registry_text, product_version, f"local source: {portable_path(registry)}")
     config_path = config_path or Path.home() / ".hermes" / "config.yaml"
     rows += parse_controls(read_optional_text(config_path) or "", product_version)
     return rows

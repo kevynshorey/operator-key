@@ -5,7 +5,7 @@ import json
 import re
 from pathlib import Path
 
-from .common import clean, entry, parse_help as parse_cli_help, read_optional_text, run, split_markdown_cells
+from .common import clean, entry, parse_help as parse_cli_help, read_optional_text, run, split_markdown_cells, portable_path
 
 COMMANDS_URL = "https://code.claude.com/docs/en/commands.md"
 KEYS_URL = "https://code.claude.com/docs/en/interactive-mode.md"
@@ -87,7 +87,7 @@ def parse_customizations(root: Path, product_version: str) -> list[dict]:
             relative = path.relative_to(commands).with_suffix("")
             command = "/" + ":".join(relative.parts)
             rows.append(entry("claude-code", "slash-command", command,
-                              _markdown_description(path, f"Custom command {command}"), f"local: {path}",
+                              _markdown_description(path, f"Custom command {command}"), f"local: {portable_path(path)}",
                               product_version, context="Claude Code interactive terminal", provenance="custom"))
     skills = root / "skills"
     if skills.exists():
@@ -98,7 +98,7 @@ def parse_customizations(root: Path, product_version: str) -> list[dict]:
             metadata = _frontmatter(text)
             name = metadata.get("name") or path.parent.name
             rows.append(entry("claude-code", "slash-command", f"/{name}",
-                              metadata.get("description") or f"Custom skill {name}", f"local: {path}",
+                              metadata.get("description") or f"Custom skill {name}", f"local: {portable_path(path)}",
                               product_version, context="Claude Code interactive terminal", provenance="custom"))
     agents = root / "agents"
     if agents.exists():
@@ -109,12 +109,12 @@ def parse_customizations(root: Path, product_version: str) -> list[dict]:
             metadata = _frontmatter(text)
             name = metadata.get("name") or path.stem
             rows.append(entry("claude-code", "cli-flag", f"--agent {name}",
-                              metadata.get("description") or f"Use custom agent {name}", f"local: {path}",
+                              metadata.get("description") or f"Use custom agent {name}", f"local: {portable_path(path)}",
                               product_version, context="claude shell invocation", provenance="custom"))
     keybindings = root / "keybindings.json"
     keybindings_text = read_optional_text(keybindings)
     if keybindings_text is not None:
-        rows += parse_keybindings(keybindings_text, product_version, f"local: {keybindings}")
+        rows += parse_keybindings(keybindings_text, product_version, f"local: {portable_path(keybindings)}")
     return rows
 
 

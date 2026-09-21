@@ -67,6 +67,26 @@ Use cached official documentation when offline:
 python3 scripts/build_catalog.py --offline
 ```
 
+### If you cloned this repository
+
+The `data/catalog.json` in git was generated on somebody else's computer. It is included
+so the app runs immediately, but until you regenerate it, every entry is a description of
+a machine you have never seen — possibly different versions, possibly tools you do not
+have at all.
+
+```bash
+python3 scripts/build_catalog.py    # makes the catalog yours
+```
+
+The app is explicit about this rather than quietly pretending otherwise. If none of the
+catalogued tools are found on your machine, it says the catalog describes a different
+computer. If some are missing, it names them and excludes them from staleness warnings:
+a tool you never installed cannot be "out of date".
+
+Provenance paths are written as `~/.claude/...` rather than absolute paths, so a catalog
+built on one machine does not leak a username or point at directories that exist nowhere
+else. `tests/test_catalog.py` fails the build if an absolute home path reappears.
+
 ## Stay current
 
 The catalog describes the tools installed on this machine at the moment it was generated.
@@ -101,7 +121,7 @@ thing that writes it.
 The application itself never reaches the network. Run the check from cron:
 
 ```cron
-0 9 * * * cd /path/to/operator-key && python3 scripts/check_updates.py --quiet
+0 9 * * 1 cd /path/to/operator-key && python3 scripts/check_updates.py --quiet
 ```
 
 Offline runs preserve what the last online check found rather than erasing it:
@@ -109,6 +129,24 @@ Offline runs preserve what the last online check found rather than erasing it:
 ```bash
 python3 scripts/check_updates.py --offline
 ```
+
+Weekly rather than daily is deliberate: most runs would find nothing, and a banner that
+cries wolf gets ignored precisely when it matters.
+
+## Run it as a web app
+
+The same build serves as a plain website with no Tauri and no Rust:
+
+```bash
+npm run build
+npx serve dist        # or any static host
+```
+
+The app detects its runtime and adapts. In a browser it labels itself `WEB DECK · COPY
+ONLY` and removes every execution path: commands can be read, searched, explained and
+copied, but nothing can be run, because a web page has no business executing anything on
+your machine. Search, teaching, predictions, onboarding and the freshness banner all work
+identically. `dist/` is a static bundle, so any host will do.
 
 ## Search by intent
 

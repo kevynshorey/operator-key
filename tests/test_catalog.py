@@ -163,5 +163,33 @@ class CatalogTests(unittest.TestCase):
             self.assertEqual(output.read_text(encoding="utf-8"), original)
 
 
+
+class Portability(unittest.TestCase):
+    """The catalog ships in a public repo and is cloned onto other machines."""
+
+    def test_no_absolute_home_paths_in_the_catalog(self):
+        # Provenance like "/home/kevo/.claude/..." leaks a username and points at a
+        # location that does not exist on anyone else's computer. "~/..." stays true
+        # everywhere.
+        document = json.loads((ROOT / "data" / "catalog.json").read_text(encoding="utf-8"))
+        offenders = [
+            entry["command"]
+            for entry in document["entries"]
+            if "/home/" in json.dumps(entry) or "/Users/" in json.dumps(entry)
+        ]
+        self.assertEqual(offenders, [], f"absolute home paths leak into provenance: {offenders[:5]}")
+
+    def test_portable_path_rewrites_the_running_users_home(self):
+        from scripts.adapters.common import portable_path
+
+        home = Path.home()
+        self.assertEqual(portable_path(home / ".claude" / "x.md"), "~/.claude/x.md")
+
+    def test_portable_path_leaves_other_paths_alone(self):
+        from scripts.adapters.common import portable_path
+
+        self.assertEqual(portable_path("/usr/share/doc/thing"), "/usr/share/doc/thing")
+
+
 if __name__ == "__main__":
     unittest.main()

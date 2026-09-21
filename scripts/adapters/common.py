@@ -41,6 +41,21 @@ def read_optional_text(path: Path) -> str | None:
         return None
 
 
+def portable_path(path: Path | str) -> str:
+    """Render a path for provenance without baking in whose machine built the catalog.
+
+    Provenance is meant to answer "where did this come from", and an absolute path under
+    one person's home directory answers it wrongly everywhere else: it leaks a username
+    and points at a location that does not exist on a cloned checkout. ``~`` keeps the
+    answer true on every machine.
+    """
+    text = str(path)
+    home = str(Path.home())
+    if text.startswith(home):
+        return "~" + text[len(home):]
+    return text
+
+
 def clean(value: str) -> str:
     value = re.sub(r"<[^>]+>", "", value)
     value = re.sub(r"\[([^]]+)]\([^)]*\)", r"\1", value)

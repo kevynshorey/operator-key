@@ -24,7 +24,6 @@ describe("natural language intent", () => {
     "I want to review my code",
     "how do I review my code",
     "check the security of my code",
-    "commit my changes",
     "show me how to resume a session",
     "I need to see my session history",
   ];
@@ -34,6 +33,16 @@ describe("natural language intent", () => {
       const results = searchCatalog(searchIndex, sentence);
       expect(results.length).toBeGreaterThan(0);
     });
+
+  // "commit my changes" is deliberately NOT in the list above. No git commands are
+  // catalogued yet, so honest behaviour is to return nothing rather than to offer an
+  // unrelated flag. This test guards against a false match sneaking back in: it passed
+  // for a while only because one hermes flag's description happened to contain the word
+  // "Uncommitted", which is not an answer to the question.
+  it("returns nothing for git intents until git is catalogued", () => {
+    const results = searchCatalog(searchIndex, "commit my changes");
+    expect(results).toHaveLength(0);
+  });
   }
 
   it("keeps filler words from vetoing a match", () => {

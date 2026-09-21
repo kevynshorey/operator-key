@@ -236,15 +236,27 @@ def build_report(*, offline: bool = False, output: Path = DEFAULT_OUTPUT) -> dic
     reachable = False
 
     for product, current in installed.items():
+        # "Not installed" is a different fact from "out of date", and conflating them is
+        # actively misleading on a cloned repo: someone who has never installed Omarchy
+        # would be told their catalog is stale for it, when really those 228 commands
+        # simply do not apply to their machine.
+        installed_here = bool(current) and current != "unknown"
         record: dict = {
             "installed": current,
+            "installed_here": installed_here,
             "catalog_built_from": built_from.get(product, ""),
             # Catalog drift is local and always knowable: it needs no network at all.
-            "catalog_matches_installed": bool(current) and built_from.get(product, "") == current,
+            # A tool that is absent cannot be "out of sync", so it is not claimed to be.
+            "catalog_matches_installed": (
+                installed_here and built_from.get(product, "") == current
+            ),
         }
 
         source = RELEASE_SOURCES.get(product)
-        if source is None:
+        if not installed_here:
+            # Nothing to compare against, and no reason to spend a request on it.
+            record.update({"upstream_status": "not-installed", "drift": "unknown"})
+        elif source is None:
             record.update({"upstream_status": "no-public-feed", "drift": "unknown"})
         elif offline:
             prior = (previous.get("products") or {}).get(product) or {}
@@ -305,7 +317,12 @@ def summarize(report: dict) -> str:
     lines.append("")
     lines.append(f"{'product':<14}{'installed':<14}{'latest':<18}{'drift':<10}catalog")
     for product, record in report["products"].items():
-        catalog_state = "in sync" if record["catalog_matches_installed"] else "STALE"
+        if not record.get("installed_here", True):
+            catalog_state = "not installed"
+        elif record["catalog_matches_installed"]:
+            catalog_state = "in sync"
+        else:
+            catalog_state = "STALE"
         lines.append(
             f"{product:<14}{record['installed']:<14}"
             f"{str(record.get('latest') or '-'):<18}"

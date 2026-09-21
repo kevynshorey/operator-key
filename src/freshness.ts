@@ -5,6 +5,11 @@
  * days ago against older binaries looks exactly as authoritative as one built this
  * morning, which is precisely the failure this module exists to prevent.
  *
+ * This matters twice as much for a cloned repository. The catalog checked into git was
+ * generated on someone else's computer, so on a fresh clone EVERY entry is a claim about
+ * a machine the operator has never seen. Saying so plainly is the difference between a
+ * tool that is honest and one that quietly misleads.
+ *
  * Nothing here fetches anything. `data/freshness.json` is written by
  * `scripts/check_updates.py` (run from cron, never from the app) and is ADVISORY: it can
  * never change a safety level, a command, or any catalog fact. The app stays offline.
@@ -14,7 +19,7 @@
 export type DriftState = "current" | "behind" | "ahead" | "unknown";
 
 /** Why a product's drift could not be determined. */
-export type UpstreamStatus = "ok" | "unreachable" | "offline" | "no-public-feed";
+export type UpstreamStatus = "ok" | "unreachable" | "offline" | "no-public-feed" | "not-installed";
 
 export interface ProductFreshness {
   readonly installed: string;
@@ -28,6 +33,8 @@ export interface ProductFreshness {
   /** What the last ONLINE check concluded, carried through offline runs. */
   readonly last_known_drift?: DriftState;
   readonly last_known_at?: string;
+  /** False when the tool is absent here, which is not the same as being out of date. */
+  readonly installed_here?: boolean;
 }
 
 export interface DocFreshness {
@@ -117,10 +124,50 @@ export function summarizeFreshness(
   const catalogAgeDays = daysBetween(report.catalog_generated_at, now);
   const daysSinceCheck = daysBetween(report.checked_at, now);
 
+  // 0. The clone case. If nothing the catalog describes is actually installed here, the
+  // whole catalog is a description of somebody else's computer. That has to be said
+  // before any detail about individual versions, or the detail implies a relevance the
+  // catalog has not earned.
+  const known = Object.values(report.products);
+  const anyInstalled = known.some((record) => record.installed_here !== false);
+
+  if (known.length > 0 && !anyInstalled) {
+    return {
+      checkedAt: report.checked_at,
+      daysSinceCheck,
+      catalogAgeDays,
+      neverChecked: false,
+      notices: [
+        {
+          level: "attention",
+          headline: "This catalog describes a different machine",
+          detail:
+            "None of the catalogued tools were found on this computer, so every command here comes from the machine that generated the catalog. Install the tools you use, then run scripts/build_catalog.py to make this yours.",
+          products: [],
+        },
+      ],
+    };
+  }
+
+  // Products absent from this machine are reported once, plainly, and then excluded from
+  // every staleness verdict below: a tool you do not have cannot be out of date.
+  const notInstalled = Object.entries(report.products)
+    .filter(([, record]) => record.installed_here === false)
+    .map(([product]) => product);
+
+  if (notInstalled.length > 0) {
+    notices.push({
+      level: "info",
+      headline: `${plural(notInstalled.length, "catalogued tool")} not installed here`,
+      detail: `The catalog includes commands for ${notInstalled.join(", ")}, which were not found on this machine. Those entries describe the computer that generated the catalog, not this one.`,
+      products: notInstalled,
+    });
+  }
+
   // 1. Catalog drift outranks everything: the catalog no longer describes this machine,
   // so entries on screen may be for versions that are not installed.
   const outOfSync = Object.entries(report.products)
-    .filter(([, record]) => !record.catalog_matches_installed)
+    .filter(([, record]) => record.installed_here !== false && !record.catalog_matches_installed)
     .map(([product]) => product);
 
   if (outOfSync.length > 0) {
@@ -140,7 +187,11 @@ export function summarizeFreshness(
   // the last online check still counts during an offline run: it did not stop being true
   // because the network was unavailable this morning.
   const behind = Object.entries(report.products)
-    .filter(([, record]) => record.drift === "behind" || record.last_known_drift === "behind")
+    .filter(
+      ([, record]) =>
+        record.installed_here !== false &&
+        (record.drift === "behind" || record.last_known_drift === "behind"),
+    )
     .map(([product]) => product);
 
   if (behind.length > 0) {
