@@ -2,18 +2,18 @@
 
 Written: 2026-09-21 (AST)
 Repo: `~/Work/operator-key`
-Branch: `main` — HEAD `b09f520be0b5e28d023881da8bc4aba5bdd285ed`
+Branch: `main` — HEAD `3a81199`
 Working tree: CLEAN (verified `git status --porcelain` empty)
-Remote: **NONE CONFIGURED** — see Open Questions
+Remote: `https://github.com/kevynshorey/operator-key` — **PUBLIC**, local and origin in sync
 
 ---
 
 ## 1. What this product is
 
 Operator Key is a local command instrument: a React + Tauri desktop app that indexes
-every command, flag, slash-command and keybinding for four tools installed on the
-machine (omarchy, hermes, claude-code, codex) and lets an operator find them by intent
-("resume a session") rather than by memorising syntax.
+every command, flag, slash-command and keybinding for six tools installed on the machine
+(omarchy, hermes, claude-code, codex, git, gh) and lets an operator find them by intent
+("undo my last commit") rather than by memorising syntax.
 
 The governing principle across every slice is **honesty over helpfulness**. The app is
 worth using only because what it shows is true of the machine it runs on. Every design
@@ -22,13 +22,12 @@ has not verified, never executes anything it has not been explicitly asked to, a
 "I cannot tell" rather than guessing. A confident wrong answer is the failure mode that
 destroys the product.
 
-Current catalog: **1,303 entries** (omarchy 228, hermes 706, claude-code 282, codex 87).
+Current catalog: **2,174 entries**
+(omarchy 228, hermes 706, claude-code 282, codex 87, git 549, gh 322).
 
 ---
 
 ## 2. Original objective (user's words, verbatim)
-
-Most recent request driving the last two slices:
 
 > "this product must always be up to date with regular checks from the websites that make
 > the tools we are using and also any changes in the repos etc, i think some kind of
@@ -41,10 +40,10 @@ Then, as constraints:
 > github repo download so ensure all functions will be set that way also this should be in
 > the future a web app if it becoms popular"
 
-So the standing objective has three parts, in order:
-1. **Freshness** — DONE (commit `892f273`, hardened in `b09f520`)
-2. **Portability + web-app readiness** — DONE (commit `b09f520`)
-3. **Educational layer, incl. git/GitHub** — **NOT STARTED. This is the next slice.**
+All three parts are now complete:
+1. **Freshness** — DONE (`892f273`, hardened in `b09f520`, RC false alarm fixed in `3a81199`)
+2. **Portability + web-app readiness** — DONE (`b09f520`, re-proven by clone at `3a81199`)
+3. **Educational layer, incl. git/GitHub** — DONE (`6aff619`)
 
 ---
 
@@ -62,6 +61,7 @@ own test file, not logic buried in `App.tsx`:
 | `src/teach.ts` | Command anatomy + teaching glossary |
 | `src/explain.ts` | Reverse lookup: explain a pasted shell command |
 | `src/onboarding.ts` | Guided route; starts read-only, ends with recovery |
+| `src/lessons.ts` | Catalog-backed workflow lessons (git, GitHub, skills) |
 | `src/freshness.ts` | How far to trust the catalog right now |
 | `src/catalog.ts` | Catalog load/parse/search index |
 | `src/runtime.ts` | `"native"` vs `"web"` detection |
@@ -70,8 +70,8 @@ own test file, not logic buried in `App.tsx`:
 not the author. Teaching outranks convenience everywhere.
 
 **False alarms are the enemy.** A safety flag that fires wrongly trains operators to
-ignore real warnings. Same logic governs the freshness banner: it is tiered so it does not
-cry wolf. No keyword matching without an intent cross-check.
+ignore real warnings. Same logic governs the freshness banner and the update checker.
+No keyword matching without an intent cross-check.
 
 **The app never touches the network.** All network I/O is isolated in
 `scripts/check_updates.py`, run from cron only. Network content can NEVER mutate
@@ -79,6 +79,11 @@ cry wolf. No keyword matching without an intent cross-check.
 source to prove the catalog path is never written — a comment is not a boundary.
 
 **The catalog is built from local binaries**, which is the only reason it can be trusted.
+
+**Lessons are catalog-backed and keyed by command text, not entry ID.** Entry IDs hash
+their provenance string, so changing how provenance renders reshuffles every ID while the
+command set is unchanged. A lesson keyed on IDs would break on a rebuild that changed
+nothing a learner can see.
 
 ---
 
@@ -92,54 +97,102 @@ source to prove the catalog path is never written — a comment is not a boundar
 a pasted command is explained with identical authority.
 
 ### `892f273` — freshness checking and honest staleness display
-- `scripts/check_updates.py` (~360 lines): installed versions via `pacman -Q` and
-  `--version`; upstream via GitHub releases API; conditional GET (ETag/Last-Modified) on
-  docs so unchanged pages cost a 304 with no body; offline-safe.
+- `scripts/check_updates.py`: installed versions via `pacman -Q` and `--version`; upstream
+  via GitHub releases API; conditional GET (ETag/Last-Modified) on docs so unchanged pages
+  cost a 304 with no body; offline-safe.
 - `src/freshness.ts` + banner in `App.tsx`.
-- Fixed two real upstream bugs found while probing:
-  - Codex docs **308-redirect**: `developers.openai.com/codex/developer-commands.md` →
-    `learn.chatgpt.com/docs/developer-commands.md`. `urllib` followed it silently, so the
-    catalog cited provenance it no longer read. Now `fetched_url` is recorded separately
-    from `url` and every 30x is logged on stderr.
-  - Omarchy repo moved `basecamp/omarchy` → `omacom/omarchy`.
+- Fixed two real upstream bugs found while probing: a Codex docs **308-redirect** that made
+  the catalog cite provenance it no longer read, and an Omarchy repo move
+  (`basecamp/omarchy` → `omacom/omarchy`).
 
 ### `b09f520` — honesty on machines that did not build the catalog
 Three real bugs, all found by actually cloning the repo rather than reasoning about it:
-- **Username leak**: 105 entries embedded `/home/kevo/...` in provenance. Now rendered
-  `~/...` via `portable_path()` in `scripts/adapters/common.py`. A test fails the build if
-  `/home/` or `/Users/` reappears anywhere in the catalog JSON.
-- **Absent tools reported as "out of date"**: a clone with none of the tools installed got
-  four `STALE` verdicts. `installed_here` is now its own state — stated once, excluded
-  from all staleness/drift verdicts, and costs no network requests. When NOTHING
-  catalogued is installed, the app leads with "this catalog describes a different machine"
-  and points at `build_catalog.py`.
-- **A search test passing by accident**: `"commit my changes"` matched one hermes flag
-  only because its description was truncated mid-sentence, leaving the word "Uncommitted".
-  Rebuilding cleaned the truncation and the match vanished. There are **no git commands in
-  the catalog**, so the honest result is zero; the test now asserts that.
+- **Username leak**: 105 entries embedded an absolute home path in provenance. Now rendered
+  `~/...` via `portable_path()`. A test fails the build if `/home/` or `/Users/` reappears
+  anywhere in the catalog JSON.
+- **Absent tools reported as "out of date"**: `installed_here` is now its own state —
+  stated once, excluded from all staleness/drift verdicts, and costs no network requests.
+- **A search test passing by accident**: `"commit my changes"` matched one hermes flag only
+  because its description was truncated mid-sentence. (Superseded by `6aff619`: git
+  commands now exist, so that query has a real answer.)
+
+### `6aff619` — git + gh adapters and the educational layer
+Lessons had to wait on adapters: the catalog contained zero git commands, so lessons
+written first would have cited commands that do not exist.
+
+Four bugs found by running the extraction rather than reasoning about it:
+- **`git <cmd> -h` exits 129.** The shared runner used `check=True` and silently returned
+  `""`, so an adapter built on it would have catalogued zero flags while the build stayed
+  green. Added `run_lenient()`.
+- **`clean()` strips `<...>` as an HTML tag**, turning
+  `--force-with-lease[=<refname>:<expect>]` into `--force-with-lease[=:]`.
+- **`git help -a` lists aliases in its own section** with no provenance and no target;
+  cataloguing them there produced duplicates that discarded the override provenance
+  `parse_aliases` attaches.
+- **gh prints `-c, --clone` where git prints the long form alone.** One concept rendering
+  two ways inside one catalog splits search between the spellings.
+
+Plus a pre-existing bug this slice exposed:
+- **`"skills"` contains `"kill"`.** Substring matching flagged **30 entries** red and
+  destructive, including read-only `hermes skills list` and `/skills`.
+  `--show-forced-updates` matched `"force"` the same way. Both now match on word
+  boundaries. A badge that fires on `hermes skills list` is one operators learn to ignore
+  before the day it fires on `git push --force`.
+
+Safety and task group are now **stated by the adapters, not inferred**: the keyword
+classifier rates `git reset`, `git rebase`, `git push` and `gh pr merge` green, and files
+`git commit` ("Record changes...") under capture-and-input. `git reflog` is deliberately
+NOT red — bare `git reflog` is `git reflog show`, read-only, and the best tool for
+recovering lost commits; only its expire/delete/drop subcommands destroy anything.
+
+Onboarding pedagogy was fixed by reading generated routes as a beginner (skill rule 19):
+structural tests were green while the git route opened with `git diagnose` (produces a
+bug-report zip), offered `git fetch --write-fetch-head` as "find help", and ranked obscure
+flags above plain commands.
+
+### `2d3cf7f` — MIT license and a clone-first note
+Without a LICENSE nobody legally has permission to use or contribute. README now says the
+shipped catalog was built on another machine and should be rebuilt.
+
+### `3a81199` — stop reporting release candidates as updates
+Found by running the real weekly cron script rather than trusting its tests. It reported
+`git: 2.55.0 -> v2.56.0-rc1`: an operator on current stable was told they were behind
+software that is not released yet. Pre-release tags are now filtered, with a fallback when
+a project has never tagged anything stable. The pattern is anchored so `rust-v0.155.1`
+(codex's normal stable spelling) is not mistaken for a pre-release — dropping that feed
+would silently remove the only release source that product has.
 
 ---
 
 ## 5. Verification status (re-run fresh at handoff, not copied from memory)
 
 ```
-TypeScript:  240 tests passing, 18 test files   (npm test)
-Python:      114 tests passing                  (python3 -m unittest discover -s tests)
+TypeScript:  259 tests passing, 20 test files   (npm test)
+Python:      160 tests passing                  (python3 -m unittest discover -s tests)
 Typecheck:   0 errors                           (npm run typecheck)
 Lint:        clean, --max-warnings 0            (npm run lint)
 Build:       succeeds                           (npm run build)
 ```
 
 Verified by real execution, not simulation:
-- Cloned the repo to a scratch dir and ran its suite there (108 tests at that commit).
-- Simulated a bare machine by patching the version probe to raise `FileNotFoundError`;
-  confirmed `not installed` instead of four false `STALE` rows.
-- Served `dist/` over plain HTTP with **no Tauri present**: app reports
-  `WEB DECK · COPY ONLY`, returns 15 results for "resume a session", shows the freshness
-  banner and onboarding, and exposes **no run affordance**.
-- Both banner tiers checked in a live browser (quiet `NOTE`, loud amber `CHECK`).
+- Cloned the **public GitHub repo** to a scratch dir and ran its suite there: 160 Python
+  tests pass, and the RC fix is present in the published tree.
+- Simulated a bare machine by patching the version probe to raise `FileNotFoundError`:
+  git and gh report `not-installed` with `installed_here: false`, not false `STALE`.
+- Adapters on a bare machine return `unknown` and 0 entries rather than crashing.
+- Catalog rebuild is deterministic: two consecutive builds are byte-identical apart from
+  the `generated_at` provenance timestamp.
+- No `/home/` or `/Users/` anywhere in the catalog JSON.
+- Ran the real cron script end-to-end; it now tracks git and gh, and after `3a81199` git
+  correctly drops off the "behind upstream" list while the four genuinely-behind tools
+  stay on it.
+- Read the lessons panel in a real browser at 2,174 entries. That is where the last defect
+  surfaced: lesson prose printed literal backticks, teaching newcomers that the
+  punctuation was part of the command. Now rendered as code, with a regression test.
+- Searched "undo my last commit" in the browser: returns `git revert` as the top result.
+  The previous handoff recorded that exact query returning zero results.
 
-No background processes running. Ports 1420 and 8899 closed. Scratch clone deleted.
+No background processes running. Ports 1420 and 8899 closed. Scratch clones deleted.
 
 ---
 
@@ -152,11 +205,13 @@ Measured 2026-09-21:
 | omarchy | 4.0.3-1 | v4.0.4 | behind |
 | claude-code | 2.1.272 | v2.1.278 | behind |
 | codex | 0.154.0 | rust-v0.155.1 | behind |
+| gh | 2.100.0 | v2.101.0 | behind |
+| git | 2.55.0 | v2.55.0 | current (v2.56.0-rc1 correctly ignored) |
 | hermes | 0.21.3 | — | no public release feed |
 
-Catalog regenerated 2026-09-21T21:42 UTC, matches installed versions (in sync).
-`data/freshness.json` exists locally and is **gitignored on purpose** — it describes THIS
-host, so committing it would show a clone someone else's drift as if it were their own.
+Catalog matches installed versions (in sync). `data/freshness.json` exists locally and is
+**gitignored on purpose** — it describes THIS host, so committing it would show a clone
+someone else's drift as if it were their own.
 
 **Suggested but not done:** `yay -Syu` then `python3 scripts/build_catalog.py` would clear
 the banner and pick up new commands. Left alone deliberately — updating the operator's
@@ -172,46 +227,34 @@ Job `e4e6e817551f` — "Operator Key upstream freshness check"
 - `no_agent=true`, `deliver=local` — silent unless there is genuinely something to report
 - Repo path from `${OPERATOR_KEY_REPO:-$HOME/Work/operator-key}`, not hardcoded
 
-**BLOCKER: the Hermes gateway is NOT running, so this job will not fire.**
-Start it with `hermes gateway start`. This is a user action; it was reported, not assumed.
-Also note: `deliver=local` means output is saved, not messaged into a CLI session.
+**Gateway: RESOLVED** (was the blocker in the previous handoff). Installed as a user
+systemd service (`hermes-gateway-portfolio.service`), enabled at boot with linger so it
+survives logout. Verified `active (running)`; `cronjob list` reports `gateway_running:
+true` and the job as `enabled`/`scheduled`. The script was run manually end-to-end and
+works.
+
+Note: `deliver=local` means output is saved, not messaged into a session. If notification
+is wanted, the job's `deliver` must target a gateway-connected platform (e.g. telegram).
 
 ---
 
-## 8. THE NEXT SLICE — educational layer (not started)
+## 8. Possible next slices (none started)
 
-The user's request has one part still outstanding: teaching people to use GitHub, add
-skills via these portals, etc.
-
-**Do this first, before any lesson content:** write `git` and `gh` adapters
-(`scripts/adapters/git.py`, `scripts/adapters/gh.py`) so they become catalogued products.
-
-Why this ordering is not optional: the user already agreed lessons must be **catalog-backed
-so they cannot rot**. The catalog currently contains **zero git commands** — verified, and
-there is now a test asserting that `"commit my changes"` returns nothing. If lessons are
-written first they would cite entry IDs that do not exist, which breaks the one guarantee
-that makes this product trustworthy.
-
-Sketch, consistent with existing architecture:
-1. `git`/`gh` adapters → catalog entries with real provenance and safety levels.
-   `gh auth login` etc. need care: some are genuinely destructive (`git push --force`).
-2. Extend `onboarding.ts` — it is already a general procedure engine, so a "first PR"
-   track slots in beside the existing per-product routes.
-3. Lessons reference entry IDs; a test asserts every referenced ID resolves, so a renamed
-   or removed upstream command fails the build instead of silently teaching fiction.
-4. Tier 3 of the freshness design (deferred, still unbuilt): catalog snapshots + diffing to
-   detect when **a command the operator actually used** was renamed, removed, or changed
-   safety level. This is the loud tier and needs snapshot history.
+1. **Tier 3 freshness** (deferred, still unbuilt): catalog snapshots + diffing to detect
+   when **a command the operator actually used** was renamed, removed, or changed safety
+   level. This is the loud tier and needs snapshot history.
+2. **More lessons.** The engine takes a template and resolves it against the catalog, so
+   adding a lesson is data, not code. Candidates: resolving merge conflicts, rebase vs
+   merge, reviewing someone else's PR.
+3. **Web deployment.** The static bundle works on any host; no host chosen.
 
 ---
 
 ## 9. Open questions for the user
 
-1. **No git remote is configured.** The repo is intended for GitHub distribution but
-   `git remote -v` is empty. Creating a remote/pushing was never approved, so nothing was
-   pushed. Ask before creating a GitHub repo or pushing.
-2. **Gateway not running** — cron is scheduled but inert until `hermes gateway start`.
-3. **Web deployment target** unknown. The static bundle works on any host; no host chosen.
+1. **Cron delivery** — currently `deliver=local` (saved, not messaged). Switch to
+   telegram/all if notification is wanted.
+2. **Web deployment target** unknown. The static bundle is ready; no host chosen.
 
 ---
 
@@ -222,5 +265,7 @@ Sketch, consistent with existing architecture:
 - Do not commit machine-specific state.
 - The app stays offline-first; network stays in the cron script.
 - Commit messages explain *why*, including bugs found and how they were proven.
-- Skill `version-aware-command-catalogs` holds 45 durable lessons from this work — read it
-  before touching the catalog, adapters, or freshness logic.
+- Print generated teaching content and read it as a beginner before trusting green tests.
+  Structural assertions prove shape, never pedagogy.
+- Skill `version-aware-command-catalogs` holds the durable lessons from this work — read it
+  before touching the catalog, adapters, lessons, or freshness logic.
