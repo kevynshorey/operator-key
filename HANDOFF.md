@@ -224,7 +224,7 @@ tools is their call, not a side effect of a build.
 Job `e4e6e817551f` — "Operator Key upstream freshness check"
 - Schedule: **weekly, Mondays 09:00** (user-specified; next 2026-09-28T09:00-04:00)
 - Script: `~/.hermes/profiles/portfolio/scripts/operator-key-freshness.sh`
-- `no_agent=true`, `deliver=local` — silent unless there is genuinely something to report
+- `no_agent=true`, `deliver=telegram` — silent unless there is genuinely something to report
 - Repo path from `${OPERATOR_KEY_REPO:-$HOME/Work/operator-key}`, not hardcoded
 
 **Gateway: RESOLVED** (was the blocker in the previous handoff). Installed as a user
@@ -233,8 +233,25 @@ survives logout. Verified `active (running)`; `cronjob list` reports `gateway_ru
 true` and the job as `enabled`/`scheduled`. The script was run manually end-to-end and
 works.
 
-Note: `deliver=local` means output is saved, not messaged into a session. If notification
-is wanted, the job's `deliver` must target a gateway-connected platform (e.g. telegram).
+Delivery is **Telegram** (user-chosen). `no_agent=true` means stdout is delivered verbatim
+and EMPTY stdout sends nothing at all — the watchdog pattern, so a week where every tool is
+current is a silent week rather than a "nothing to report" ping. A non-zero exit or timeout
+still raises an error alert, so genuine breakage is never silent.
+
+**Known operational gotcha — Telegram bot-token conflict.** Telegram permits exactly ONE
+poller per bot token. A long-running interactive Hermes CLI session holds that token, so
+while one is open the gateway loses the race and logs
+`Conflict: terminated by other getUpdates request`, ending with
+`Gateway started with no connected platforms`. It retries about every 60s and connects on
+its own once the CLI session exits; no manual restart is needed.
+
+**A cron run can report `last_status: ok` while nothing was delivered.** That field reflects
+the SCRIPT's exit code, not the send. Verified on 2026-09-21: the job ran, produced correct
+drift output, and saved it to
+`~/.hermes/profiles/portfolio/cron/output/e4e6e817551f/` — but no message was sent, because
+no platform was connected. To confirm real delivery, check the gateway log for
+`[Telegram] Connected to Telegram (polling mode)` WITHOUT a following conflict, rather than
+trusting the cron status field.
 
 ---
 
@@ -252,9 +269,7 @@ is wanted, the job's `deliver` must target a gateway-connected platform (e.g. te
 
 ## 9. Open questions for the user
 
-1. **Cron delivery** — currently `deliver=local` (saved, not messaged). Switch to
-   telegram/all if notification is wanted.
-2. **Web deployment target** unknown. The static bundle is ready; no host chosen.
+1. **Web deployment target** unknown. The static bundle is ready; no host chosen.
 
 ---
 
