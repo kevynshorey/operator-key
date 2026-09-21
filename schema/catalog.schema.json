@@ -25,23 +25,27 @@
     "productMapString": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["omarchy", "hermes", "claude-code", "codex"],
+      "required": ["omarchy", "hermes", "claude-code", "codex", "git", "gh"],
       "properties": {
         "omarchy": {"type": "string", "minLength": 1},
         "hermes": {"type": "string", "minLength": 1},
         "claude-code": {"type": "string", "minLength": 1},
-        "codex": {"type": "string", "minLength": 1}
+        "codex": {"type": "string", "minLength": 1},
+        "git": {"type": "string", "minLength": 1},
+        "gh": {"type": "string", "minLength": 1}
       }
     },
     "productMapInteger": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["omarchy", "hermes", "claude-code", "codex"],
+      "required": ["omarchy", "hermes", "claude-code", "codex", "git", "gh"],
       "properties": {
         "omarchy": {"type": "integer", "minimum": 0},
         "hermes": {"type": "integer", "minimum": 0},
         "claude-code": {"type": "integer", "minimum": 0},
-        "codex": {"type": "integer", "minimum": 0}
+        "codex": {"type": "integer", "minimum": 0},
+        "git": {"type": "integer", "minimum": 0},
+        "gh": {"type": "integer", "minimum": 0}
       }
     },
     "provenance": {
@@ -61,7 +65,7 @@
       "required": ["id", "product", "product_version", "interface", "task_group", "category", "command", "canonical_chord", "aliases", "description", "context", "safety_level", "destructive", "available", "conflict_ids", "source", "provenance"],
       "properties": {
         "id": {"type": "string", "minLength": 1},
-        "product": {"type": "string", "enum": ["omarchy", "hermes", "claude-code", "codex"]},
+        "product": {"type": "string", "enum": ["omarchy", "hermes", "claude-code", "codex", "git", "gh"]},
         "product_version": {"type": "string", "minLength": 1},
         "interface": {"type": "string", "enum": ["hotkey", "slash-command", "shell-command", "cli-flag", "menu-action"]},
         "task_group": {"type": "string", "enum": ["review-and-verify", "parallel-agents", "context-and-memory", "models-and-performance", "debug-and-recover", "sessions-and-navigation", "capture-and-input", "system-and-hardware", "configuration", "development", "help-and-reference"]},

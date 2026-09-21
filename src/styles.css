@@ -544,6 +544,21 @@ body:has(.runtime-web) { background: #0b0e10; }
 .safety-dot.safety-red { background: var(--red); }
 .onboarding-panel > footer { padding: 10px 14px; border-top: 1px solid var(--etched); color: var(--muted); font-family: var(--mono); font-size: 10px; line-height: 1.5; }
 
+/* Lessons teach a workflow across products; the guided route teaches one product. */
+.lesson-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 0; }
+.lesson-tabs button { min-height: 26px; padding: 4px 9px; border: 1px solid var(--etched); border-radius: 1px; background: #121a1d; color: var(--muted); font-family: var(--mono); font-size: 10px; }
+.lesson-tabs button:hover { border-color: var(--cyan); color: var(--white); }
+.lesson-tabs button.active { border-color: var(--cyan); background: #16242a; color: var(--white); }
+.lesson-audience { margin: 10px 14px 0; max-width: 80ch; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.lesson-audience b { color: var(--cyan); font-weight: 700; }
+/* An incomplete lesson states its gap in amber: informative, not alarming. */
+.lesson-caveat { margin: 8px 14px 0; padding: 7px 10px; border: 1px solid var(--amber); border-radius: 1px; color: var(--amber); font-family: var(--mono); font-size: 10px; line-height: 1.5; }
+.lesson-code { padding: 1px 4px; border-radius: 1px; background: #16242a; color: var(--cyan); font-family: var(--mono); font-size: 11px; }
+.lesson-missing { margin: 0 0 6px; max-width: 80ch; color: var(--amber); font-family: var(--mono); font-size: 10px; line-height: 1.5; }
+/* Hazard prose is amber-ruled so it reads as a caution without mimicking a red command. */
+.step-watchout { margin: 0 0 6px; padding: 6px 9px; max-width: 80ch; border-left: 2px solid var(--amber); background: #1a1508; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.step-watchout b { color: var(--amber); font-weight: 700; }
+
 /* Reverse lookup: "I ran this, what did it do?" */
 .explain-panel { margin: 14px 0 0; border: 1px solid var(--etched); border-radius: 2px; background: #0e1619; }
 .explain-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--etched); }

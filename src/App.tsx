@@ -38,6 +38,7 @@ import { createPredictionIndex, predictIntent, starterPrompts, type PredictionSu
 import { buildFollowUps, type FollowUp, type FollowUpPriority } from "./followups";
 import { buildCommandLesson, createTeachingIndex, type CommandLesson } from "./teach";
 import { explainCommand, type CommandExplanation } from "./explain";
+import { buildLessons, type Lesson } from "./lessons";
 import { buildOnboardingPath, type OnboardingPath } from "./onboarding";
 import {
   highestLevel,
@@ -51,6 +52,8 @@ const PRODUCT_LABELS: Record<Product, string> = {
   hermes: "Hermes",
   "claude-code": "Claude Code",
   codex: "Codex",
+  git: "Git",
+  gh: "GitHub CLI",
 };
 
 const TASK_LABELS: Record<TaskGroup, string> = Object.fromEntries(
@@ -595,6 +598,128 @@ function OnboardingPanel({ path, onSelectEntry, onClose }: {
 }
 
 /**
+ * Render lesson prose, turning `backticked` spans into real code elements.
+ *
+ * Lesson text is authored in the same voice as the rest of the repo, where backticks mark
+ * a command. Rendering it raw prints the backtick characters on screen, which teaches a
+ * newcomer that the punctuation is part of the command they are supposed to type.
+ */
+function LessonProse({ text }: { text: string }) {
+  // Split on backtick pairs, keeping the delimiters' contents: odd indices are code.
+  const parts = text.split(/`([^`]+)`/g);
+  return (
+    <>
+      {parts.map((part, index) => (
+        index % 2 === 1
+          ? <code className="lesson-code" key={index}>{part}</code>
+          : <span key={index}>{part}</span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * The lessons panel teaches a WORKFLOW, where the onboarding route teaches a PRODUCT.
+ * "Open your first pull request" crosses git and gh, so it cannot be a per-product route.
+ *
+ * Every command shown here was resolved from the catalog, never written into the lesson
+ * text, so a lesson cannot outlive the command it teaches. Where a reference did not
+ * resolve on this machine the gap is stated rather than hidden: a lesson that silently
+ * drops a step reads as complete while teaching one.
+ */
+function LessonsPanel({ lessons, selectedId, onSelectLesson, onSelectEntry, onClose }: {
+  lessons: readonly Lesson[];
+  selectedId: string;
+  onSelectLesson: (id: string) => void;
+  onSelectEntry: (entry: CatalogEntry) => void;
+  onClose: () => void;
+}) {
+  const lesson = lessons.find((item) => item.id === selectedId) ?? lessons[0];
+  if (!lesson) return null;
+  return (
+    <section className="onboarding-panel lessons-panel" aria-label="Lesson">
+      <header>
+        <div>
+          <span id="lessons-heading">{lesson.title}</span>
+          <p>{lesson.summary}</p>
+        </div>
+        <button type="button" className="onboarding-close" onClick={onClose} aria-label="Close lessons">
+          CLOSE
+        </button>
+      </header>
+
+      <div className="lesson-tabs" role="tablist" aria-label="Lessons">
+        {lessons.map((item) => (
+          <button
+            type="button"
+            key={item.id}
+            role="tab"
+            aria-selected={item.id === lesson.id}
+            className={item.id === lesson.id ? "active" : ""}
+            onClick={() => onSelectLesson(item.id)}
+          >
+            {item.title}
+          </button>
+        ))}
+      </div>
+
+      <p className="lesson-audience"><b>Who this is for:</b> {lesson.audience}</p>
+      {/*
+        role="note" rather than status/alert: this is a standing advisory, and the app
+        already uses the status live region to announce actions like "Copied".
+      */}
+      {!lesson.complete && (
+        <p className="lesson-caveat" role="note">{lesson.caveat}</p>
+      )}
+
+      <ol className="onboarding-steps">
+        {lesson.steps.map((step, index) => (
+          <li key={step.id}>
+            <div className="step-index" aria-hidden="true">{index + 1}</div>
+            <div className="step-body">
+              <h4>{step.title}</h4>
+              <p className="step-why"><LessonProse text={step.explain} /></p>
+              {step.commands.length > 0 && (
+                <div className="step-commands">
+                  {step.commands.map((entry) => (
+                    <button type="button" key={entry.id} onClick={() => onSelectEntry(entry)}>
+                      <code>{entry.command}</code>
+                      <span className={`safety-dot safety-${entry.safety_level}`} aria-hidden="true" />
+                      <span className="step-command-desc">{entry.description}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {step.missing.length > 0 && (
+                <p className="lesson-missing">
+                  Not on this machine:{" "}
+                  {step.missing.map((ref) => `${ref.command}`).join(", ")}. Install{" "}
+                  {[...new Set(step.missing.map((ref) => ref.product))].join(" and ")} and rebuild
+                  the catalog to see it here.
+                </p>
+              )}
+              {step.watchOut && (
+                <p className="step-watchout"><b>Watch out:</b> <LessonProse text={step.watchOut} /></p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      {/*
+        Deliberately worded differently from the guided-route footer. Both panels make the
+        same promise, but an existing test queries that footer by regex, and duplicated
+        prose turns a single-match query into an ambiguous one the moment both render.
+      */}
+      <footer>
+        Reading only — this panel never runs anything. Every command above was read from
+        this machine&apos;s catalog, so what you see is what this computer actually has.
+      </footer>
+    </section>
+  );
+}
+
+/**
  * Freshness is optional by design. A clone that has never run scripts/check_updates.py
  * must still build and run, and must say "never checked" rather than imply currency.
  * import.meta.glob resolves at build time and yields nothing when the file is absent.
@@ -678,6 +803,8 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const [apprenticeMode, setApprenticeMode] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
   const [guideProduct, setGuideProduct] = useState<Product>("hermes");
+  const [showLessons, setShowLessons] = useState(false);
+  const [lessonId, setLessonId] = useState("git-first-save");
 
   // Advisory only: this never gates or alters a catalog entry, it just tells the operator
   // how much to trust what they are looking at.
@@ -782,6 +909,12 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const onboardingPath = useMemo(
     () => searchIndex && showGuide ? buildOnboardingPath(searchIndex, guideProduct) : undefined,
     [searchIndex, showGuide, guideProduct],
+  );
+
+  // Lessons resolve against the catalog, so they are rebuilt only when it changes.
+  const lessons = useMemo(
+    () => parsed.ok ? buildLessons(parsed.catalog.entries) : [],
+    [parsed],
   );
 
   const acceptPrediction = useCallback((completion: string) => {
@@ -1017,7 +1150,24 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         <FreshnessBanner summary={freshnessSummary} />
         <PredictionRail suggestions={predictions} disabled={controlsLocked} onAccept={acceptPrediction} />
         <StarterPrompts prompts={starters} disabled={controlsLocked} onSelect={acceptPrediction} />
-        {apprenticeMode && !showGuide && (
+        {apprenticeMode && !showGuide && !showLessons && (
+          <div className="guide-invite lessons-invite">
+            <span>Never used git or GitHub? Learn the workflow, not just the commands.</span>
+            <div className="guide-invite-actions">
+              {lessons.map((lesson) => (
+                <button
+                  type="button"
+                  key={lesson.id}
+                  disabled={controlsLocked}
+                  onClick={() => { setLessonId(lesson.id); setShowLessons(true); }}
+                >
+                  {lesson.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {apprenticeMode && !showGuide && !showLessons && (
           <div className="guide-invite">
             <span>New to this? Take the guided route instead of searching.</span>
             <div className="guide-invite-actions">
@@ -1093,6 +1243,16 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
           </div>
         </div>
       </section>
+
+      {showLessons && lessons.length > 0 && (
+        <LessonsPanel
+          lessons={lessons}
+          selectedId={lessonId}
+          onSelectLesson={setLessonId}
+          onSelectEntry={(entry) => { selectEntryById(entry.id); }}
+          onClose={() => setShowLessons(false)}
+        />
+      )}
 
       {onboardingPath && (
         <OnboardingPanel

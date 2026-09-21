@@ -33,17 +33,22 @@ describe("natural language intent", () => {
       const results = searchCatalog(searchIndex, sentence);
       expect(results.length).toBeGreaterThan(0);
     });
-
-  // "commit my changes" is deliberately NOT in the list above. No git commands are
-  // catalogued yet, so honest behaviour is to return nothing rather than to offer an
-  // unrelated flag. This test guards against a false match sneaking back in: it passed
-  // for a while only because one hermes flag's description happened to contain the word
-  // "Uncommitted", which is not an answer to the question.
-  it("returns nothing for git intents until git is catalogued", () => {
-    const results = searchCatalog(searchIndex, "commit my changes");
-    expect(results).toHaveLength(0);
-  });
   }
+
+  // This assertion previously lived INSIDE the loop above, so it was registered once per
+  // sentence -- six identical tests that all asserted the same thing. Closing the loop
+  // first keeps it a single, honest test.
+  //
+  // It used to assert ZERO results, which was correct while the catalog contained no git
+  // commands at all. git and gh are now catalogued from the local binaries, so the honest
+  // expectation inverts: this query must return a real git commit command. Asserting
+  // emptiness now would be asserting that the product fails at its most common question.
+  it("answers a git intent now that git is catalogued", () => {
+    const results = searchCatalog(searchIndex, "commit my changes");
+    expect(results.length).toBeGreaterThan(0);
+    const commands = results.map((result) => result.entry.command.toLowerCase());
+    expect(commands.some((command) => command.startsWith("git commit"))).toBe(true);
+  });
 
   it("keeps filler words from vetoing a match", () => {
     const bare = searchCatalog(searchIndex, "review code");

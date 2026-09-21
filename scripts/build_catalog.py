@@ -18,6 +18,8 @@ if str(ROOT) not in sys.path:
 
 from scripts.adapters import claude as claude_adapter
 from scripts.adapters import codex as codex_adapter
+from scripts.adapters import gh as gh_adapter
+from scripts.adapters import git as git_adapter
 from scripts.adapters import hermes as hermes_adapter
 from scripts.adapters import omarchy as omarchy_adapter
 from scripts.adapters.common import classify, dedupe, entry, run, safety, split_markdown_cells
@@ -34,7 +36,7 @@ DOCS = {
     "claude_keys": "https://code.claude.com/docs/en/interactive-mode.md",
     "codex_commands": "https://learn.chatgpt.com/docs/developer-commands.md",
 }
-PRODUCTS = ("omarchy", "hermes", "claude-code", "codex")
+PRODUCTS = ("omarchy", "hermes", "claude-code", "codex", "git", "gh")
 
 
 def version(command: str) -> str:
@@ -55,6 +57,9 @@ def installed_versions() -> dict[str, str]:
         "hermes": version("hermes"),
         "claude-code": version("claude"),
         "codex": version("codex"),
+        # git and gh parse their own version banners, which do not match the patterns above.
+        "git": git_adapter.version(),
+        "gh": gh_adapter.version(),
     }
 
 
@@ -168,6 +173,10 @@ def build_document(*, offline: bool = False,
     rows += hermes_adapter.collect(versions["hermes"])
     rows += claude_adapter.collect(versions["claude-code"], claude_commands, claude_keys)
     rows += codex_adapter.collect(versions["codex"], codex_commands)
+    # git and gh are catalogued purely from local binaries -- no docs fetch, so they are
+    # unaffected by --offline and cost no network requests.
+    rows += git_adapter.collect(versions["git"])
+    rows += gh_adapter.collect(versions["gh"])
     rows = dedupe(rows)
     conflicts = annotate_conflicts(rows)
     counts = {product: sum(row["product"] == product for row in rows) for product in PRODUCTS}

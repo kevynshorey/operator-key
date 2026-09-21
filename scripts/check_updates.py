@@ -38,6 +38,9 @@ RELEASE_SOURCES: dict[str, dict[str, str]] = {
     "omarchy": {"kind": "github_tags", "repo": "omacom/omarchy"},
     "claude-code": {"kind": "github_release", "repo": "anthropics/claude-code"},
     "codex": {"kind": "github_release", "repo": "openai/codex"},
+    "gh": {"kind": "github_release", "repo": "cli/cli"},
+    # git publishes tags, not GitHub releases, on its official mirror.
+    "git": {"kind": "github_tags", "repo": "git/git"},
     # Hermes intentionally omitted: no public release feed was found. Reporting "unknown"
     # is correct; inventing a source would produce confident nonsense.
 }
@@ -86,6 +89,14 @@ def installed_versions() -> dict[str, str]:
     codex = run("codex", "--version")
     match = re.search(r"([0-9][^\s]*)", codex)
     versions["codex"] = match.group(1) if match else "unknown"
+
+    git = run("git", "--version")
+    match = re.search(r"git version ([^\s]+)", git)
+    versions["git"] = match.group(1) if match else "unknown"
+
+    gh = run("gh", "--version")
+    match = re.search(r"gh version ([^\s]+)", gh)
+    versions["gh"] = match.group(1) if match else "unknown"
 
     return versions
 

@@ -37,7 +37,10 @@ describe("Operator Key overlay", () => {
     render(<App />);
     expect(screen.getByRole("searchbox", { name: /operator intent/i })).toHaveFocus();
     expect(screen.getByRole("radiogroup", { name: /product lanes/i })).toBeInTheDocument();
-    expect(screen.getByText(/1,303 commands ready/i)).toBeInTheDocument();
+    // Derived from the shipped catalog so a rebuild does not fail a UI test that is
+    // really about the banner rendering at all.
+    const expectedTotal = (catalogJson as { total: number }).total.toLocaleString("en-US");
+    expect(screen.getByText(new RegExp(`${expectedTotal} commands ready`, "i"))).toBeInTheDocument();
     expect(screen.getByText(/active context/i)).toBeInTheDocument();
   });
 

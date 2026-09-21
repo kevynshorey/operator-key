@@ -1,4 +1,4 @@
-export const PRODUCTS = ["omarchy", "hermes", "claude-code", "codex"] as const;
+export const PRODUCTS = ["omarchy", "hermes", "claude-code", "codex", "git", "gh"] as const;
 export const INTERFACES = ["hotkey", "slash-command", "shell-command", "cli-flag", "menu-action"] as const;
 export const TASK_GROUPS = [
   "review-and-verify", "parallel-agents", "context-and-memory", "models-and-performance",

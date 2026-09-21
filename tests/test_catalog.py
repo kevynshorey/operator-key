@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from scripts.adapters import claude, codex, hermes, omarchy
+from scripts.adapters import claude, codex, gh, git, hermes, omarchy
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -119,6 +119,8 @@ class CatalogTests(unittest.TestCase):
             "hermes": "0.21.3",
             "claude-code": "2.1.272",
             "codex": "0.154.0",
+            "git": "2.55.0",
+            "gh": "2.100.0",
         }
         omarchy_rows = omarchy.parse_bindings(
             (ROOT / "tests" / "fixtures" / "omarchy.bindings.txt").read_text(encoding="utf-8"),
@@ -135,17 +137,31 @@ class CatalogTests(unittest.TestCase):
             versions["codex"],
             "fixture: codex-keymap.json",
         )
+        git_rows = git.parse_command_list(
+            "Main Porcelain Commands\n   status                  Show the working tree status\n",
+            versions["git"],
+            "fixture: git help -a",
+        )
+        gh_rows = gh.parse_group(
+            "pr",
+            "GENERAL COMMANDS\n  list:          List pull requests in a repository\n",
+            versions["gh"],
+            "fixture: gh pr --help",
+        )
 
         with (
             mock.patch.object(build.omarchy_adapter, "collect", return_value=omarchy_rows) as omarchy_collect,
             mock.patch.object(build.hermes_adapter, "collect", return_value=hermes_rows) as hermes_collect,
             mock.patch.object(build.claude_adapter, "collect", return_value=claude_rows) as claude_collect,
             mock.patch.object(build.codex_adapter, "collect", return_value=codex_rows) as codex_collect,
+            mock.patch.object(build.git_adapter, "collect", return_value=git_rows) as git_collect,
+            mock.patch.object(build.gh_adapter, "collect", return_value=gh_rows) as gh_collect,
             mock.patch.object(build, "fetch", return_value=""),
         ):
             document = build.build_document(offline=True, versions=versions)
 
-        for collector in (omarchy_collect, hermes_collect, claude_collect, codex_collect):
+        for collector in (omarchy_collect, hermes_collect, claude_collect, codex_collect,
+                          git_collect, gh_collect):
             collector.assert_called_once()
         self.assertEqual(build.validate_catalog(document), [])
         self.assertTrue(document["conflicts"])

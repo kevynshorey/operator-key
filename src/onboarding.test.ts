@@ -111,7 +111,7 @@ describe("buildOnboardingPath", () => {
     // Routes are product-shaped and steps with no safe command are dropped, so not every
     // product has every step. What must never change is the ORDER: orientation before
     // action, action before verification, recovery last.
-    const canonical = ["orient", "find-help", "start-work", "inspect-change", "verify", "navigate", "launch", "recover"];
+    const canonical = ["orient", "find-help", "start-work", "inspect-change", "save-work", "share-work", "verify", "navigate", "launch", "recover"];
     for (const product of PRODUCTS) {
       const ids = buildOnboardingPath(index, product).steps.map((step) => step.id);
       const ranks = ids.map((id) => canonical.indexOf(id));

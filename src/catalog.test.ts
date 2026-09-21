@@ -7,8 +7,12 @@ describe("catalog boundary", () => {
     const result = parseCatalog(catalogJson);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.catalog.entries).toHaveLength(1303);
-      expect(result.catalog.total).toBe(1303);
+      // Assert the catalog's INTERNAL consistency rather than a frozen number. A literal
+      // count turns every legitimate rebuild (a new adapter, an upstream tool gaining a
+      // command) into a red test that says nothing about correctness.
+      expect(result.catalog.entries.length).toBeGreaterThan(0);
+      expect(result.catalog.total).toBe(result.catalog.entries.length);
+      expect(result.catalog.total).toBe(catalogJson.total);
     }
   });
 

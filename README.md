@@ -2,7 +2,7 @@
 
 Operator Key is a local-first command compass for operators who remember the task but not the shortcut.
 
-It builds a version-aware catalog from the installed Omarchy, Hermes Agent, Claude Code, and Codex CLI environments, then lets the operator search by intent.
+It builds a version-aware catalog from the installed Omarchy, Hermes Agent, Claude Code, Codex CLI, Git, and GitHub CLI environments, then lets the operator search by intent.
 
 ## Current deliverable
 
@@ -15,6 +15,7 @@ It builds a version-aware catalog from the installed Omarchy, Hermes Agent, Clau
 - React/Vite intent-search overlay backed by the checked-in catalog
 - Product, task, interface, and safety filters
 - Keyboard result navigation, product tabs, conflict telemetry, and large-text mode
+- Catalog-backed lessons that teach Git, GitHub, and agent skills as workflows
 - Tauri 2 desktop shell configured as a local, always-on-top overlay
 - Catalog-validated clipboard copy and guarded terminal insertion
 - Deterministic Python and TypeScript tests
@@ -163,6 +164,31 @@ For machine-readable results:
 python3 scripts/operator_key.py review --json
 ```
 
+## Lessons
+
+Apprentice mode offers five lessons that teach a workflow rather than a single product:
+saving work with Git, recovering when Git goes wrong, opening a first pull request,
+working with other people's repositories, and extending an agent with skills.
+
+Lessons are **catalog-backed**. A lesson names a product and a command (`git commit`), and
+the command shown on screen is resolved from this machine's catalog at load time. Nothing
+is transcribed into the lesson text, so a lesson cannot outlive the command it teaches: if
+an upstream tool renames or removes a command, `src/lessons.test.ts` fails on the next
+rebuild instead of the app silently teaching fiction.
+
+Lessons reference commands by **product plus command text, never by entry ID**. Entry IDs
+hash their provenance string, so a cosmetic change to how provenance is rendered reshuffles
+every ID while the command set is unchanged — a lesson keyed on IDs would break on a
+rebuild that changed nothing a learner can see.
+
+When a tool is not installed, its lesson degrades honestly: the steps that resolved are
+still shown, and the missing ones are named along with the tool to install. A lesson never
+silently drops a step, because one that does reads as complete while teaching a gap.
+
+Lessons never present a red or destructive command as the thing to do. Hazards such as
+`git push --force` appear as "Watch out" prose next to the safe command, and a test asserts
+this across every step of every lesson.
+
 ## Test and verify
 
 ```bash
@@ -194,7 +220,7 @@ Build the standalone Tauri executable without platform bundles:
 npm run tauri -- build --no-bundle
 ```
 
-Install only `src-tauri/target/release/operator-key`. A binary produced by plain `cargo build` loads the development URL and is not standalone. The web build intentionally embeds the complete 1,303-entry catalog for local, offline search. Vite therefore reports the catalog chunk at approximately 958 kB (approximately 148 kB gzip), above its default 500 kB advisory threshold. This is the known catalog payload rather than application-code growth; the warning remains enabled so unrelated bundle growth stays visible.
+Install only `src-tauri/target/release/operator-key`. A binary produced by plain `cargo build` loads the development URL and is not standalone. The web build intentionally embeds the complete 2,174-entry catalog for local, offline search. Vite therefore reports the catalog chunk above its default 500 kB advisory threshold. This is the known catalog payload rather than application-code growth; the warning remains enabled so unrelated bundle growth stays visible.
 
 ## Important behavior
 

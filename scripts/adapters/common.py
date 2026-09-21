@@ -24,6 +24,26 @@ TASK_RULES = [
 ]
 DANGER_WORDS = ("delete", "remove", "logout", "kill", "bypass", "yolo", "force", "power off", "close all")
 AMBER_WORDS = ("edit", "write", "install", "update", "apply", "run", "exec", "move", "send", "publish", "deploy")
+GREEN_WORDS = ("review", "diff", "status", "help", "show", "list", "context")
+# Compound words that substring matching used to catch by accident and that must stay
+# caught once matching becomes word-accurate. `uninstall` previously matched the AMBER
+# word `install`; losing it would silently downgrade a removal command to green.
+EXTRA_AMBER_WORDS = ("uninstall",)
+
+
+def _mentions_word(haystack: str, word: str) -> bool:
+    """Match a whole word, so 'skills' is not read as the destructive verb 'kill'.
+
+    Substring matching made every skill command in the catalog red and destructive --
+    `hermes skills list`, `/skills`, `hermes skills search` -- because "s-KILL-s"
+    contains "kill". It also flagged `git pull --show-forced-updates`, a read-only
+    display option, as a force-push-grade hazard because "forced" contains "force".
+
+    False alarms are the specific failure this product cannot afford: an operator who
+    learns that the red badge fires on `hermes skills list` stops reading it before the
+    day it fires on `git push --force`.
+    """
+    return re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", haystack) is not None
 
 
 def run(*cmd: str, timeout: int = 45) -> str:
@@ -31,6 +51,23 @@ def run(*cmd: str, timeout: int = 45) -> str:
         return subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, check=True).stdout
     except (OSError, subprocess.SubprocessError):
         return ""
+
+
+def run_lenient(*cmd: str, timeout: int = 45) -> str:
+    """Run a command that reports usage through a non-zero exit status.
+
+    ``git <subcommand> -h`` prints its full option list and then exits 129. ``run`` uses
+    ``check=True``, so it would discard that output and return an empty string -- the
+    adapter would silently catalog zero flags while the build stayed green. Tools that
+    document themselves via a usage exit need a runner that reads the output anyway.
+
+    stderr is used only when stdout is empty, because some tools print usage to stderr.
+    """
+    try:
+        result = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout or result.stderr or ""
 
 
 def read_optional_text(path: Path) -> str | None:
@@ -75,11 +112,13 @@ def classify(command: str, description: str) -> str:
 def safety(command: str, description: str) -> tuple[str, bool]:
     command_text = command.lower()
     description_text = description.lower().lstrip()
-    if any(word in command_text for word in DANGER_WORDS) or description_text.startswith(DANGER_WORDS):
+    if (any(_mentions_word(command_text, word) for word in DANGER_WORDS)
+            or description_text.startswith(DANGER_WORDS)):
         return "red", True
-    if any(word in command_text for word in ("review", "diff", "status", "help", "show", "list", "context")):
+    if any(_mentions_word(command_text, word) for word in GREEN_WORDS):
         return "green", False
-    if any(word in command_text for word in AMBER_WORDS) or description_text.startswith(AMBER_WORDS):
+    if (any(_mentions_word(command_text, word) for word in AMBER_WORDS + EXTRA_AMBER_WORDS)
+            or description_text.startswith(AMBER_WORDS)):
         return "amber", False
     return "green", False
 
@@ -87,12 +126,23 @@ def safety(command: str, description: str) -> tuple[str, bool]:
 def entry(product: str, interface: str, command: str, description: str, source: str,
           product_version: str, *, context: str = "", aliases: Iterable[str] = (),
           category: str = "", available: bool = True, provenance: str = "default",
-          status: str | None = None, verbatim: bool = False) -> dict:
+          status: str | None = None, verbatim: bool = False,
+          safety_override: tuple[str, bool] | None = None,
+          task_override: str | None = None) -> dict:
     if verbatim:
         command, description = command.strip(), description.strip()
     else:
         command, description = clean(command), clean(description)
-    risk, destructive = safety(command, description)
+    # Keyword heuristics read what a command MENTIONS, not what it DOES. That is wrong in
+    # both directions for version control: `git rebase` and `gh pr merge` score green
+    # while rewriting history and publishing work. An adapter that knows the real action
+    # semantics of its product passes an explicit verdict instead of guessing.
+    risk, destructive = safety_override if safety_override else safety(command, description)
+    # Same failure mode on the organising axis: `git commit` is filed under
+    # capture-and-input because "Record changes" contains "record", and `git init` under
+    # context-and-memory because it contains "init". Task group drives the product's
+    # primary filter, so an adapter that knows better states the group outright.
+    task_group = task_override or classify(command, description)
     status = status or ("active" if available else "disabled")
     identity = f"{product}\0{interface}\0{command}\0{description}\0{context}\0{provenance}\0{status}"
     return {
@@ -100,8 +150,8 @@ def entry(product: str, interface: str, command: str, description: str, source: 
         "product": product,
         "product_version": product_version,
         "interface": interface,
-        "task_group": classify(command, description),
-        "category": category or classify(command, description),
+        "task_group": task_group,
+        "category": category or task_group,
         "command": command,
         "canonical_chord": canonicalize_chord(command) if interface == "hotkey" else "",
         "aliases": [clean(alias) for alias in aliases if clean(alias)],
