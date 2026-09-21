@@ -26,6 +26,31 @@ function clean(value: string): string {
   return value.toLowerCase().trim().replace(/[_–—]/g, "-").replace(/\s+/g, " ");
 }
 
+/**
+ * Pure function words. They carry no discriminating power in a command catalog, so they
+ * are allowed to contribute score but are never allowed to veto a match. Verbs and nouns
+ * are deliberately excluded — "make", "get" and "use" are real commands.
+ */
+const STOPWORDS: ReadonlySet<string> = new Set([
+  "a", "an", "the", "this", "that", "these", "those",
+  "i", "me", "my", "mine", "we", "our", "us", "you", "your", "yours", "it", "its",
+  "of", "for", "to", "in", "on", "at", "by", "with", "from", "into", "onto", "about",
+  "and", "or", "but", "so", "as", "is", "am", "are", "was", "were", "be", "been",
+  "do", "does", "did", "please", "some", "any", "all", "if", "then",
+]);
+
+/**
+ * Natural-language preambles a learner types before the real intent. Only stripped from the
+ * START of a query so a mid-query word is never silently discarded.
+ */
+const INTENT_PREAMBLE = /^(?:(?:i(?:'d)? (?:want|need|would like|would want|wish) to|i want|i need|how (?:do|can|would) i|how to|show me (?:how to )?|help me(?: to)?|can i|could i|let me|is there a way to|what(?:'s| is) the (?:command|way) (?:to|for))\s+)+/;
+
+function stripIntentPreamble(value: string): string {
+  const stripped = clean(value).replace(INTENT_PREAMBLE, "");
+  // Never strip the query down to nothing — a bare preamble is still a query.
+  return stripped.trim() ? stripped : clean(value);
+}
+
 function words(value: string): string[] {
   return clean(value).replace(/^\/+/, "").split(/[^a-z0-9]+/).filter(Boolean);
 }
@@ -125,7 +150,13 @@ interface Match {
   matchedTerms: string[];
 }
 
-function scoreRecord(record: SearchRecord, normalizedQuery: string, queryTerms: readonly string[], chordQuery: string): Match | null {
+function scoreRecord(
+  record: SearchRecord,
+  normalizedQuery: string,
+  queryTerms: readonly string[],
+  chordQuery: string,
+  optionalTerms: ReadonlySet<string>,
+): Match | null {
   if (!normalizedQuery) return { score: 0, matchedTerms: [] };
   if (chordQuery && chordQuery === record.chord) {
     return { score: 1_000_000, matchedTerms: [chordQuery] };
@@ -145,6 +176,9 @@ function scoreRecord(record: SearchRecord, normalizedQuery: string, queryTerms: 
     else if (record.taskWords.has(term) || record.task.includes(term)) score += 800;
     else if (record.descriptionWords.has(term) || record.description.includes(term)) score += 120;
     else if (record.productWords.has(term) || record.product.includes(term)) score += 20;
+    // Filler and unknown words may add score but must never discard an otherwise
+    // good match, so an operator can type a full sentence and still be understood.
+    else if (optionalTerms.has(term)) continue;
     else return null;
     matchedTerms.push(term);
   }
@@ -189,6 +223,15 @@ function candidatesForTerm(index: SearchIndex, term: string): readonly number[] 
   return candidates;
 }
 
+/** Union of records matching ANY term — the widening pass for sentence-like queries. */
+function unionCandidates(index: SearchIndex, queryTerms: readonly string[]): readonly number[] {
+  const union = new Set<number>();
+  for (const term of queryTerms) {
+    for (const recordIndex of candidatesForTerm(index, term)) union.add(recordIndex);
+  }
+  return [...union].sort((left, right) => left - right);
+}
+
 function candidateIndexes(index: SearchIndex, queryTerms: readonly string[], chordQuery: string): readonly number[] {
   const chordCandidates = chordQuery ? index.chordPostings.get(chordQuery) : undefined;
   if (chordCandidates?.length) return chordCandidates;
@@ -208,17 +251,60 @@ export function searchCatalog(
   limit = 50,
 ): SearchResult[] {
   const normalizedQuery = clean(query);
-  const queryTerms = words(query);
   const chordQuery = looksLikeChord(query) ? normalizeChord(query) : "";
-  const results: SearchResult[] = [];
+  // A learner types "how do I review my code" — strip the preamble, then treat pure
+  // function words as optional so the real intent words drive the match.
+  const allTerms = words(stripIntentPreamble(query));
+  const contentTerms = allTerms.filter((term) => !STOPWORDS.has(term));
+  const searchTerms = contentTerms.length > 0 ? contentTerms : allTerms;
+  const optionalTerms = new Set(allTerms.filter((term) => !searchTerms.includes(term)));
 
-  for (const recordIndex of candidateIndexes(index, queryTerms, chordQuery)) {
-    const record = index.records[recordIndex];
-    if (!passesFilters(record.entry, filters)) continue;
-    const match = scoreRecord(record, normalizedQuery, queryTerms, chordQuery);
-    if (!match) continue;
-    results.push({ entry: record.entry, score: match.score, matchedTerms: match.matchedTerms, unavailable: !record.entry.available });
+  const collect = (terms: readonly string[], optional: ReadonlySet<string>): SearchResult[] => {
+    const found: SearchResult[] = [];
+    for (const recordIndex of candidateIndexes(index, terms, chordQuery)) {
+      const record = index.records[recordIndex];
+      if (!passesFilters(record.entry, filters)) continue;
+      const match = scoreRecord(record, normalizedQuery, terms, chordQuery, optional);
+      if (!match) continue;
+      found.push({ entry: record.entry, score: match.score, matchedTerms: match.matchedTerms, unavailable: !record.entry.available });
+    }
+    return found;
+  };
+
+  let results = collect(searchTerms, optionalTerms);
+
+  // Graceful degradation for sentences. When an operator writes prose that matches nothing
+  // as a whole, surface the entries that still understand most of it rather than an empty
+  // screen. Deliberately conservative:
+  //   - never when an explicit filter is set (the operator narrowed on purpose, and
+  //     silently widening the match would make the filter look broken),
+  //   - only for genuinely sentence-like queries, and
+  //   - only for entries that account for at least half of the content words, so
+  //     nonsense still returns nothing rather than a single incidental hit.
+  const hasActiveFilter = Boolean(filters.product || filters.interface || filters.task || filters.safety);
+  if (results.length === 0 && !hasActiveFilter && searchTerms.length >= 3) {
+    const everyTermOptional = new Set(allTerms);
+    const seen = new Set<string>();
+    const relaxed: SearchResult[] = [];
+    for (const recordIndex of unionCandidates(index, searchTerms)) {
+      const record = index.records[recordIndex];
+      if (!passesFilters(record.entry, filters)) continue;
+      const match = scoreRecord(record, normalizedQuery, searchTerms, chordQuery, everyTermOptional);
+      if (!match) continue;
+      if (match.matchedTerms.length / searchTerms.length < 0.5) continue;
+      if (seen.has(record.entry.id)) continue;
+      seen.add(record.entry.id);
+      // Partial understanding must never outrank a full match.
+      relaxed.push({
+        entry: record.entry,
+        score: Math.round(match.score / 2),
+        matchedTerms: match.matchedTerms,
+        unavailable: !record.entry.available,
+      });
+    }
+    results = relaxed;
   }
+
   results.sort((left, right) => Number(left.unavailable) - Number(right.unavailable)
     || right.score - left.score
     || left.entry.id.localeCompare(right.entry.id));

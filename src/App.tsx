@@ -34,6 +34,9 @@ import {
   type SparkIntentPlan,
   type SparkStatus,
 } from "./intent";
+import { createPredictionIndex, predictIntent, starterPrompts, type PredictionSuggestion } from "./predict";
+import { buildFollowUps, type FollowUp, type FollowUpPriority } from "./followups";
+import { buildCommandLesson, createTeachingIndex, type CommandLesson } from "./teach";
 
 const PRODUCT_LABELS: Record<Product, string> = {
   omarchy: "Omarchy",
@@ -137,7 +140,7 @@ function ResultRow({ entry, active, position, total, disabled, onSelect, setRowR
   );
 }
 
-function Header({ largeText, onLargeText, onClose, runtime, disabled = false }: { largeText: boolean; onLargeText: () => void; onClose: () => void; runtime: OperatorRuntime; disabled?: boolean }) {
+function Header({ largeText, onLargeText, onClose, runtime, disabled = false, apprenticeMode, onApprenticeMode }: { largeText: boolean; onLargeText: () => void; onClose: () => void; runtime: OperatorRuntime; disabled?: boolean; apprenticeMode?: boolean; onApprenticeMode?: () => void }) {
   return (
     <header className="masthead">
       <div className="wordmark" aria-label="Operator Key">
@@ -147,6 +150,20 @@ function Header({ largeText, onLargeText, onClose, runtime, disabled = false }: 
       <div className="system-readout">
         <span><i className="signal-light" /> LOCAL CATALOG</span>
         <span>{runtime === "web" ? "WEB DECK · COPY ONLY" : "NO EXECUTION PATH"}</span>
+        {onApprenticeMode && (
+          <button
+            type="button"
+            className="mode-toggle"
+            aria-pressed={apprenticeMode}
+            disabled={disabled}
+            title={apprenticeMode
+              ? "Apprentice mode explains each command and expands required follow-ups."
+              : "Operator mode keeps explanations collapsed."}
+            onClick={onApprenticeMode}
+          >
+            <span aria-hidden="true">{apprenticeMode ? "◉" : "○"}</span> {apprenticeMode ? "Apprentice" : "Operator"}
+          </button>
+        )}
         <button type="button" className="text-mode" aria-pressed={largeText} disabled={disabled} onClick={onLargeText}>
           <span aria-hidden="true">Aa</span> Large text
         </button>
@@ -300,10 +317,163 @@ function IntentStructure({ activePlan, onReturn }: { activePlan: ActiveIntentPla
   );
 }
 
+const PRIORITY_LABELS: Record<FollowUpPriority, string> = {
+  required: "Required",
+  recommended: "Recommended",
+  optional: "Optional",
+};
+
+function LearnPanel({ lesson, entry, expanded }: { lesson: CommandLesson; entry: CatalogEntry; expanded: boolean }) {
+  return (
+    <section className="learn-panel" aria-labelledby="learn-panel-heading">
+      <div className="lane-heading">
+        <span id="learn-panel-heading">LEARN / {entry.interface.replaceAll("-", " ").toUpperCase()}</span>
+        <strong>{lesson.anatomy.length.toString().padStart(2, "0")}</strong>
+      </div>
+      <p className="learn-headline">{lesson.headline}</p>
+
+      <details className="learn-section" open={expanded}>
+        <summary>Anatomy — what each part means</summary>
+        <ol className="anatomy-list">
+          {lesson.anatomy.map((token, index) => (
+            <li key={`${token.text}-${index}`} className={`anatomy-token role-${token.role}`}>
+              <code>{token.text}</code>
+              <span className="token-role">{token.role.replaceAll("-", " ")}</span>
+              <p>
+                {token.explanation}
+                {token.sourcedFrom && <em className="token-source"> · from the local catalog</em>}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </details>
+
+      {lesson.glossary.length > 0 && (
+        <details className="learn-section" open={expanded}>
+          <summary>Concepts used here ({lesson.glossary.length})</summary>
+          <dl className="glossary-list">
+            {lesson.glossary.map((item) => (
+              <div key={item.term}>
+                <dt>{item.term}</dt>
+                <dd>{item.definition}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
+
+      <div className={`safety-briefing safety-${entry.safety_level}`}>
+        <strong>Safety · {entry.safety_level}</strong>
+        <p>{lesson.safetyBriefing}</p>
+        <p className="practice-hint">{lesson.practiceHint}</p>
+      </div>
+    </section>
+  );
+}
+
+function NextMovesPanel({ followUps, expanded, onSelectEntry }: {
+  followUps: readonly FollowUp[];
+  expanded: boolean;
+  onSelectEntry: (entryId: string) => void;
+}) {
+  if (followUps.length === 0) return null;
+  return (
+    <section className="next-moves" aria-labelledby="next-moves-heading">
+      <div className="lane-heading">
+        <span id="next-moves-heading">NEXT MOVES</span>
+        <strong>{followUps.length.toString().padStart(2, "0")}</strong>
+      </div>
+      <p className="next-moves-intro">Running the command is one step. These are the follow-ups this command warrants.</p>
+      <ul className="followup-list">
+        {followUps.map((followUp) => (
+          <li key={followUp.kind} className={`followup followup-${followUp.kind}`}>
+            <details open={expanded && followUp.priority === "required"}>
+              <summary>
+                <span className={`priority-tag priority-${followUp.priority}`}>{PRIORITY_LABELS[followUp.priority]}</span>
+                <strong>{followUp.title}</strong>
+                <em>{followUp.question}</em>
+              </summary>
+              <p className="followup-rationale">{followUp.rationale}</p>
+              {followUp.actions.length > 0 ? (
+                <ul className="followup-actions">
+                  {followUp.actions.map((action) => (
+                    <li key={action.entry.id}>
+                      <button type="button" onClick={() => onSelectEntry(action.entry.id)}>
+                        <span>{PRODUCT_LABELS[action.entry.product]}</span>
+                        <strong>{action.entry.command}</strong>
+                        <small>{action.entry.description}</small>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="followup-empty">The local catalog holds no command for this step. Handle it with your own process.</p>
+              )}
+            </details>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function PredictionRail({ suggestions, disabled, onAccept }: {
+  suggestions: readonly PredictionSuggestion[];
+  disabled: boolean;
+  onAccept: (completion: string) => void;
+}) {
+  if (suggestions.length === 0) return null;
+  return (
+    // A group of shortcuts, not a listbox: the search box's aria-controls already points
+    // at the real result listbox, and a second options collection would confuse it.
+    <div className="prediction-rail" role="group" aria-label="Predicted intent">
+      <span className="prediction-hint"><kbd>TAB</kbd> accept</span>
+      {suggestions.map((suggestion, index) => (
+        <button
+          type="button"
+          key={suggestion.completion}
+          className={suggestion.ghost && index === 0 ? "is-lead" : suggestion.kind === "intent" ? "is-intent" : ""}
+          disabled={disabled}
+          title={suggestion.kind === "intent"
+            ? `Search the catalog for "${suggestion.completion}"`
+            : index === 0 ? "Press Tab to accept this completion" : undefined}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onAccept(suggestion.completion)}
+        >
+          {suggestion.kind === "intent" && <span className="intent-marker" aria-hidden="true">≈</span>}
+          {suggestion.completion}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StarterPrompts({ prompts, disabled, onSelect }: { prompts: readonly string[]; disabled: boolean; onSelect: (prompt: string) => void }) {
+  if (prompts.length === 0) return null;
+  return (
+    <div className="starter-prompts" aria-label="Try one of these">
+      <span>New here? Try</span>
+      {prompts.map((prompt) => (
+        <button type="button" key={prompt} disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(prompt)}>
+          {prompt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner }: AppProps) {
   const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
   const searchIndex = useMemo(
     () => parsed.ok ? createSearchIndex(parsed.catalog.entries) : undefined,
+    [parsed],
+  );
+  const predictionIndex = useMemo(
+    () => parsed.ok ? createPredictionIndex(parsed.catalog.entries) : undefined,
+    [parsed],
+  );
+  const teachingIndex = useMemo(
+    () => parsed.ok ? createTeachingIndex(parsed.catalog.entries) : undefined,
     [parsed],
   );
   const [query, setQuery] = useState("");
@@ -316,6 +486,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const [actionStatus, setActionStatus] = useState<ActionStatus>();
   const [actionPending, setActionPending] = useState(false);
   const [largeText, setLargeText] = useState(false);
+  const [apprenticeMode, setApprenticeMode] = useState(true);
   const [sparkStatus, setSparkStatus] = useState<SparkStatus>();
   const [sparkStatusPending, setSparkStatusPending] = useState(true);
   const [reasoningPending, setReasoningPending] = useState(false);
@@ -372,6 +543,47 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const boundedIndex = Math.min(selectedIndex, Math.max(0, displayedResults.length - 1));
   const selected = displayedResults[boundedIndex]?.entry;
   const actionSelection = activePlan ? selected : query === settledQuery ? selected : liveResults[0]?.entry;
+
+  const predictions = useMemo(
+    () => predictionIndex && !activePlan ? predictIntent(predictionIndex, query, 5) : [],
+    [predictionIndex, query, activePlan],
+  );
+  const ghost = predictions.find((item) => item.ghost.length > 0)?.ghost ?? "";
+  const ghostCompletion = predictions.find((item) => item.ghost.length > 0)?.completion ?? "";
+  const starters = useMemo(
+    () => predictionIndex && !query.trim() ? starterPrompts(predictionIndex, 5) : [],
+    [predictionIndex, query],
+  );
+  const lesson = useMemo(
+    () => teachingIndex && selected ? buildCommandLesson(teachingIndex, selected) : undefined,
+    [teachingIndex, selected],
+  );
+  const followUps = useMemo(
+    () => searchIndex && selected ? buildFollowUps(searchIndex, selected) : [],
+    [searchIndex, selected],
+  );
+
+  const acceptPrediction = useCallback((completion: string) => {
+    setQuery(completion);
+    setSelectedIndex(0);
+    setActionStatus(undefined);
+  }, []);
+
+  const selectEntryById = useCallback((entryId: string) => {
+    const position = displayedResults.findIndex((result) => result.entry.id === entryId);
+    if (position >= 0) {
+      setSelectedIndex(position);
+      return;
+    }
+    // A follow-up may point outside the current result lane; search for it directly.
+    if (!parsed.ok) return;
+    const target = parsed.catalog.entries.find((item) => item.id === entryId);
+    if (target) {
+      setQuery(target.command);
+      setSelectedIndex(0);
+      setActionStatus(undefined);
+    }
+  }, [displayedResults, parsed]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -477,6 +689,19 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
 
   const handleSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
     if (controlsLocked) return;
+    const input = event.currentTarget;
+    const atEndOfInput = input.selectionStart === query.length && input.selectionEnd === query.length;
+
+    if (event.key === "Tab" && ghost && !event.shiftKey) {
+      event.preventDefault();
+      acceptPrediction(ghostCompletion);
+      return;
+    }
+    if (event.key === "ArrowRight" && ghost && atEndOfInput) {
+      event.preventDefault();
+      acceptPrediction(ghostCompletion);
+      return;
+    }
     if (event.key === "ArrowDown" && displayedResults.length) {
       event.preventDefault();
       setSelectedIndex((boundedIndex + 1) % displayedResults.length);
@@ -521,7 +746,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
 
   return (
     <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}${query.trim() ? " has-query" : ""}`} data-testid="operator-shell">
-      <Header runtime={runtime} largeText={largeText} disabled={controlsLocked} onLargeText={() => setLargeText((value) => !value)} onClose={() => {
+      <Header runtime={runtime} largeText={largeText} disabled={controlsLocked} apprenticeMode={apprenticeMode} onApprenticeMode={() => setApprenticeMode((value) => !value)} onLargeText={() => setLargeText((value) => !value)} onClose={() => {
         if (runtime === "native") void dismissOverlay();
         else { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); setSelectedIndex(0); setActionStatus(undefined); clearReasoning(); }
       }} />
@@ -535,28 +760,41 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         <label className="search-field">
           <span className="search-index">DESCRIBE OUTCOME /</span>
           <span className="sr-only">Operator intent</span>
-          <input
-            autoFocus
-            type="search"
-            role="searchbox"
-            aria-label="Operator intent"
-            aria-controls="result-list"
-            aria-activedescendant={selected ? `result-${selected.id}` : undefined}
-            value={query}
-            disabled={controlsLocked}
-            placeholder="Describe the outcome you want to achieve in a full sentence."
-            onChange={(event) => {
-              if (!controlsLocked) {
-                setQuery(event.target.value);
-                setSelectedIndex(0);
-                setActionStatus(undefined);
-                clearReasoning();
-              }
-            }}
-            onKeyDown={handleSearchKey}
-          />
+          <span className="input-stack">
+            <input
+              autoFocus
+              type="search"
+              role="searchbox"
+              aria-label="Operator intent"
+              aria-controls="result-list"
+              aria-activedescendant={selected ? `result-${selected.id}` : undefined}
+              aria-describedby={ghost ? "intent-ghost" : undefined}
+              autoComplete="off"
+              value={query}
+              disabled={controlsLocked}
+              placeholder="Describe the outcome you want to achieve in a full sentence."
+              onChange={(event) => {
+                if (!controlsLocked) {
+                  setQuery(event.target.value);
+                  setSelectedIndex(0);
+                  setActionStatus(undefined);
+                  clearReasoning();
+                }
+              }}
+              onKeyDown={handleSearchKey}
+            />
+            {ghost && (
+              <span className="ghost-text" aria-hidden="true">
+                <span className="ghost-typed">{query}</span>
+                <span className="ghost-completion">{ghost}</span>
+              </span>
+            )}
+          </span>
+          {ghost && <span id="intent-ghost" className="sr-only" aria-live="polite">Suggested completion: {ghostCompletion}. Press Tab to accept.</span>}
           <kbd className="escape-key">ESC</kbd>
         </label>
+        <PredictionRail suggestions={predictions} disabled={controlsLocked} onAccept={acceptPrediction} />
+        <StarterPrompts prompts={starters} disabled={controlsLocked} onSelect={acceptPrediction} />
         <div className="intent-composer-actions">
           <button type="button" className="spark-button" aria-label="Reason with Luna" aria-describedby="luna-availability" disabled={sparkDisabled} onClick={() => { void reasonAboutIntent(); }}>
             <span aria-hidden="true">✦</span> {reasoningPending ? "Reasoning…" : "Reason with Luna"} <kbd>ALT+ENTER</kbd>
@@ -639,6 +877,8 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
                   onInsert={() => { void insertSelected(); }}
                 />
               )}
+              {selected && lesson && <LearnPanel lesson={lesson} entry={selected} expanded={apprenticeMode} />}
+              {selected && <NextMovesPanel followUps={followUps} expanded={apprenticeMode} onSelectEntry={selectEntryById} />}
             </div>
             <section className="alternatives" aria-label="Alternatives">
               <div className="lane-heading"><span>{activePlan ? "NEXT STEPS" : "ALTERNATIVES"}</span><strong>{alternatives.length.toString().padStart(2, "0")}</strong></div>
@@ -680,6 +920,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         <span>{parsed.catalog.total.toLocaleString()} commands ready</span>
         <span><b>{displayedResults.length}</b> shown</span>
         <span><kbd>↑</kbd><kbd>↓</kbd> select</span>
+        <span><kbd>TAB</kbd> · COMPLETE</span>
         <span><kbd>ENTER</kbd> · COPY</span>
         <span>{runtime === "native" ? <><kbd>SHIFT+ENTER</kbd> · GUARDED INSERT</> : "LOCAL-ONLY · COPY-ONLY"}</span>
         <span className="execution-lock">{runtime === "native" ? "● EXECUTION DISABLED" : "● NATIVE COMPANION REQUIRED FOR INSERTION"}</span>
