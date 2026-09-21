@@ -1,7 +1,7 @@
 # Operator Key — Session Handoff
 
 Written: 2026-09-21 (AST)
-Repo: `/home/kevo/Work/operator-key`
+Repo: `~/Work/operator-key`
 Branch: `main` — HEAD `b09f520be0b5e28d023881da8bc4aba5bdd285ed`
 Working tree: CLEAN (verified `git status --porcelain` empty)
 Remote: **NONE CONFIGURED** — see Open Questions

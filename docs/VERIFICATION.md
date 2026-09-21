@@ -16,8 +16,8 @@ Verified on 2026-09-16 against Luna application-bearing source commit `a9ff3d3ab
 ## Installed baseline before Luna cutover
 
 - Physical shortcut: `SUPER + U` (Command + U on the connected Apple keyboard)
-- Managed binding: `o.bind("SUPER + U", "Operator Key", o.launch("/home/kevo/.local/bin/operator-key"))`
-- Installed path: `/home/kevo/.local/bin/operator-key`
+- Managed binding: `o.bind("SUPER + U", "Operator Key", o.launch("~/.local/bin/operator-key"))`
+- Installed path: `~/.local/bin/operator-key`
 - Release SHA-256: `7a4297de42da9c7632119ea0bc72ab14413cbc9ef3619ba1b9cdaad09a6168d7`
 - Source and installed hashes matched exactly.
 - The installer observed a new `operator-key` client after the physical shortcut press and verified `/proc/<pid>/exe` resolved exactly to the installed path.

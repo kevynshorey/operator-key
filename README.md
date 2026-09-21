@@ -2,6 +2,11 @@
 
 Operator Key is a local-first command compass for operators who remember the task but not the shortcut.
 
+> **If you just cloned this repository, run `python3 scripts/build_catalog.py` first.**
+> The catalog shipped in `data/catalog.json` was generated on the author's machine. It
+> lets the app run immediately, but until you rebuild it, it describes software versions
+> that are not yours. The app says so on screen rather than implying otherwise.
+
 It builds a version-aware catalog from the installed Omarchy, Hermes Agent, Claude Code, Codex CLI, Git, and GitHub CLI environments, then lets the operator search by intent.
 
 ## Current deliverable
