@@ -173,6 +173,36 @@ class ReportBuilding(unittest.TestCase):
             result = check_updates.check_release("omarchy", {"kind": "github_tags", "repo": "omacom/omarchy"})
         self.assertEqual(result["latest"], "v4.0.10")
 
+    def test_ignores_release_candidates_when_stable_tags_exist(self):
+        # Found by running the real weekly check: git tags `v2.56.0-rc1` in the same feed
+        # as its stable tags, so an operator on the current stable release was told they
+        # were "behind" software that is not released yet. Same false-alarm failure mode as
+        # a safety badge that fires on a read-only command.
+        tags = json.dumps([
+            {"name": "v2.56.0-rc1"},
+            {"name": "v2.55.0"},
+            {"name": "v2.54.0"},
+        ]).encode()
+        with mock.patch.object(check_updates, "http_get", self._fake_http({"tags": (200, tags, {})})):
+            result = check_updates.check_release("git", {"kind": "github_tags", "repo": "git/git"})
+        self.assertEqual(result["latest"], "v2.55.0")
+
+    def test_falls_back_to_prereleases_when_nothing_stable_exists(self):
+        # A project that has only ever tagged pre-releases still deserves an answer;
+        # reporting "unknown" there would be its own dishonesty.
+        tags = json.dumps([{"name": "v0.1.0-alpha"}, {"name": "v0.2.0-alpha"}]).encode()
+        with mock.patch.object(check_updates, "http_get", self._fake_http({"tags": (200, tags, {})})):
+            result = check_updates.check_release("git", {"kind": "github_tags", "repo": "git/git"})
+        self.assertEqual(result["latest"], "v0.2.0-alpha")
+
+    def test_prerelease_pattern_does_not_reject_real_versions(self):
+        # `rust-v0.155.1` is codex's normal stable spelling: rejecting it as a pre-release
+        # would silently drop the only feed that product has.
+        for stable in ("v2.56.0", "rust-v0.155.1", "4.0.3-1", "v2.101.0", "v0.21.3"):
+            self.assertIsNone(check_updates.PRERELEASE.search(stable), stable)
+        for pre in ("v2.56.0-rc1", "v1.0.0-beta.2", "v1.0.0-alpha", "v1.2.3-nightly"):
+            self.assertIsNotNone(check_updates.PRERELEASE.search(pre), pre)
+
     def test_detects_documentation_changing_at_an_unchanged_version(self):
         # The subtle rot: the version stays put while a command's meaning moves.
         previous = {"docs": {"claude_commands": {"sha256": "old-digest", "etag": "\"abc\""}}}

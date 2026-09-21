@@ -63,6 +63,14 @@ DOC_SOURCES: dict[str, dict[str, str]] = {
 }
 
 
+# Pre-release markers seen in real upstream tag feeds. Matched on a word boundary so a
+# legitimate version like `v2.56.0` is never mistaken for one.
+PRERELEASE = re.compile(
+    r"[-._](rc|alpha|beta|pre|preview|dev|next|nightly|snapshot)[-._]?\d*$",
+    re.IGNORECASE,
+)
+
+
 def installed_versions() -> dict[str, str]:
     """Read versions from the binaries actually present on this machine."""
 
@@ -168,9 +176,17 @@ def check_release(product: str, source: dict[str, str]) -> dict:
     tags = json.loads(body)
     if not isinstance(tags, list) or not tags:
         return {"status": "unreachable", "http_status": status}
+
+    # Exclude pre-releases. git tags release candidates (`v2.56.0-rc1`) in the same feed as
+    # stable tags, so taking the highest version told an operator on the current stable
+    # release that they were "behind" software that is not released yet. That is the same
+    # false-alarm failure mode as a safety badge that fires on a read-only command: it
+    # trains people to ignore the notice before the day it matters.
+    stable = [tag for tag in tags if not PRERELEASE.search(str(tag.get("name", "")))]
+    candidates = stable or tags
     # Tags arrive in repository order, which is not version order. Sort numerically so a
     # stale 'v4.0.10' style tag cannot be misread as older than 'v4.0.9'.
-    best = max(tags, key=lambda tag: normalize_version(str(tag.get("name", ""))) or ())
+    best = max(candidates, key=lambda tag: normalize_version(str(tag.get("name", ""))) or ())
     return {
         "status": "ok",
         "latest": str(best.get("name", "")),
