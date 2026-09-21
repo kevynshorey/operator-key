@@ -26,10 +26,13 @@ from scripts.chords import annotate_conflicts
 DEFAULT_OUTPUT = ROOT / "data" / "catalog.json"
 DEFAULT_SCHEMA = ROOT / "schema" / "catalog.schema.json"
 
+# Record the URL we actually read, not the one we historically asked for. The Codex docs
+# moved to learn.chatgpt.com behind a 308; urllib follows redirects silently, so the old
+# entry made every Codex record claim provenance from an address that no longer serves it.
 DOCS = {
     "claude_commands": "https://code.claude.com/docs/en/commands.md",
     "claude_keys": "https://code.claude.com/docs/en/interactive-mode.md",
-    "codex_commands": "https://developers.openai.com/codex/developer-commands.md",
+    "codex_commands": "https://learn.chatgpt.com/docs/developer-commands.md",
 }
 PRODUCTS = ("omarchy", "hermes", "claude-code", "codex")
 
@@ -56,6 +59,12 @@ def installed_versions() -> dict[str, str]:
 
 
 def fetch(url: str, cache_name: str, offline: bool) -> str:
+    """Fetch a documentation source, caching it for offline rebuilds.
+
+    Reports redirects on stderr rather than following them silently. A moved docs URL is
+    how a catalog starts quoting provenance it no longer reads: the build keeps working,
+    so nobody notices until an entry is traced back to a dead address.
+    """
     cache_dir = ROOT / "data" / "source-cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache = cache_dir / cache_name
@@ -64,6 +73,13 @@ def fetch(url: str, cache_name: str, offline: bool) -> str:
             request = urllib.request.Request(url, headers={"User-Agent": "Operator-Key/0.1"})
             with urllib.request.urlopen(request, timeout=30) as response:
                 text = response.read().decode("utf-8")
+                final_url = response.geturl()
+            if final_url != url:
+                print(
+                    f"warning: {url} redirected to {final_url}; update DOCS so provenance "
+                    "records the address actually read",
+                    file=sys.stderr,
+                )
             cache.write_text(text, encoding="utf-8")
             return text
         except (OSError, UnicodeError):

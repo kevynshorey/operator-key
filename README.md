@@ -67,6 +67,49 @@ Use cached official documentation when offline:
 python3 scripts/build_catalog.py --offline
 ```
 
+## Stay current
+
+The catalog describes the tools installed on this machine at the moment it was generated.
+Upstream keeps moving, so a separate check compares what you have against what has shipped:
+
+```bash
+python3 scripts/check_updates.py
+```
+
+It writes `data/freshness.json` and prints a summary:
+
+```
+product       installed     latest            drift     catalog
+omarchy       4.0.3-1       v4.0.4            behind    in sync
+claude-code   2.1.272       v2.1.278          behind    in sync
+```
+
+Three different problems are tracked, because they need different responses:
+
+- **Version drift** — your installed tool is behind upstream. Update, then regenerate.
+- **Content drift** — official documentation changed at the *same* version, so a command's
+  meaning may have moved. Detected by hashing docs between runs.
+- **Catalog drift** — the catalog was built from versions other than those installed now.
+  This is purely local and is detected even with no network.
+
+The app reads `data/freshness.json` and shows a banner when there is something to say. It
+is advisory: **the checker never writes to the catalog**. Network content must not be able
+to change a command or how it is classified — the catalog earns its authority by being
+generated locally from installed binaries, and `scripts/build_catalog.py` remains the only
+thing that writes it.
+
+The application itself never reaches the network. Run the check from cron:
+
+```cron
+0 9 * * * cd /path/to/operator-key && python3 scripts/check_updates.py --quiet
+```
+
+Offline runs preserve what the last online check found rather than erasing it:
+
+```bash
+python3 scripts/check_updates.py --offline
+```
+
 ## Search by intent
 
 ```bash

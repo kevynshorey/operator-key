@@ -11,7 +11,8 @@
     "lint": "eslint . --max-warnings 0",
     "tauri": "tauri",
     "test:e2e": "playwright test",
-    "test:native": "python3 scripts/verify_native.py"
+    "test:native": "python3 scripts/verify_native.py",
+    "check:updates": "python3 scripts/check_updates.py"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11.1",

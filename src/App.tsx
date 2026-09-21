@@ -39,6 +39,12 @@ import { buildFollowUps, type FollowUp, type FollowUpPriority } from "./followup
 import { buildCommandLesson, createTeachingIndex, type CommandLesson } from "./teach";
 import { explainCommand, type CommandExplanation } from "./explain";
 import { buildOnboardingPath, type OnboardingPath } from "./onboarding";
+import {
+  highestLevel,
+  parseFreshness,
+  summarizeFreshness,
+  type FreshnessSummary,
+} from "./freshness";
 
 const PRODUCT_LABELS: Record<Product, string> = {
   omarchy: "Omarchy",
@@ -69,6 +75,8 @@ interface AppProps {
   actions?: OperatorActions;
   runtime?: OperatorRuntime;
   intentReasoner?: IntentReasoner;
+  /** Advisory freshness report; injected in tests, read from data/freshness.json at build. */
+  freshness?: unknown;
 }
 
 interface ActiveIntentPlan {
@@ -586,7 +594,64 @@ function OnboardingPanel({ path, onSelectEntry, onClose }: {
   );
 }
 
-export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner }: AppProps) {
+/**
+ * Freshness is optional by design. A clone that has never run scripts/check_updates.py
+ * must still build and run, and must say "never checked" rather than imply currency.
+ * import.meta.glob resolves at build time and yields nothing when the file is absent.
+ */
+const freshnessModules = import.meta.glob<{ default: unknown }>("../data/freshness.json", {
+  eager: true,
+});
+const freshnessData = Object.values(freshnessModules)[0]?.default;
+
+/**
+ * Tells the operator how far the catalog can be trusted right now.
+ *
+ * Deliberately not dismissible for the "attention" tier: a catalog that no longer matches
+ * the installed tools undermines every command on screen, and a banner you can wave away
+ * is one you will wave away.
+ *
+ * Only the attention tier claims a live region. `role="status"` is already the app's
+ * channel for action feedback ("Copied"), and a standing advisory sitting in that channel
+ * both steals announcements from real actions and makes "the status" ambiguous.
+ */
+function FreshnessBanner({ summary }: { summary: FreshnessSummary }) {
+  const level = highestLevel(summary);
+  if (level === "none") return null;
+
+  return (
+    <section
+      className={`freshness-banner freshness-${level}`}
+      role={level === "attention" ? "alert" : "note"}
+      aria-label="Catalog freshness"
+    >
+      <div className="freshness-head">
+        <span className="freshness-tag">{level === "attention" ? "CHECK" : "NOTE"}</span>
+        <span className="freshness-meta">
+          {summary.neverChecked
+            ? "never checked for updates"
+            : summary.daysSinceCheck === 0
+              ? "checked today"
+              : `checked ${summary.daysSinceCheck}d ago`}
+        </span>
+      </div>
+      <ul className="freshness-notices">
+        {summary.notices.map((notice) => (
+          <li key={notice.headline} className={`freshness-${notice.level}`}>
+            <b>{notice.headline}</b>
+            <span>{notice.detail}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="freshness-foot">
+        This comes from a separate offline check, not from the app. Nothing here changes a
+        command or how it is classified.
+      </p>
+    </section>
+  );
+}
+
+export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData }: AppProps) {
   const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
   const searchIndex = useMemo(
     () => parsed.ok ? createSearchIndex(parsed.catalog.entries) : undefined,
@@ -613,6 +678,13 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const [apprenticeMode, setApprenticeMode] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
   const [guideProduct, setGuideProduct] = useState<Product>("hermes");
+
+  // Advisory only: this never gates or alters a catalog entry, it just tells the operator
+  // how much to trust what they are looking at.
+  const freshnessSummary = useMemo(
+    () => summarizeFreshness(parseFreshness(injectedFreshness)),
+    [injectedFreshness],
+  );
   const [sparkStatus, setSparkStatus] = useState<SparkStatus>();
   const [sparkStatusPending, setSparkStatusPending] = useState(true);
   const [reasoningPending, setReasoningPending] = useState(false);
@@ -942,6 +1014,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
           {ghost && <span id="intent-ghost" className="sr-only" aria-live="polite">Suggested completion: {ghostCompletion}. Press Tab to accept.</span>}
           <kbd className="escape-key">ESC</kbd>
         </label>
+        <FreshnessBanner summary={freshnessSummary} />
         <PredictionRail suggestions={predictions} disabled={controlsLocked} onAccept={acceptPrediction} />
         <StarterPrompts prompts={starters} disabled={controlsLocked} onSelect={acceptPrediction} />
         {apprenticeMode && !showGuide && (

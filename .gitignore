@@ -8,3 +8,8 @@ src-tauri/target/
 playwright-report/
 test-results/
 .DS_Store
+
+# Machine-specific freshness report: it describes THIS host's installed versions against
+# upstream. Committing it would make a fresh clone display another machine's drift as if
+# it were their own. An absent file correctly reads as "never checked".
+data/freshness.json
