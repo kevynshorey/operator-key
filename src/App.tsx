@@ -37,6 +37,8 @@ import {
 import { createPredictionIndex, predictIntent, starterPrompts, type PredictionSuggestion } from "./predict";
 import { buildFollowUps, type FollowUp, type FollowUpPriority } from "./followups";
 import { buildCommandLesson, createTeachingIndex, type CommandLesson } from "./teach";
+import { explainCommand, type CommandExplanation } from "./explain";
+import { buildOnboardingPath, type OnboardingPath } from "./onboarding";
 
 const PRODUCT_LABELS: Record<Product, string> = {
   omarchy: "Omarchy",
@@ -462,6 +464,128 @@ function StarterPrompts({ prompts, disabled, onSelect }: { prompts: readonly str
   );
 }
 
+/**
+ * Reverse lookup: the operator pastes a command they ran or saw somewhere and learns what
+ * it does. Risk warnings come from the text itself, so an unknown command is still
+ * assessed honestly rather than presented as harmless.
+ */
+function ExplainPanel({ explanation, onSelectEntry }: {
+  explanation: CommandExplanation;
+  onSelectEntry: (entry: CatalogEntry) => void;
+}) {
+  const confidenceLabel = explanation.confidence === "exact"
+    ? "KNOWN COMMAND"
+    : explanation.confidence === "close"
+      ? "CLOSEST MATCH"
+      : "NOT IN CATALOG";
+
+  return (
+    <section className="explain-panel" aria-labelledby="explain-heading">
+      <header>
+        <span id="explain-heading">WHAT THIS DOES</span>
+        <b className={`explain-confidence is-${explanation.confidence}`}>{confidenceLabel}</b>
+      </header>
+
+      <p className="explain-input"><code>{explanation.input}</code></p>
+      <p className="explain-summary">{explanation.summary}</p>
+
+      {explanation.risks.length > 0 && (
+        <div className="explain-risks" role="note">
+          <h4>Before you run this</h4>
+          <ul>
+            {explanation.risks.map((risk) => (
+              <li key={risk.title} className={`risk-${risk.severity}`}>
+                <b>{risk.title}</b>
+                <span>{risk.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {explanation.anatomy.length > 0 && (
+        <div className="explain-anatomy">
+          <h4>Piece by piece</h4>
+          <ul>
+            {explanation.anatomy.map((token, index) => (
+              <li key={`${token.text}-${index}`}>
+                <code className={`token-${token.role}`}>{token.text}</code>
+                <span className="token-role">{token.role.replaceAll("-", " ")}</span>
+                <span className="token-explanation">{token.explanation}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {explanation.related.length > 0 && (
+        <div className="explain-related">
+          <h4>Related commands in the catalog</h4>
+          <div className="explain-related-list">
+            {explanation.related.map((entry) => (
+              <button type="button" key={entry.id} onClick={() => onSelectEntry(entry)}>
+                <code>{entry.command}</code>
+                <span>{entry.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The guided "first 10 minutes" route for a newcomer, built from the real catalog. */
+function OnboardingPanel({ path, onSelectEntry, onClose }: {
+  path: OnboardingPath;
+  onSelectEntry: (entry: CatalogEntry) => void;
+  onClose: () => void;
+}) {
+  return (
+    <section className="onboarding-panel" aria-labelledby="onboarding-heading">
+      <header>
+        <div>
+          <span id="onboarding-heading">{path.title}</span>
+          <p>{path.intro}</p>
+        </div>
+        <button type="button" className="onboarding-close" onClick={onClose} aria-label="Close guided path">
+          CLOSE
+        </button>
+      </header>
+
+      <ol className="onboarding-steps">
+        {path.steps.map((step, index) => (
+          <li key={step.id}>
+            <div className="step-index" aria-hidden="true">{index + 1}</div>
+            <div className="step-body">
+              <h4>{step.title}</h4>
+              <p className="step-why">{step.why}</p>
+              <p className="step-do"><b>Do this:</b> {step.doThis}</p>
+              {step.commands.length > 0 && (
+                <div className="step-commands">
+                  {step.commands.map((entry) => (
+                    <button type="button" key={entry.id} onClick={() => onSelectEntry(entry)}>
+                      <code>{entry.command}</code>
+                      <span className={`safety-dot safety-${entry.safety_level}`} aria-hidden="true" />
+                      <span className="step-command-desc">{entry.description}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="step-learned"><b>You learned:</b> {step.youLearned}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <footer>
+        Nothing here runs on its own. Every command is shown so you can read it, understand
+        it, and decide for yourself.
+      </footer>
+    </section>
+  );
+}
+
 export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner }: AppProps) {
   const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
   const searchIndex = useMemo(
@@ -487,6 +611,8 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const [actionPending, setActionPending] = useState(false);
   const [largeText, setLargeText] = useState(false);
   const [apprenticeMode, setApprenticeMode] = useState(true);
+  const [showGuide, setShowGuide] = useState(false);
+  const [guideProduct, setGuideProduct] = useState<Product>("hermes");
   const [sparkStatus, setSparkStatus] = useState<SparkStatus>();
   const [sparkStatusPending, setSparkStatusPending] = useState(true);
   const [reasoningPending, setReasoningPending] = useState(false);
@@ -561,6 +687,29 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const followUps = useMemo(
     () => searchIndex && selected ? buildFollowUps(searchIndex, selected) : [],
     [searchIndex, selected],
+  );
+
+  // Reverse lookup only engages for text that actually looks like a command the operator
+  // ran or pasted — not for the plain-English intent the search box is normally used for.
+  // "review my code" is three lowercase words and must NOT be treated as a command, so
+  // bare word sequences do not qualify: there has to be real shell or CLI syntax.
+  const explanation = useMemo(() => {
+    if (!searchIndex || !apprenticeMode) return undefined;
+    const text = query.trim();
+    if (text.length < 2) return undefined;
+    const looksLikeCommand = /^[$#>]\s/.test(text)          // copied shell prompt
+      || /^[/-]/.test(text)                                  // slash command or flag
+      || /[|;]|&&|>>|\s>\s/.test(text)                       // shell plumbing
+      || /\s-{1,2}[a-z]/i.test(text)                         // a flag argument
+      || /[~/]\w|\.\w{2,4}\b/.test(text)                     // a path or filename
+      || /^(sudo|git|npm|npx|docker|curl|wget|chmod|chown|rm|ls|cd|cat|grep|tar|ssh|kill|make|python3?|node|systemctl)\b/i.test(text);
+    if (!looksLikeCommand) return undefined;
+    return explainCommand(searchIndex, text) ?? undefined;
+  }, [searchIndex, query, apprenticeMode]);
+
+  const onboardingPath = useMemo(
+    () => searchIndex && showGuide ? buildOnboardingPath(searchIndex, guideProduct) : undefined,
+    [searchIndex, showGuide, guideProduct],
   );
 
   const acceptPrediction = useCallback((completion: string) => {
@@ -795,6 +944,23 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
         </label>
         <PredictionRail suggestions={predictions} disabled={controlsLocked} onAccept={acceptPrediction} />
         <StarterPrompts prompts={starters} disabled={controlsLocked} onSelect={acceptPrediction} />
+        {apprenticeMode && !showGuide && (
+          <div className="guide-invite">
+            <span>New to this? Take the guided route instead of searching.</span>
+            <div className="guide-invite-actions">
+              {PRODUCT_TABS.filter((tab) => tab.value).map((tab) => (
+                <button
+                  type="button"
+                  key={tab.label}
+                  disabled={controlsLocked}
+                  onClick={() => { setGuideProduct(tab.value as Product); setShowGuide(true); }}
+                >
+                  First 10 minutes: {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="intent-composer-actions">
           <button type="button" className="spark-button" aria-label="Reason with Luna" aria-describedby="luna-availability" disabled={sparkDisabled} onClick={() => { void reasonAboutIntent(); }}>
             <span aria-hidden="true">✦</span> {reasoningPending ? "Reasoning…" : "Reason with Luna"} <kbd>ALT+ENTER</kbd>
@@ -854,6 +1020,20 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
           </div>
         </div>
       </section>
+
+      {onboardingPath && (
+        <OnboardingPanel
+          path={onboardingPath}
+          onSelectEntry={(entry) => { selectEntryById(entry.id); setShowGuide(false); }}
+          onClose={() => setShowGuide(false)}
+        />
+      )}
+
+      {/* Reverse lookup sits above results: when someone pastes a command they ran, the
+          explanation IS the answer, and it must appear even if search finds nothing. */}
+      {explanation && !showGuide && (
+        <ExplainPanel explanation={explanation} onSelectEntry={(entry) => selectEntryById(entry.id)} />
+      )}
 
       {displayedResults.length === 0 ? (
         <section className="empty-panel" role="status">

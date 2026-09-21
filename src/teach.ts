@@ -108,16 +108,22 @@ function describeFlag(token: string): string {
     : `Short flag. Single-letter switches can often be combined, as in -la.`;
 }
 
-function classifyShellToken(token: string, index: number): TokenRole {
+/**
+ * Classify one shell token. Exported so reverse lookup can explain a command the operator
+ * pasted from elsewhere using exactly the same rules as a catalog entry.
+ */
+export function classifyShellToken(token: string, index: number): TokenRole {
+  // Operators must be checked before path/flag heuristics: ">" and "|" are not paths.
+  if (["|", ">", ">>", "<", "<<", "&&", "||", ";", "&", "2>", "2>&1"].includes(token)) return "operator";
   if (index === 0) return "program";
   if (token.startsWith("--") || /^-[A-Za-z]/.test(token)) return "flag";
   if (/^[<[{].*[>\]}]$/.test(token) || /^[A-Z_]{2,}$/.test(token)) return "placeholder";
   if (token.includes("/") || token.startsWith("~") || token.startsWith(".")) return "path";
-  if (["|", ">", ">>", "<", "&&", "||", ";", "&"].includes(token)) return "operator";
   return "subcommand";
 }
 
-function explainShellToken(token: string, role: TokenRole, index: number, entry: CatalogEntry): string {
+/** Plain-language explanation for a shell token, given the program it belongs to. */
+export function explainShellToken(token: string, role: TokenRole, index: number, programName: string): string {
   switch (role) {
     case "program":
       return `The program being run. Everything after it tells ${token} what to do.`;
@@ -128,13 +134,26 @@ function explainShellToken(token: string, role: TokenRole, index: number, entry:
     case "path":
       return "A filesystem path. ~ means your home folder, . means the current folder.";
     case "operator":
-      return "A shell operator. It connects or redirects commands rather than being part of one.";
+      return OPERATOR_NOTES[token] ?? "A shell operator. It connects or redirects commands rather than being part of one.";
     default:
       return index === 1
-        ? `The subcommand. It selects which part of ${entry.command.split(/\s+/)[0]} you are using.`
+        ? `The subcommand. It selects which part of ${programName} you are using.`
         : "An argument passed to the command.";
   }
 }
+
+const OPERATOR_NOTES: Record<string, string> = {
+  "|": "A pipe. It feeds this command's output into the next command instead of your screen.",
+  ">": "Redirect. It writes output into the named file, REPLACING anything already in that file.",
+  ">>": "Append redirect. It adds output to the end of the file instead of replacing it.",
+  "<": "Input redirect. It feeds a file into the command as if you had typed it.",
+  "&&": "Run the next command only if this one succeeds.",
+  "||": "Run the next command only if this one fails.",
+  ";": "Run the next command afterwards regardless of whether this one succeeded.",
+  "&": "Run in the background and give the prompt back immediately.",
+  "2>": "Redirect error messages into a file.",
+  "2>&1": "Send error messages to the same place as normal output.",
+};
 
 function buildChordAnatomy(entry: CatalogEntry): CommandToken[] {
   const source = entry.canonical_chord || entry.command;
@@ -152,13 +171,14 @@ function buildChordAnatomy(entry: CatalogEntry): CommandToken[] {
 }
 
 function buildShellAnatomy(teaching: TeachingIndex, entry: CatalogEntry): CommandToken[] {
+  const programName = entry.command.split(/\s+/)[0];
   return entry.command.split(/\s+/).filter(Boolean).map((token, index) => {
     const role = classifyShellToken(token, index);
     const documented = teaching.byToken.get(tokenKey(entry.product, token.replace(/[=,].*$/, "")));
     if (documented && documented.id !== entry.id && (role === "flag" || index === 0)) {
       return { text: token, role, explanation: documented.description, sourcedFrom: documented.id };
     }
-    return { text: token, role, explanation: explainShellToken(token, role, index, entry) };
+    return { text: token, role, explanation: explainShellToken(token, role, index, programName) };
   });
 }
 

@@ -510,3 +510,75 @@ body:has(.runtime-web) { background: #0b0e10; }
   .runtime-web .anatomy-token { grid-template-columns: 1fr; }
   .runtime-web .mode-toggle { min-height: 44px; }
 }
+
+/* Guided route invitation — the entry point for someone who does not yet know what to search for. */
+.guide-invite { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 11px; border: 1px dashed var(--graphite-600); border-radius: 2px; background: #10181b; }
+.guide-invite > span { color: var(--muted); font-family: var(--mono); font-size: 10px; letter-spacing: .02em; }
+.guide-invite-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.guide-invite-actions button { min-height: 26px; padding: 4px 9px; border: 1px solid var(--etched); border-radius: 1px; background: #121a1d; color: var(--muted); font-family: var(--mono); font-size: 10px; }
+.guide-invite-actions button:hover { border-color: var(--cyan); color: var(--white); }
+
+/* Guided onboarding route. */
+.onboarding-panel { margin: 14px 0 0; border: 1px solid var(--cyan); border-radius: 2px; background: #0e1619; }
+.onboarding-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 12px 14px; border-bottom: 1px solid var(--etched); }
+.onboarding-panel > header span { color: var(--cyan); font-family: var(--display); font-size: 14px; font-weight: 800; letter-spacing: .04em; }
+.onboarding-panel > header p { margin: 5px 0 0; max-width: 78ch; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.onboarding-close { align-self: flex-start; padding: 4px 9px; border: 1px solid var(--graphite-600); border-radius: 1px; background: transparent; color: var(--muted); font-family: var(--mono); font-size: 10px; }
+.onboarding-close:hover { border-color: var(--cyan); color: var(--white); }
+.onboarding-steps { margin: 0; padding: 4px 0; list-style: none; }
+.onboarding-steps > li { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--graphite-800); }
+.onboarding-steps > li:last-child { border-bottom: 0; }
+.step-index { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--cyan); border-radius: 50%; color: var(--cyan); font-family: var(--mono); font-size: 11px; }
+.step-body h4 { margin: 0 0 5px; color: var(--white); font-family: var(--display); font-size: 13px; letter-spacing: .02em; }
+.step-why, .step-do, .step-learned { margin: 0 0 6px; max-width: 80ch; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.step-do b, .step-learned b { color: var(--cyan); font-weight: 700; }
+.step-learned { padding-top: 6px; border-top: 1px dashed var(--graphite-800); }
+.step-commands { display: flex; flex-direction: column; gap: 5px; margin: 0 0 8px; }
+.step-commands button { display: grid; grid-template-columns: auto 8px 1fr; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid var(--etched); border-radius: 1px; background: #121a1d; color: var(--muted); text-align: left; }
+.step-commands button:hover { border-color: var(--cyan); }
+.step-commands code { color: var(--cyan); font-family: var(--mono); font-size: 11px; }
+.step-command-desc { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.safety-dot { width: 7px; height: 7px; border-radius: 50%; }
+.safety-dot.safety-green { background: #46c97e; }
+.safety-dot.safety-amber { background: var(--amber); }
+.safety-dot.safety-red { background: var(--red); }
+.onboarding-panel > footer { padding: 10px 14px; border-top: 1px solid var(--etched); color: var(--muted); font-family: var(--mono); font-size: 10px; line-height: 1.5; }
+
+/* Reverse lookup: "I ran this, what did it do?" */
+.explain-panel { margin: 14px 0 0; border: 1px solid var(--etched); border-radius: 2px; background: #0e1619; }
+.explain-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--etched); }
+.explain-panel > header span { color: var(--cyan); font-family: var(--display); font-size: 13px; font-weight: 800; letter-spacing: .04em; }
+.explain-confidence { padding: 3px 7px; border: 1px solid var(--graphite-600); border-radius: 1px; color: var(--muted); font-family: var(--mono); font-size: 9px; letter-spacing: .06em; }
+.explain-confidence.is-exact { border-color: #46c97e; color: #46c97e; }
+.explain-confidence.is-close { border-color: var(--amber); color: var(--amber); }
+.explain-confidence.is-unknown { border-color: var(--graphite-600); color: var(--muted); }
+.explain-input { margin: 0; padding: 10px 14px 0; }
+.explain-input code { color: var(--white); font-family: var(--mono); font-size: 13px; word-break: break-all; }
+.explain-summary { margin: 6px 0 0; padding: 0 14px 10px; max-width: 86ch; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.explain-panel h4 { margin: 0 0 7px; color: var(--white); font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.explain-risks { padding: 11px 14px; border-top: 1px solid var(--etched); background: #17110c; }
+.explain-risks ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.explain-risks li { display: grid; gap: 2px; padding-left: 11px; border-left: 2px solid var(--amber); }
+.explain-risks li.risk-danger { border-left-color: var(--red); }
+.explain-risks b { color: var(--amber); font-size: 11px; }
+.explain-risks li.risk-danger b { color: var(--red); }
+.explain-risks span { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.explain-anatomy { padding: 11px 14px; border-top: 1px solid var(--etched); }
+.explain-anatomy ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.explain-anatomy li { display: grid; grid-template-columns: minmax(70px, auto) minmax(64px, auto) 1fr; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--graphite-850); }
+.explain-anatomy li:last-child { border-bottom: 0; }
+.explain-anatomy code { color: var(--cyan); font-family: var(--mono); font-size: 11px; word-break: break-all; }
+.token-role { color: var(--graphite-600); font-family: var(--mono); font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
+.token-explanation { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.explain-related { padding: 11px 14px; border-top: 1px solid var(--etched); }
+.explain-related-list { display: flex; flex-direction: column; gap: 5px; }
+.explain-related-list button { display: grid; gap: 2px; padding: 6px 9px; border: 1px solid var(--etched); border-radius: 1px; background: #121a1d; text-align: left; }
+.explain-related-list button:hover { border-color: var(--cyan); }
+.explain-related-list code { color: var(--cyan); font-family: var(--mono); font-size: 11px; }
+.explain-related-list span { color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+@media (max-width: 720px) {
+  .explain-anatomy li { grid-template-columns: 1fr; gap: 2px; }
+  .onboarding-steps > li { grid-template-columns: 1fr; }
+  .step-commands button { grid-template-columns: 1fr; gap: 3px; }
+}
