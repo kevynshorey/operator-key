@@ -1,0 +1,91 @@
+# Changelog
+
+All notable changes to Operator Key are recorded here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
+project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Security
+
+- **Reasoning is now disabled by default and reads its configuration from outside the
+  repository.** The app ships no model, no endpoint and no credential. A clone contains
+  nothing about whoever built it. Configuration lives at
+  `${XDG_CONFIG_HOME:-~/.config}/operator-key/reasoning.json`, which is read at startup and
+  never written to. See `docs/REASONING.md`.
+- **The reasoning transport refuses any address that is not loopback**, checked after DNS
+  resolution rather than by inspecting the hostname string, so a name that resolves
+  off-host is rejected rather than trusted. Enforced in `src-tauri/src/provider.rs` and
+  covered by tests that drive a real socket.
+- **The insertion gate now rejects every control character**, not just newline and
+  carriage return. Terminal escape sequences, backspace, NUL, DEL, the C1 range and
+  bidirectional overrides can all rewrite what a terminal displays versus what it
+  receives; a command whose visible text differs from its real text must never be typed
+  for the operator. Verified against all 1,468 insertable catalog entries with no false
+  positives.
+- **Availability is recomputed on the machine that runs the app.** It was previously baked
+  into the catalog by the machine that built it, so a downloaded release claimed tools the
+  operator does not have. Insertion of a command whose program is absent from `PATH` now
+  fails closed with a clear message.
+- **Provider login status is read from both stdout and stderr.** Codex prints `Logged in`
+  to stderr, so a stdout-only check reported a working installation as broken.
+- **A release no longer discloses the machine that built it.** A default `cargo build
+  --release` embeds dependency source paths from the local registry, so the shipped binary
+  contained 209 strings naming the builder's home directory and username — confirmed by
+  running `strings` over a built `.deb` payload. `scripts/build-release.sh` remaps those
+  paths and then fails the build if any home path or username survives, and the release
+  workflow repeats the check independently.
+- **An operator's own catalog cannot weaken a safety classification.** A catalog may now
+  be supplied at runtime (see below). It may add and refresh entries, but an entry the
+  reviewed catalog marks red or amber keeps that level, and an entry the app has never
+  seen can never arrive as green. Verified by a test that writes a hostile file to the
+  real location and confirms the insertion gate still refuses it.
+- **Continuous verification added.** Every push and pull request runs the TypeScript,
+  Python and Rust suites, typecheck, lint, production build, `npm audit`, `cargo audit`, a
+  secret scan, and a guard that refuses to publish host paths, personal identifiers,
+  private network addresses or machine-specific state. Dependabot keeps dependencies
+  moving.
+
+### Added
+
+- Support for any OpenAI-compatible local model server, including Ollama and
+  llama.cpp, alongside the existing Codex CLI provider. A small local model is sufficient:
+  the provider only ranks and explains catalog entries it is given.
+- `desktop_capabilities` command and matching UI state, so a desktop without Wayland and
+  Hyprland disables insertion with an explanation instead of failing with a raw process
+  error when the operator presses the button. Search and copy continue to work there.
+- `SECURITY.md` with a private disclosure route and a map of the trust boundaries worth
+  attacking.
+- **A catalog rebuilt on your own machine is picked up without rebuilding the
+  application.** Drop it at `${XDG_DATA_HOME:-~/.local/share}/operator-key/catalog.json`
+  and restart. A missing, oversized, unreadable or malformed file changes nothing: the
+  app falls back to its built-in catalog rather than starting with none. See
+  `docs/CATALOG.md`.
+- `catalog_snapshot` command, so the interface and the native insertion gate resolve the
+  same command text. Without it, a sidecar-updated catalog would make every copy and
+  insert fail as a text mismatch.
+- `.deb` and `.rpm` packages, built and checksummed by a release workflow on a version
+  tag, replacing "copy this binary onto your PATH" as the only install route.
+- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` and this changelog.
+- `docs/REASONING.md` and `docs/reasoning.example.json`.
+
+### Changed
+
+- The handoff document no longer records one machine's installed versions or the author's
+  personal notification setup.
+- `docs/INSTALL.md` uses `$HOME` instead of a literal home directory in its example.
+
+### Fixed
+
+- Reasoning resolved candidate entries against the build-time catalog while the insertion
+  gate used the runtime one. An entry supplied by an operator's catalog was therefore
+  visible and insertable in the interface, yet rejected by reasoning as not existing. Both
+  now read one loader, locked by a test that fails if they diverge.
+- `is_none_or` raised the effective toolchain requirement to Rust 1.82 while the project
+  declares 1.77.2, which would have failed to build for anyone on an older toolchain.
+- Overlay tests no longer flake against a 5-second default timeout on a loaded machine.
+
+## [0.1.0]
+
+Initial development version. Not released as a tagged artifact.

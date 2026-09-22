@@ -1,0 +1,133 @@
+# Verification gate for Operator Key.
+#
+# Every job here must pass before `main` moves. The repository holds 465+ tests across
+# three languages, and before this workflow existed nothing ran them automatically: a
+# commit could reach the default branch entirely unverified. That was the single highest
+# finding of the 2026-09-21 audit.
+#
+# Design notes:
+#   * The Python suite is stdlib-only and needs no install step.
+#   * The Rust jobs need GTK/WebKit because Tauri links against them on Linux.
+#   * `cargo test --lib` covers the security boundaries (provider isolation, insertion
+#     gates, process lifecycle) and does not need a display.
+#   * Audits run with `--deny warnings` so a new advisory fails the build instead of
+#     printing quietly into a log nobody reads.
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Weekly, so a newly published advisory against an unchanged dependency is still caught.
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  # Called by release.yml, so a tag cannot publish something the suite has not verified.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  frontend:
+    name: frontend (typecheck, lint, tests, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Tests
+        run: npm test -- --run
+      - name: Production build
+        run: npm run build
+
+  python:
+    name: python (catalog builder and adapters)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Tests
+        run: python3 -m unittest discover -s tests -v
+
+  rust:
+    name: rust (native boundaries)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Formatting
+        working-directory: src-tauri
+        run: cargo fmt --check
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test --lib
+
+  audit:
+    name: dependency audits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: npm audit
+        run: npm audit --audit-level=moderate
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: src-tauri
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # gitleaks needs history to scan commits, not just the current tree.
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  no-machine-state:
+    name: no machine state committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Refuse host paths, personal identifiers and machine drift data
+        run: bash scripts/ci/check-no-machine-state.sh

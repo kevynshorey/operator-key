@@ -1,0 +1,35 @@
+# `cargo audit` configuration.
+#
+# Vulnerabilities fail the build. The entries below are advisories that are NOT
+# vulnerabilities: they are "unmaintained" or "unsound" notices against crates this
+# project does not depend on directly and cannot currently replace, because every one of
+# them is reached through Tauri's own dependency graph.
+#
+# They are listed explicitly rather than globally silenced, so each is a decision on the
+# record with its reachability stated. Re-examine this list whenever Tauri is upgraded;
+# the correct long-term fix is upstream, not here.
+
+[advisories]
+# Keep reporting these categories rather than hiding them: an ignored advisory below is
+# still printed as a warning, so the list cannot quietly rot.
+informational_warnings = ["unmaintained", "unsound", "notice"]
+
+ignore = [
+  # proc-macro-error (unmaintained) — build-time only, via tauri-build's macro stack.
+  # Not present in the shipped binary.
+  "RUSTSEC-2024-0370",
+
+  # unic-* family (unmaintained) — reached via urlpattern -> tauri-utils. Used for URL
+  # pattern parsing in Tauri's own capability system, not by this application's code.
+  # IDs confirmed from `cargo audit` output on Cargo.lock, not guessed.
+  "RUSTSEC-2025-0075",
+  "RUSTSEC-2025-0080",
+  "RUSTSEC-2025-0081",
+  "RUSTSEC-2025-0098",
+  "RUSTSEC-2025-0100",
+
+  # glib 0.18 (unsound) — unsoundness in VariantStrIter's Iterator impls, reached via
+  # gtk/atk/tao under Tauri's Linux runtime. This application never constructs a
+  # glib::Variant or iterates one; the affected API is not called from our code.
+  "RUSTSEC-2024-0429",
+]

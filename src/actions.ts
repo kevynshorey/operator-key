@@ -16,6 +16,59 @@ export interface OperatorActions {
   insert(entry: CatalogEntry): Promise<void>;
 }
 
+/**
+ * What the host desktop can actually do.
+ *
+ * Copy and insert are implemented with `wl-copy`, `hyprctl` and `wtype`, which exist only
+ * under Wayland, and insertion additionally needs Hyprland's IPC. On any other desktop the
+ * operator used to get a raw "could not start hyprctl" process error. The native side
+ * reports capability up front so the UI can disable the control and explain it instead.
+ */
+export interface DesktopCapabilities {
+  canCopy: boolean;
+  canInsert: boolean;
+}
+
+/** Assume nothing until the native side answers. */
+export const UNKNOWN_DESKTOP_CAPABILITIES: DesktopCapabilities = { canCopy: false, canInsert: false };
+
+/** A browser tab has its own clipboard and can never insert. */
+export const WEB_DESKTOP_CAPABILITIES: DesktopCapabilities = { canCopy: true, canInsert: false };
+
+export const UNSUPPORTED_INSERT_REASON = "Terminal insertion needs a Wayland session running Hyprland. Search and copy still work.";
+
+
+/**
+ * The catalog the native side will actually enforce.
+ *
+ * The frontend imports `data/catalog.json` at build time. The native side may have applied
+ * an operator's sidecar catalog on top of it. Those must agree: the native gate matches the
+ * submitted command text against its own catalog exactly, so a UI rendering build-time text
+ * against a sidecar-updated native catalog would fail every copy and insert as a mismatch.
+ *
+ * Returns null when there is no native side or the command is unavailable, in which case
+ * the caller keeps the build-time catalog it already has.
+ */
+export async function readCatalogSnapshot(nativeInvoke: Invoke = invoke): Promise<unknown | null> {
+  try {
+    return await nativeInvoke<unknown>("catalog_snapshot");
+  } catch {
+    return null;
+  }
+}
+
+export async function readDesktopCapabilities(
+  nativeInvoke: Invoke = invoke,
+): Promise<DesktopCapabilities> {
+  try {
+    return await nativeInvoke<DesktopCapabilities>("desktop_capabilities");
+  } catch {
+    // An older native build without this command must not break the UI: fall back to
+    // "unknown", which disables the affected controls rather than promising them.
+    return UNKNOWN_DESKTOP_CAPABILITIES;
+  }
+}
+
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
 type BrowserNavigator = {
@@ -26,7 +79,11 @@ type BrowserNavigator = {
 
 export const WEB_INSERT_REASON = "Install/open the native Operator Key companion to insert into a confirmed terminal.";
 
-export function getActionAvailability(entry: CatalogEntry, runtime: OperatorRuntime = "native"): ActionAvailability {
+export function getActionAvailability(
+  entry: CatalogEntry,
+  runtime: OperatorRuntime = "native",
+  capabilities: DesktopCapabilities = { canCopy: true, canInsert: true },
+): ActionAvailability {
   if (runtime === "web") {
     return {
       copy: true,
@@ -48,6 +105,9 @@ export function getActionAvailability(entry: CatalogEntry, runtime: OperatorRunt
   }
   if (!TERMINAL_INTERFACES.has(entry.interface)) {
     return { copy: true, insert: false, insertReason: "Insertion requires a terminal-compatible interface." };
+  }
+  if (!capabilities.canInsert) {
+    return { copy: true, insert: false, insertReason: UNSUPPORTED_INSERT_REASON };
   }
   return { copy: true, insert: true };
 }

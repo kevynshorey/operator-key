@@ -1,0 +1,46 @@
+# Dependency update automation.
+#
+# The 2026-09-21 audit found zero vulnerable dependencies but no mechanism to learn when
+# that changed. `npm audit` and `cargo audit` in CI catch advisories against the versions
+# already pinned; Dependabot is what actually moves those pins forward.
+#
+# Grouping keeps the noise low: a lockfile refresh should be one reviewable pull request,
+# not thirty. Major versions stay separate because they need a human decision.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      dev-minor-and-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+      prod-minor-and-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "deps"
+      include: scope
+
+  - package-ecosystem: cargo
+    directory: "/src-tauri"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      cargo-minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "deps(cargo)"
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps(actions)"

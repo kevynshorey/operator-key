@@ -1,7 +1,10 @@
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::env;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
@@ -12,6 +15,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::os::unix::fs::OpenOptionsExt;
 
 const CATALOG_JSON: &str = include_str!("../../data/catalog.json");
+/// Hard ceiling on a sidecar catalog, so a huge or runaway file cannot exhaust memory.
+const MAX_SIDECAR_CATALOG_BYTES: u64 = 32 * 1024 * 1024;
 const NATIVE_DEADLINE: Duration = Duration::from_secs(2);
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
 const MAX_NATIVE_STDIN_BYTES: usize = 4 * 1024;
@@ -39,6 +44,7 @@ struct Catalog {
 #[derive(Debug, Deserialize)]
 struct CatalogEntry {
     id: String,
+    product: String,
     interface: String,
     command: String,
     safety_level: SafetyLevel,
@@ -61,6 +67,8 @@ enum ActionError {
     RedAction,
     UnsupportedInterface,
     Multiline,
+    ControlCharacter,
+    ProgramMissing(&'static str),
     Overlay(String),
     TargetDetection(String),
     NonTerminal,
@@ -86,6 +94,14 @@ impl fmt::Display for ActionError {
                 write!(formatter, "entry is not terminal-compatible")
             }
             Self::Multiline => write!(formatter, "multiline terminal insertion is not allowed"),
+            Self::ControlCharacter => write!(
+                formatter,
+                "this command contains a hidden control character and was not inserted"
+            ),
+            Self::ProgramMissing(program) => write!(
+                formatter,
+                "`{program}` is not installed on this machine, so the command was not inserted"
+            ),
             Self::Overlay(message) => write!(formatter, "overlay handoff failed: {message}"),
             Self::TargetDetection(message) => {
                 write!(formatter, "terminal target detection failed: {message}")
@@ -423,6 +439,61 @@ fn process_input(
     run_spawned_child(child, program, Some(input.to_vec()), deadline, capture)
 }
 
+/// Which desktop integrations this machine can actually perform.
+///
+/// Clipboard and insertion are implemented with `wl-copy`, `hyprctl` and `wtype`, which
+/// exist only under Wayland, and insertion additionally needs Hyprland's IPC. On any
+/// other desktop those binaries are simply absent, and the operator previously saw a raw
+/// "could not start hyprctl" process error. Detecting the capability up front lets the UI
+/// say what is unsupported and why, while search stays fully available everywhere.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopCapabilities {
+    pub can_copy: bool,
+    pub can_insert: bool,
+}
+
+/// Report what this desktop supports, from the environment and PATH only.
+///
+/// This runs no subprocess: it is called on startup to render availability, so it must be
+/// cheap and must never block the UI.
+pub fn detect_desktop_capabilities() -> DesktopCapabilities {
+    let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some();
+    let hyprland = std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some();
+    DesktopCapabilities {
+        can_copy: wayland && program_on_path("wl-copy"),
+        can_insert: wayland && hyprland && program_on_path("hyprctl") && program_on_path("wtype"),
+    }
+}
+
+/// Explain an unsupported desktop in terms the operator can act on.
+fn unsupported_desktop_message(action: &str) -> String {
+    let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some();
+    let hyprland = std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some();
+    if !wayland {
+        format!(
+            "{action} needs Wayland. This session is not Wayland, so search and copy-by-hand still work but {} is unavailable here.",
+            action.to_lowercase()
+        )
+    } else if !hyprland {
+        format!(
+            "{action} needs Hyprland's window IPC, which this Wayland session does not provide."
+        )
+    } else {
+        let mut missing: Vec<&str> = Vec::new();
+        for program in ["hyprctl", "wtype", "wl-copy"] {
+            if !program_on_path(program) {
+                missing.push(program);
+            }
+        }
+        if missing.is_empty() {
+            format!("{action} is unavailable on this desktop.")
+        } else {
+            format!("{action} needs {} on PATH.", missing.join(" and "))
+        }
+    }
+}
+
 struct NativeClipboard;
 
 impl ClipboardWriter for NativeClipboard {
@@ -518,6 +589,71 @@ fn copy_catalog_command_with(
         .map_err(ActionError::Clipboard)
 }
 
+/// Map a catalog product to the executable an operator needs for its commands.
+///
+/// `omarchy` is absent deliberately: its entries are keybindings and desktop actions
+/// rather than a single binary, so there is nothing on PATH to verify.
+fn required_program(product: &str) -> Option<&'static str> {
+    match product {
+        "git" => Some("git"),
+        "gh" => Some("gh"),
+        "hermes" => Some("hermes"),
+        "codex" => Some("codex"),
+        "claude-code" => Some("claude"),
+        _ => None,
+    }
+}
+
+/// True when `program` resolves to an executable file on the current PATH.
+///
+/// The catalog's `available` flag is decided on the machine that BUILT the catalog. A
+/// downloaded release therefore carries the builder's environment, not the operator's,
+/// and insertion must not type a command for a tool this machine does not have. This is
+/// the runtime half of that check: `available` stays an advisory hint for ranking and
+/// display, while this decides whether keystrokes are allowed.
+#[cfg(unix)]
+fn program_on_path(program: &str) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    // A catalog product name is a fixed identifier from `required_program`, never
+    // operator input, but refuse separators anyway so this can never become a path probe.
+    if program.is_empty() || program.contains('/') {
+        return false;
+    }
+    let Some(path) = std::env::var_os("PATH") else {
+        return false;
+    };
+    std::env::split_paths(&path).any(|directory| {
+        if directory.as_os_str().is_empty() {
+            return false;
+        }
+        let candidate = directory.join(program);
+        candidate
+            .metadata()
+            .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+    })
+}
+
+#[cfg(not(unix))]
+fn program_on_path(program: &str) -> bool {
+    if program.is_empty() {
+        return false;
+    }
+    std::env::var_os("PATH")
+        .map(|path| std::env::split_paths(&path).any(|directory| directory.join(program).is_file()))
+        .unwrap_or(false)
+}
+
+/// Reject any control character before command text can be typed into a live terminal.
+///
+/// `\n` and `\r` submit a line, so they were always refused. The wider rule matters for
+/// the same reason: ESC (`\x1b`) begins a terminal escape sequence, and other C0/C1 and
+/// Unicode separator controls can move the cursor or alter what a reader sees versus what
+/// the shell receives. The catalog is generated from local `--help` output and is clean
+/// today, but this is the last gate before synthetic keystrokes reach a real shell, so it
+/// validates rather than assumes. Legitimate command text never needs a control
+/// character; a bidirectional override or a bare ESC is a signal, not a false positive.
 fn validate_insert(entry: &CatalogEntry) -> Result<(), ActionError> {
     if !matches!(entry.safety_level, SafetyLevel::Green | SafetyLevel::Amber) {
         return Err(ActionError::RedAction);
@@ -531,7 +667,31 @@ fn validate_insert(entry: &CatalogEntry) -> Result<(), ActionError> {
     if entry.command.contains(['\n', '\r']) {
         return Err(ActionError::Multiline);
     }
+    if entry.command.chars().any(is_forbidden_in_command) {
+        return Err(ActionError::ControlCharacter);
+    }
+    if let Some(program) = required_program(&entry.product) {
+        if !program_on_path(program) {
+            return Err(ActionError::ProgramMissing(program));
+        }
+    }
     Ok(())
+}
+
+/// True for characters that must never reach a terminal through synthetic keystrokes.
+fn is_forbidden_in_command(character: char) -> bool {
+    character.is_control()
+        || matches!(
+            character,
+            // Bidirectional overrides: reorder rendered text away from what is typed.
+            '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}'
+            // Zero-width and invisible formatting.
+            | '\u{200b}'..='\u{200d}' | '\u{2060}' | '\u{feff}'
+            // Line and paragraph separators: newline equivalents in some consumers.
+            | '\u{2028}' | '\u{2029}'
+            // NBSP and friends: render as a space but are not argument separators.
+            | '\u{00a0}' | '\u{202f}'
+        )
 }
 
 fn is_valid_hyprland_address(address: &str) -> bool {
@@ -621,17 +781,190 @@ fn insert_catalog_command_with(
     result.map_err(|error| restore_after(error, environment))
 }
 
+/// Where an operator's own rebuilt catalog is read from, if they have one.
+///
+/// The catalog is generated from `--help` output on the machine that runs
+/// `scripts/build_catalog.py`. Before this, the only catalog was the one compiled into the
+/// binary, so reflecting your own installed tools meant rebuilding the whole application
+/// and having the Rust and Node toolchains to do it.
+///
+/// Returns `None` when no home directory is known, which reads as "no sidecar".
+fn sidecar_catalog_path() -> Option<PathBuf> {
+    let base = match env::var_os("XDG_DATA_HOME") {
+        Some(value) if !value.is_empty() => PathBuf::from(value),
+        _ => PathBuf::from(env::var_os("HOME")?).join(".local/share"),
+    };
+    Some(base.join("operator-key").join("catalog.json"))
+}
+
+/// Merge an operator's sidecar catalog over the embedded one, refusing any downgrade.
+///
+/// The security question is what a sidecar file is allowed to change. The app types
+/// command text into a live terminal, so the catalog is the trust anchor for that text: if
+/// a sidecar could relabel `git push --force` as green, it could get a destructive command
+/// inserted behind a safe-looking badge.
+///
+/// The rule is therefore asymmetric, and deliberately not "recompute safety from the
+/// command text". Recomputing sounds safer but is measurably worse: 33 entries in the
+/// shipped catalog are classified *below* what the word rules alone would produce, because
+/// the adapters know things the word list cannot — `--force-with-lease` is the safe form of
+/// a force push, `--dry-run` performs no write. Recomputing would paint those red, and a
+/// red badge that fires on safe commands is the one failure this product cannot afford:
+/// operators stop reading it, and then it cannot warn them about anything.
+///
+/// So:
+///   * An ID present in the embedded catalog keeps its **embedded** safety level. A
+///     sidecar may refresh its text, but never its risk.
+///   * An ID not in the embedded catalog is accepted as a new entry, but is clamped so it
+///     can never be more permissive than `amber`: a brand-new command from an unreviewed
+///     source is never silently green.
+///   * Anything unparsable leaves the embedded catalog in place.
+///
+/// This works on the raw JSON rather than the typed struct so that fields the native side
+/// does not model — descriptions, aliases, provenance — survive into the UI intact.
+fn merge_sidecar_value(
+    embedded: &serde_json::Value,
+    mut sidecar: serde_json::Value,
+) -> serde_json::Value {
+    let trusted: HashMap<String, serde_json::Value> = embedded
+        .get("entries")
+        .and_then(|entries| entries.as_array())
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|entry| {
+                    let id = entry.get("id")?.as_str()?.to_string();
+                    Some((id, entry.get("safety_level")?.clone()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if let Some(entries) = sidecar
+        .get_mut("entries")
+        .and_then(|entries| entries.as_array_mut())
+    {
+        for entry in entries.iter_mut() {
+            let id = entry
+                .get("id")
+                .and_then(|id| id.as_str())
+                .map(|id| id.to_string());
+            let Some(object) = entry.as_object_mut() else {
+                continue;
+            };
+            match id.as_deref().and_then(|id| trusted.get(id)) {
+                // Known entry: the reviewed classification is authoritative.
+                Some(level) => {
+                    object.insert("safety_level".into(), level.clone());
+                }
+                // Unknown entry: allow it, but never at the most permissive level.
+                None => {
+                    // `is_none_or` would be clearer but needs Rust 1.82, and this crate
+                    // supports 1.77.2. A missing or non-string level counts as green here
+                    // so that a malformed entry is clamped rather than trusted.
+                    let is_green = match object.get("safety_level").and_then(|l| l.as_str()) {
+                        Some(level) => level == "green",
+                        None => true,
+                    };
+                    if is_green {
+                        object.insert("safety_level".into(), serde_json::Value::from("amber"));
+                    }
+                }
+            }
+        }
+    }
+
+    sidecar
+}
+
+/// The catalog the app should use: embedded, with an operator's sidecar applied if valid.
+///
+/// Every failure path returns the embedded catalog rather than an error: a missing,
+/// unreadable, oversized or malformed sidecar must degrade to the known-good data, never
+/// leave the operator with no catalog at all.
+/// The catalog every part of the app must agree on, sidecar applied.
+///
+/// `intent.rs` resolves reasoning candidates against a catalog too. If it used the
+/// build-time import while this module used the merged one, an entry that came from an
+/// operator's sidecar would be visible and insertable in the UI yet rejected by reasoning
+/// as "not in the catalog". One loader keeps the two views honest.
+pub(crate) fn merged_catalog_value() -> Result<serde_json::Value, String> {
+    let embedded: serde_json::Value =
+        serde_json::from_str(CATALOG_JSON).map_err(|error| error.to_string())?;
+
+    let Some(path) = sidecar_catalog_path() else {
+        return Ok(embedded);
+    };
+    let Ok(metadata) = fs::metadata(&path) else {
+        return Ok(embedded);
+    };
+    // A symlink or a device node here would be someone else's decision about what this
+    // process reads; only a regular file is accepted.
+    if !metadata.is_file() || metadata.len() > MAX_SIDECAR_CATALOG_BYTES {
+        return Ok(embedded);
+    }
+    let Ok(raw) = fs::read_to_string(&path) else {
+        return Ok(embedded);
+    };
+    match serde_json::from_str::<serde_json::Value>(&raw) {
+        Ok(sidecar)
+            if sidecar
+                .get("entries")
+                .and_then(|entries| entries.as_array())
+                .is_some_and(|entries| !entries.is_empty()) =>
+        {
+            let merged = merge_sidecar_value(&embedded, sidecar);
+            // The merged result must still satisfy the typed schema the gates rely on.
+            // If it does not, the sidecar is not usable and the embedded data stands.
+            match serde_json::from_value::<Catalog>(merged.clone()) {
+                Ok(_) => Ok(merged),
+                Err(_) => Ok(embedded),
+            }
+        }
+        // Parsed but empty, or unparsable: keep what we know is good.
+        _ => Ok(embedded),
+    }
+}
+
+fn load_catalog() -> Result<Catalog, String> {
+    let value = merged_catalog_value()?;
+    serde_json::from_value(value).map_err(|error| error.to_string())
+}
+
 fn catalog() -> Result<&'static Catalog, ActionError> {
     static CATALOG: OnceLock<Result<Catalog, String>> = OnceLock::new();
     CATALOG
-        .get_or_init(|| serde_json::from_str(CATALOG_JSON).map_err(|error| error.to_string()))
+        .get_or_init(load_catalog)
         .as_ref()
         .map_err(|message| ActionError::Catalog(message.clone()))
+}
+
+/// Hand the UI the same catalog the native gates will enforce.
+///
+/// Both sides must agree on command text. `matched_entry` requires the submitted command
+/// to equal the catalog's exactly, so if the UI rendered build-time text while the native
+/// side had applied an operator's sidecar, every copy and insert would fail as a mismatch.
+#[tauri::command]
+pub async fn catalog_snapshot() -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(merged_catalog_value)
+        .await
+        .map_err(|error| format!("catalog snapshot failed: {error}"))?
+}
+
+/// Report which desktop integrations work here, so the UI can disable what cannot.
+#[tauri::command]
+pub async fn desktop_capabilities() -> Result<DesktopCapabilities, String> {
+    tauri::async_runtime::spawn_blocking(detect_desktop_capabilities)
+        .await
+        .map_err(|error| format!("desktop capability probe failed: {error}"))
 }
 
 #[tauri::command]
 pub async fn copy_catalog_command(entry_id: String, command: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
+        if !detect_desktop_capabilities().can_copy {
+            return Err(unsupported_desktop_message("Copying to the clipboard"));
+        }
         copy_catalog_command_with(
             catalog().map_err(|error| error.to_string())?,
             &entry_id,
@@ -651,6 +984,9 @@ pub async fn insert_catalog_command(
     command: String,
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
+        if !detect_desktop_capabilities().can_insert {
+            return Err(unsupported_desktop_message("Inserting into a terminal"));
+        }
         let environment = NativeInsertionEnvironment {
             window,
             deadline: Instant::now() + NATIVE_DEADLINE,
@@ -682,6 +1018,9 @@ mod tests {
         };
         CatalogEntry {
             id: "entry-1".into(),
+            // "omarchy" needs no binary on PATH, so the existing fixtures keep exercising
+            // the checks they were written for. The PATH gate has its own tests below.
+            product: "omarchy".into(),
             interface: interface.into(),
             command: command.into(),
             safety_level,
@@ -1277,5 +1616,458 @@ mod tests {
         assert!(!output.success);
         assert_eq!(output.stdout, "stdout-value");
         assert_eq!(output.stderr, "stderr-value");
+    }
+
+    /// Build an entry for a product whose binary must exist on PATH.
+    fn product_entry(product: &str, command: &str) -> CatalogEntry {
+        CatalogEntry {
+            id: "entry-1".into(),
+            product: product.into(),
+            interface: "shell-command".into(),
+            command: command.into(),
+            safety_level: SafetyLevel::Green,
+            available: true,
+        }
+    }
+
+    #[test]
+    fn a_hidden_control_character_is_refused_before_any_keystroke_is_sent() {
+        // The catalog is generated from local --help output and is clean today. This is
+        // the last gate before synthetic keystrokes reach a live shell, so it validates
+        // rather than trusting the generator.
+        for (name, command) in [
+            ("escape", "git status\u{1b}[2K"),
+            ("bell", "git status\u{7}"),
+            ("backspace", "git status\u{8}"),
+            ("vertical tab", "git status\u{b}"),
+            ("nul", "git status\u{0}"),
+            ("delete", "git status\u{7f}"),
+            ("bidi override", "git status\u{202e}drowssap"),
+            ("zero width space", "git\u{200b} status"),
+            ("line separator", "git status\u{2028}rm -rf /"),
+            ("non-breaking space", "git\u{a0}status"),
+        ] {
+            let entry = CatalogEntry {
+                product: "omarchy".into(),
+                ..product_entry("omarchy", command)
+            };
+            assert_eq!(
+                validate_insert(&entry),
+                Err(ActionError::ControlCharacter),
+                "{name} must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn ordinary_command_text_still_passes_the_control_character_gate() {
+        // Fail-closed logic must not reject the commands the catalog actually contains.
+        for command in [
+            "git status",
+            "gh pr create --fill",
+            "git commit -m \"message with spaces\"",
+            "git log --pretty=format:'%h %s'",
+            "hermes chat --model gpt-4o | tee /tmp/out.txt",
+            "git diff HEAD~1..HEAD -- src/*.rs",
+            "gh api repos/{owner}/{repo} --jq '.name'",
+        ] {
+            let entry = product_entry("omarchy", command);
+            assert_eq!(validate_insert(&entry), Ok(()), "{command} must be allowed");
+        }
+    }
+
+    /// Build a catalog JSON document from (id, command, level) triples.
+    fn catalog_value(rows: &[(&str, &str, &str)]) -> serde_json::Value {
+        serde_json::json!({
+            "entries": rows.iter().map(|(id, command, level)| serde_json::json!({
+                "id": id,
+                "product": "omarchy",
+                "interface": "shell-command",
+                "command": command,
+                "safety_level": level,
+                "available": true,
+            })).collect::<Vec<_>>()
+        })
+    }
+
+    fn level_of(value: &serde_json::Value, index: usize) -> &str {
+        value["entries"][index]["safety_level"].as_str().unwrap()
+    }
+
+    #[test]
+    fn a_sidecar_catalog_cannot_downgrade_a_dangerous_command() {
+        // The attack this rule exists to stop: the app types command text into a live
+        // terminal, so if a sidecar file could relabel a destructive command as green, it
+        // would be inserted behind a safe-looking badge.
+        let embedded = catalog_value(&[("id-1", "git push --force", "red")]);
+        let hostile = catalog_value(&[("id-1", "git push --force", "green")]);
+
+        let merged = merge_sidecar_value(&embedded, hostile);
+
+        assert_eq!(level_of(&merged, 0), "red");
+        // And the gate still refuses it, which is the property that actually protects the
+        // operator rather than the label alone.
+        let typed: Catalog = serde_json::from_value(merged).unwrap();
+        assert_eq!(
+            validate_insert(&typed.entries[0]),
+            Err(ActionError::RedAction)
+        );
+    }
+
+    #[test]
+    fn a_sidecar_catalog_cannot_downgrade_amber_to_green_either() {
+        let embedded = catalog_value(&[("id-1", "git commit", "amber")]);
+        let hostile = catalog_value(&[("id-1", "git commit", "green")]);
+
+        let merged = merge_sidecar_value(&embedded, hostile);
+
+        assert_eq!(level_of(&merged, 0), "amber");
+    }
+
+    #[test]
+    fn a_sidecar_entry_may_refresh_command_text_for_a_known_id() {
+        // The point of the feature: an operator who rebuilds the catalog against their own
+        // newer tools sees their own commands without rebuilding the application.
+        let embedded = catalog_value(&[("id-1", "gh pr list --limit 30", "green")]);
+        let refreshed = catalog_value(&[("id-1", "gh pr list --limit 50", "green")]);
+
+        let merged = merge_sidecar_value(&embedded, refreshed);
+
+        assert_eq!(merged["entries"][0]["command"], "gh pr list --limit 50");
+        assert_eq!(level_of(&merged, 0), "green");
+    }
+
+    #[test]
+    fn a_new_sidecar_entry_is_never_accepted_as_green() {
+        // A command the reviewed catalog has never seen is allowed through so the feature
+        // is useful, but it cannot arrive at the most permissive level.
+        let embedded = catalog_value(&[("id-1", "gh pr list", "green")]);
+        let with_new = catalog_value(&[("id-2", "some brand new command", "green")]);
+
+        let merged = merge_sidecar_value(&embedded, with_new);
+
+        assert_eq!(merged["entries"][0]["id"], "id-2");
+        assert_eq!(level_of(&merged, 0), "amber");
+    }
+
+    #[test]
+    fn a_new_sidecar_entry_keeps_a_stricter_level_it_declares() {
+        let embedded = catalog_value(&[("id-1", "gh pr list", "green")]);
+        let with_new = catalog_value(&[("id-2", "rm -rf /", "red")]);
+
+        let merged = merge_sidecar_value(&embedded, with_new);
+
+        assert_eq!(level_of(&merged, 0), "red");
+    }
+
+    #[test]
+    fn sidecar_merging_preserves_every_sidecar_entry() {
+        let embedded = catalog_value(&[("id-1", "a", "green"), ("id-2", "b", "red")]);
+        let sidecar = catalog_value(&[
+            ("id-1", "a2", "green"),
+            ("id-2", "b2", "green"),
+            ("id-3", "c", "amber"),
+        ]);
+
+        let merged = merge_sidecar_value(&embedded, sidecar);
+
+        assert_eq!(merged["entries"].as_array().unwrap().len(), 3);
+        // id-2 was red in the reviewed catalog and must stay red.
+        assert_eq!(level_of(&merged, 1), "red");
+    }
+
+    #[test]
+    fn a_sidecar_entry_without_a_safety_level_is_not_treated_as_green() {
+        // A malformed or truncated entry must not default to the most permissive label.
+        let embedded = catalog_value(&[("id-1", "a", "green")]);
+        let sidecar = serde_json::json!({
+            "entries": [{
+                "id": "id-9",
+                "product": "omarchy",
+                "interface": "shell-command",
+                "command": "mystery command",
+                "available": true,
+            }]
+        });
+
+        let merged = merge_sidecar_value(&embedded, sidecar);
+
+        assert_eq!(level_of(&merged, 0), "amber");
+    }
+
+    #[test]
+    fn the_sidecar_path_follows_the_xdg_data_directory() {
+        let _guard = ENVIRONMENT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let previous = env::var_os("XDG_DATA_HOME");
+
+        // SAFETY: single-threaded within the environment lock.
+        unsafe { env::set_var("XDG_DATA_HOME", "/tmp/xdg-example") };
+        let path = sidecar_catalog_path().expect("a path when XDG_DATA_HOME is set");
+        assert_eq!(
+            path,
+            PathBuf::from("/tmp/xdg-example/operator-key/catalog.json")
+        );
+
+        match previous {
+            Some(value) => unsafe { env::set_var("XDG_DATA_HOME", value) },
+            None => unsafe { env::remove_var("XDG_DATA_HOME") },
+        }
+    }
+
+    #[test]
+    fn a_missing_sidecar_leaves_the_embedded_catalog_in_place() {
+        let _guard = ENVIRONMENT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let previous = env::var_os("XDG_DATA_HOME");
+
+        // SAFETY: single-threaded within the environment lock.
+        unsafe { env::set_var("XDG_DATA_HOME", "/nonexistent-operator-key-test-path") };
+        let loaded = load_catalog().expect("the embedded catalog still parses");
+        assert!(
+            !loaded.entries.is_empty(),
+            "a missing sidecar must not empty the catalog"
+        );
+
+        match previous {
+            Some(value) => unsafe { env::set_var("XDG_DATA_HOME", value) },
+            None => unsafe { env::remove_var("XDG_DATA_HOME") },
+        }
+    }
+
+    #[test]
+    fn a_hostile_sidecar_file_on_disk_cannot_get_a_red_command_inserted() {
+        // The unit tests above prove the merge function. This proves the whole path an
+        // attacker would actually use: write a real file to the real configured location,
+        // load through the real loader, and confirm the insertion gate still refuses.
+        let _guard = ENVIRONMENT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let previous = env::var_os("XDG_DATA_HOME");
+
+        let root = std::env::temp_dir().join(format!(
+            "operator-key-sidecar-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let dir = root.join("operator-key");
+        fs::create_dir_all(&dir).expect("create sidecar dir");
+
+        // Take a genuinely red entry out of the shipped catalog and try to relabel it.
+        let embedded: Catalog = serde_json::from_str(CATALOG_JSON).expect("embedded catalog");
+        let red = embedded
+            .entries
+            .iter()
+            .find(|e| e.safety_level == SafetyLevel::Red)
+            .expect("the shipped catalog contains a red entry");
+
+        let hostile = format!(
+            r#"{{"entries":[{{"id":"{}","product":"{}","interface":"{}","command":"{}","safety_level":"green","available":true}}]}}"#,
+            red.id,
+            red.product,
+            red.interface,
+            red.command.replace('\\', "\\\\").replace('"', "\\\"")
+        );
+        fs::write(dir.join("catalog.json"), hostile).expect("write hostile sidecar");
+
+        // SAFETY: single-threaded within the environment lock.
+        unsafe { env::set_var("XDG_DATA_HOME", &root) };
+        let loaded = load_catalog().expect("catalog loads");
+        let entry = loaded
+            .entries
+            .iter()
+            .find(|e| e.id == red.id)
+            .expect("the entry survived the merge");
+
+        // The file said green. The reviewed catalog said red. Red wins.
+        assert_eq!(
+            entry.safety_level,
+            SafetyLevel::Red,
+            "a sidecar file must not be able to relabel a destructive command"
+        );
+        assert_eq!(validate_insert(entry), Err(ActionError::RedAction));
+
+        match previous {
+            Some(value) => unsafe { env::set_var("XDG_DATA_HOME", value) },
+            None => unsafe { env::remove_var("XDG_DATA_HOME") },
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_malformed_sidecar_file_degrades_to_the_embedded_catalog() {
+        let _guard = ENVIRONMENT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let previous = env::var_os("XDG_DATA_HOME");
+
+        let root = std::env::temp_dir().join(format!(
+            "operator-key-bad-sidecar-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let dir = root.join("operator-key");
+        fs::create_dir_all(&dir).expect("create sidecar dir");
+        fs::write(dir.join("catalog.json"), "{ this is not json").expect("write junk");
+
+        // SAFETY: single-threaded within the environment lock.
+        unsafe { env::set_var("XDG_DATA_HOME", &root) };
+        let loaded = load_catalog().expect("a broken sidecar must not break the app");
+        assert!(
+            loaded.entries.len() > 1000,
+            "expected the full embedded catalog, got {} entries",
+            loaded.entries.len()
+        );
+
+        match previous {
+            Some(value) => unsafe { env::set_var("XDG_DATA_HOME", value) },
+            None => unsafe { env::remove_var("XDG_DATA_HOME") },
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn insertion_is_refused_when_the_required_program_is_absent_from_path() {
+        // `available` is decided on the machine that BUILT the catalog. A downloaded
+        // release carries the builder's environment, so the decision is remade here.
+        // PATH mutation is serialized, because cargo runs tests in parallel threads and
+        // an unsynchronized change here would intermittently break any other test that
+        // resolves a program.
+        let entry = product_entry("git", "git status");
+        with_environment(&[("PATH", Some("/nonexistent-operator-key-probe"))], || {
+            assert_eq!(
+                validate_insert(&entry),
+                Err(ActionError::ProgramMissing("git"))
+            );
+        });
+
+        // The message names the missing tool so the operator can act on it.
+        assert!(ActionError::ProgramMissing("git")
+            .to_string()
+            .contains("`git` is not installed"));
+    }
+
+    #[test]
+    fn insertion_is_allowed_when_the_required_program_is_present() {
+        // `sh` is guaranteed on any POSIX machine, so this proves the gate passes rather
+        // than merely that it rejects everything.
+        assert!(program_on_path("sh"), "sh must resolve on a POSIX machine");
+        assert!(!program_on_path("operator-key-definitely-not-installed"));
+        // A product with no single binary is not gated at all.
+        assert_eq!(required_program("omarchy"), None);
+        assert_eq!(required_program("git"), Some("git"));
+        assert_eq!(required_program("claude-code"), Some("claude"));
+    }
+
+    #[test]
+    fn a_path_lookup_never_becomes_a_path_probe() {
+        // required_program only ever yields fixed identifiers, but the helper refuses
+        // separators so it cannot be repurposed into an arbitrary filesystem check.
+        assert!(!program_on_path("/bin/sh"));
+        assert!(!program_on_path("../bin/sh"));
+        assert!(!program_on_path(""));
+    }
+
+    /// Serialize the tests that mutate process-wide environment variables.
+    static ENVIRONMENT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Run `body` with an exact environment, restoring the previous values afterwards.
+    fn with_environment(pairs: &[(&str, Option<&str>)], body: impl FnOnce()) {
+        let guard = ENVIRONMENT_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let saved: Vec<(String, Option<std::ffi::OsString>)> = pairs
+            .iter()
+            .map(|(key, _)| ((*key).to_owned(), std::env::var_os(key)))
+            .collect();
+        for (key, value) in pairs {
+            // SAFETY: mutation is serialized by ENVIRONMENT_LOCK and reverted below.
+            unsafe {
+                match value {
+                    Some(value) => std::env::set_var(key, value),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(body));
+        for (key, value) in saved {
+            unsafe {
+                match value {
+                    Some(value) => std::env::set_var(&key, value),
+                    None => std::env::remove_var(&key),
+                }
+            }
+        }
+        drop(guard);
+        if let Err(payload) = outcome {
+            std::panic::resume_unwind(payload);
+        }
+    }
+
+    #[test]
+    fn a_non_wayland_desktop_reports_no_copy_or_insert_and_explains_why() {
+        // Previously this path surfaced a raw "could not start hyprctl" process error.
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", None),
+                ("HYPRLAND_INSTANCE_SIGNATURE", None),
+            ],
+            || {
+                let capabilities = detect_desktop_capabilities();
+                assert_eq!(
+                    capabilities,
+                    DesktopCapabilities {
+                        can_copy: false,
+                        can_insert: false
+                    }
+                );
+
+                let message = unsupported_desktop_message("Inserting into a terminal");
+                assert!(message.contains("needs Wayland"), "{message}");
+                assert!(
+                    !message.contains("hyprctl"),
+                    "no raw binary name: {message}"
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_wayland_session_without_hyprland_can_copy_but_not_insert() {
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", Some("wayland-0")),
+                ("HYPRLAND_INSTANCE_SIGNATURE", None),
+            ],
+            || {
+                // Insertion needs Hyprland's IPC and must be refused regardless of PATH.
+                assert!(!detect_desktop_capabilities().can_insert);
+
+                let message = unsupported_desktop_message("Inserting into a terminal");
+                assert!(message.contains("Hyprland"), "{message}");
+            },
+        );
+    }
+
+    #[test]
+    fn a_hyprland_session_missing_its_helpers_names_the_missing_programs() {
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", Some("wayland-0")),
+                ("HYPRLAND_INSTANCE_SIGNATURE", Some("test-signature")),
+                ("PATH", Some("/nonexistent-operator-key-probe")),
+            ],
+            || {
+                assert_eq!(
+                    detect_desktop_capabilities(),
+                    DesktopCapabilities {
+                        can_copy: false,
+                        can_insert: false
+                    }
+                );
+
+                let message = unsupported_desktop_message("Inserting into a terminal");
+                assert!(message.contains("on PATH"), "{message}");
+                assert!(message.contains("hyprctl"), "{message}");
+            },
+        );
     }
 }

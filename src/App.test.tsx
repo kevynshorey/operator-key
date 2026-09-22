@@ -12,7 +12,7 @@ const STATUS_ID = "16fe16d89f85e6a8";
 
 function sparkPlan(overrides: Partial<SparkIntentPlan> = {}): SparkIntentPlan {
   return {
-    model: "gpt-5.6-luna",
+    model: "test-model:7b",
     summary: "Inspect the agent, then open an interactive session.",
     assumptions: ["Codex CLI is authenticated."],
     gaps: ["The target workspace is not specified."],
@@ -26,7 +26,7 @@ function sparkPlan(overrides: Partial<SparkIntentPlan> = {}): SparkIntentPlan {
 
 function nativeReasoner(overrides: Partial<IntentReasoner> = {}): IntentReasoner {
   return {
-    status: vi.fn().mockResolvedValue({ available: true, loggedIn: true, model: "gpt-5.6-luna", message: "Luna ready." }),
+    status: vi.fn().mockResolvedValue({ available: true, loggedIn: true, model: "test-model:7b", provider: "ollama", configPath: "/tmp/reasoning.json", message: "Local model server reachable. Reasoning uses test-model:7b." }),
     reason: vi.fn().mockResolvedValue(sparkPlan()),
     ...overrides,
   };
@@ -178,7 +178,7 @@ describe("Operator Key overlay", () => {
   it("inserts a terminal-compatible selection only with Shift+Enter", async () => {
     const user = userEvent.setup();
     const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
-    render(<App runtime="native" actions={actions} />);
+    render(<App runtime="native" actions={actions} desktopCapabilities={{ canCopy: true, canInsert: true }} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes chat");
     await user.keyboard("{Shift>}{Enter}{/Shift}");
     expect(actions.insert).toHaveBeenCalledOnce();
@@ -244,9 +244,27 @@ describe("Operator Key overlay", () => {
     await waitFor(() => expect(search).not.toBeDisabled());
   });
 
+
+  it("explains rather than fails when the desktop cannot insert", async () => {
+    // A non-Wayland or non-Hyprland desktop previously produced a raw
+    // "could not start hyprctl" error only after the operator pressed the button.
+    const user = userEvent.setup();
+    const actions = { copy: vi.fn().mockResolvedValue(undefined), insert: vi.fn().mockResolvedValue(undefined) };
+    render(<App runtime="native" actions={actions} desktopCapabilities={{ canCopy: true, canInsert: false }} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes chat");
+
+    const insert = screen.getByRole("button", { name: /insert into confirmed terminal/i });
+    await waitFor(() => expect(insert).toBeDisabled());
+    expect(document.getElementById("insert-disabled-reason")).toHaveTextContent(/wayland/i);
+
+    // The keyboard path must be gated too, not just the button.
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(actions.insert).not.toHaveBeenCalled();
+  });
+
   it("associates the disabled insertion explanation with the control", async () => {
     const user = userEvent.setup();
-    render(<App runtime="native" />);
+    render(<App runtime="native" desktopCapabilities={{ canCopy: true, canInsert: true }} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "hermes logout");
 
     const insert = screen.getByRole("button", { name: /insert into confirmed terminal/i });
@@ -301,24 +319,24 @@ describe("Operator Key overlay", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/catalog is missing schema_version/i);
   });
 
-  it("checks native Luna status on mount without reasoning automatically", async () => {
+  it("checks native reasoning status on mount without reasoning automatically", async () => {
     const reasoner = nativeReasoner();
     render(<App runtime="native" intentReasoner={reasoner} />);
-    expect(screen.getByText(/checking luna status/i)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/luna ready/i)).toBeInTheDocument());
+    expect(screen.getByText(/checking reasoning status/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/reasoning uses test-model/i)).toBeInTheDocument());
     expect(reasoner.status).toHaveBeenCalledOnce();
     expect(reasoner.reason).not.toHaveBeenCalled();
-    const lunaButton = screen.getByRole("button", { name: /reason with luna/i });
-    expect(lunaButton).toHaveAttribute("aria-describedby", "luna-availability");
-    expect(document.getElementById("luna-availability")).toHaveAttribute("aria-live", "polite");
-    expect(document.getElementById("luna-availability")).toHaveAttribute("aria-atomic", "true");
+    const reasoningButton = screen.getByRole("button", { name: /^reason\b/i });
+    expect(reasoningButton).toHaveAttribute("aria-describedby", "reasoning-availability");
+    expect(document.getElementById("reasoning-availability")).toHaveAttribute("aria-live", "polite");
+    expect(document.getElementById("reasoning-availability")).toHaveAttribute("aria-atomic", "true");
     expect(screen.getByText(/bounded command fields shown in the local catalog.*never source paths, provenance, files, secrets, terminal contents, or history/i)).toBeInTheDocument();
   });
 
-  it("disables Luna in the browser and explains the native companion requirement", async () => {
+  it("disables reasoning in the browser and explains the native app requirement", async () => {
     const reasoner = nativeReasoner();
     render(<App runtime="web" intentReasoner={reasoner} />);
-    const button = screen.getByRole("button", { name: /reason with luna/i });
+    const button = screen.getByRole("button", { name: /^reason\b/i });
     expect(button).toBeDisabled();
     expect(screen.getAllByText(/native operator key companion/i).length).toBeGreaterThan(0);
     expect(reasoner.reason).not.toHaveBeenCalled();
@@ -326,13 +344,13 @@ describe("Operator Key overlay", () => {
 
   it("shows signed-out native status and keeps reasoning disabled", async () => {
     const reasoner = nativeReasoner({
-      status: vi.fn().mockResolvedValue({ available: true, loggedIn: false, model: "gpt-5.6-luna", message: "Sign in with Codex CLI to continue." }),
+      status: vi.fn().mockResolvedValue({ available: true, loggedIn: false, model: "test-model:7b", provider: "codex", configPath: "/tmp/reasoning.json", message: "Codex is signed out. Run `codex login` to sign in before using reasoning." }),
     });
     const user = userEvent.setup();
     render(<App runtime="native" intentReasoner={reasoner} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Open an interactive Hermes session after checking status.");
-    expect(await screen.findByText(/sign in with codex cli/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /reason with luna/i })).toBeDisabled();
+    expect(await screen.findByText(/codex is signed out/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^reason\b/i })).toBeDisabled();
   });
 
   it("reasons only on Alt+Enter and sends the exact bounded candidate IDs", async () => {
@@ -342,7 +360,7 @@ describe("Operator Key overlay", () => {
     const input = screen.getByRole("searchbox", { name: /operator intent/i });
     const intent = "Open an interactive Hermes session after checking status.";
     await user.type(input, intent);
-    await screen.findByText(/luna ready/i);
+    await screen.findByText(/reasoning uses test-model/i);
     await user.keyboard("{Alt>}{Enter}{/Alt}");
 
     const parsed = parseCatalog(catalogJson);
@@ -355,7 +373,7 @@ describe("Operator Key overlay", () => {
     );
   });
 
-  it("locks every interaction including Escape while Luna is pending without copying or inserting", async () => {
+  it("locks every interaction including Escape while reasoning is pending without copying or inserting", async () => {
     const user = userEvent.setup();
     let finishReasoning: ((plan: SparkIntentPlan) => void) | undefined;
     const reasoner = nativeReasoner({ reason: vi.fn(() => new Promise<SparkIntentPlan>((resolve) => { finishReasoning = resolve; })) });
@@ -364,11 +382,11 @@ describe("Operator Key overlay", () => {
     render(<App runtime="native" intentReasoner={reasoner} actions={actions} hideOverlay={hideOverlay} />);
     const input = screen.getByRole("searchbox", { name: /operator intent/i });
     await user.type(input, "hermes status");
-    await screen.findByText(/luna ready/i);
-    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByText(/reasoning uses test-model/i);
+    await user.click(screen.getByRole("button", { name: /^reason\b/i }));
 
     expect(input).toBeDisabled();
-    expect(screen.getByRole("button", { name: /reason with luna/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^reason\b/i })).toBeDisabled();
     expect(screen.getByLabelText(/interface filter/i)).toBeDisabled();
     expect(screen.getByLabelText(/safety filter/i)).toBeDisabled();
     expect(screen.getByRole("listbox", { name: /command results/i })).toHaveAttribute("aria-busy", "true");
@@ -378,14 +396,14 @@ describe("Operator Key overlay", () => {
     expect(screen.getByRole("button", { name: /close operator key/i })).toBeDisabled();
     expect(actions.copy).not.toHaveBeenCalled();
     expect(actions.insert).not.toHaveBeenCalled();
-    expect(document.getElementById("luna-availability")).toHaveTextContent(/reasoning in progress/i);
+    expect(document.getElementById("reasoning-availability")).toHaveTextContent(/reasoning in progress/i);
     fireEvent.keyDown(window, { key: "Escape" });
     expect(hideOverlay).not.toHaveBeenCalled();
     expect(input).toHaveValue("hermes status");
 
     finishReasoning?.(sparkPlan());
     await screen.findByRole("region", { name: /intent structure/i });
-    expect(screen.getByText(/luna reasoning complete with 2 ordered commands/i)).toHaveAttribute("role", "status");
+    expect(screen.getByText(/reasoning complete with 2 ordered commands/i)).toHaveAttribute("role", "status");
   });
 
   it("renders trusted catalog commands in recommendation order with assumptions and gaps", async () => {
@@ -393,11 +411,11 @@ describe("Operator Key overlay", () => {
     const reasoner = nativeReasoner();
     render(<App runtime="native" intentReasoner={reasoner} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Check status then start chat.");
-    await screen.findByText(/luna ready/i);
-    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByText(/reasoning uses test-model/i);
+    await user.click(screen.getByRole("button", { name: /^reason\b/i }));
 
     const structure = await screen.findByRole("region", { name: /intent structure/i });
-    expect(structure).toHaveTextContent("gpt-5.6-luna");
+    expect(structure).toHaveTextContent("test-model:7b");
     expect(structure).toHaveTextContent("Inspect the agent, then open an interactive session.");
     expect(structure).toHaveTextContent("Codex CLI is authenticated.");
     expect(structure).toHaveTextContent("The target workspace is not specified.");
@@ -418,8 +436,8 @@ describe("Operator Key overlay", () => {
     });
     render(<App runtime="native" intentReasoner={reasoner} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Do a made-up thing.");
-    await screen.findByText(/luna ready/i);
-    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByText(/reasoning uses test-model/i);
+    await user.click(screen.getByRole("button", { name: /^reason\b/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/unknown.*model-invented-command/i);
     expect(screen.queryByText("Unsafe invention")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
@@ -430,8 +448,8 @@ describe("Operator Key overlay", () => {
     const reasoner = nativeReasoner({ reason: vi.fn().mockRejectedValue(new Error("Codex request timed out")) });
     render(<App runtime="native" intentReasoner={reasoner} />);
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Check status.");
-    await screen.findByText(/luna ready/i);
-    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByText(/reasoning uses test-model/i);
+    await user.click(screen.getByRole("button", { name: /^reason\b/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/codex request timed out/i);
     expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
   });
@@ -446,8 +464,8 @@ describe("Operator Key overlay", () => {
     render(<App runtime="native" intentReasoner={nativeReasoner()} />);
     const input = screen.getByRole("searchbox", { name: /operator intent/i });
     await user.type(input, "Check status then chat.");
-    await screen.findByText(/luna ready/i);
-    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByText(/reasoning uses test-model/i);
+    await user.click(screen.getByRole("button", { name: /^reason\b/i }));
     expect(await screen.findByRole("region", { name: /intent structure/i })).toBeInTheDocument();
 
     const control = getControl();
@@ -463,8 +481,8 @@ describe("Operator Key overlay", () => {
     render(<App runtime="native" intentReasoner={reasoner} />);
     const input = screen.getByRole("searchbox", { name: /operator intent/i });
     await user.type(input, "Check status then chat.");
-    await screen.findByText(/luna ready/i);
-    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByText(/reasoning uses test-model/i);
+    await user.click(screen.getByRole("button", { name: /^reason\b/i }));
     await screen.findByRole("region", { name: /intent structure/i });
     await user.type(input, " now");
     expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
@@ -476,8 +494,8 @@ describe("Operator Key overlay", () => {
     const input = screen.getByRole("searchbox", { name: /operator intent/i });
     const intent = "hermes";
     await user.type(input, intent);
-    await screen.findByText(/luna ready/i);
-    await user.click(screen.getByRole("button", { name: /reason with luna/i }));
+    await screen.findByText(/reasoning uses test-model/i);
+    await user.click(screen.getByRole("button", { name: /^reason\b/i }));
     await screen.findByRole("region", { name: /intent structure/i });
     await user.click(screen.getByRole("button", { name: /return to local search/i }));
     expect(input).toHaveValue(intent);

@@ -1,0 +1,119 @@
+# Build installable packages on a version tag.
+#
+# Distribution was previously "copy the raw ELF somewhere on your PATH", which works for
+# the author and is unfriendly and unverifiable for anyone else. This produces .deb and
+# .rpm packages from a clean checkout, plus SHA-256 sums so a download can be checked.
+#
+# AppImage is deliberately not built: its bundler downloads `linuxdeploy` at build time,
+# which fails in a sandboxed runner and makes the release non-reproducible. .deb and .rpm
+# are built entirely from the checkout.
+#
+# The verify workflow must pass before a release is published: a tag is not a substitute
+# for the test suite.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: verify before releasing
+    uses: ./.github/workflows/verify.yml
+
+  package:
+    name: build packages
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Confirm the tag matches the declared version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          declared=$(node -p "require('./package.json').version")
+          if [ "$tag" != "$declared" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $declared" >&2
+            exit 1
+          fi
+          echo "Tag and declared version agree: $declared"
+
+      - name: Build packages
+        # This script applies the path remapping that keeps the builder's identity out of
+        # the binary, and fails if any home path or username survives into the result.
+        run: bash scripts/build-release.sh
+
+      - name: Collect artefacts and checksums
+        run: |
+          mkdir -p dist
+          find src-tauri/target/release/bundle -type f \( -name '*.deb' -o -name '*.rpm' \) \
+            -exec cp {} dist/ \;
+          cd dist
+          # Spaces in the bundled filenames make shell globbing fragile; rename first.
+          for f in *; do mv -- "$f" "$(echo "$f" | tr ' ' '.')"; done
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Confirm the built binary carries no builder identity
+        run: |
+          # scripts/build-release.sh already fails on a leak. This repeats the check as an
+          # independent gate, so a future change to that script cannot quietly remove the
+          # only thing standing between a builder's username and a public download.
+          bin=src-tauri/target/release/operator-key
+          if strings -n 6 "$bin" | grep -qE '/home/[a-z0-9_-]+/|/Users/[a-z0-9_-]+/'; then
+            echo "FAIL: the built binary contains a real home directory path" >&2
+            strings -n 6 "$bin" | grep -oE '/home/[a-z0-9_-]+/|/Users/[a-z0-9_-]+/' | sort -u >&2
+            exit 1
+          fi
+          if strings -n 4 "$bin" | grep -qF "/$(id -un)/"; then
+            echo "FAIL: the built binary names the building user" >&2
+            exit 1
+          fi
+          echo "ok: no builder home paths or username in the binary"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: dist/
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            Install the `.deb` or `.rpm` for your distribution.
+
+            Verify your download before installing:
+
+            ```
+            sha256sum -c SHA256SUMS
+            ```
+
+            Operator Key ships no model, no account and no credential. Reasoning is
+            optional, disabled by default, and talks only to a model you run yourself on
+            loopback — see `docs/REASONING.md`.

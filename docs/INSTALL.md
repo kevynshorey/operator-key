@@ -35,9 +35,12 @@ Typical output identifies the target and backup, the source and stable destinati
 
 ```lua
 -- >>> Operator Key managed binding >>>
-o.bind("SUPER + SHIFT + K", "Operator Key", o.launch("/home/you/.local/bin/operator-key"))
+o.bind("SUPER + SHIFT + K", "Operator Key", o.launch("$HOME/.local/bin/operator-key"))
 -- <<< Operator Key managed binding <<<
 ```
+
+The installer writes your own absolute home directory here; `$HOME` stands in for it in
+this document so the example reads correctly on any machine.
 
 Omarchy's user bindings file already defines `o`; its helper contract accepts `o.bind(chord, description, o.launch(absolute_path))`. The installer preserves the exact bytes and mode outside this uniquely marked block, including the file's newline style.
 

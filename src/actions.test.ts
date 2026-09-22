@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CatalogEntry } from "./catalog";
-import { createBrowserActions, createNativeActions, getActionAvailability } from "./actions";
+import {
+  createBrowserActions,
+  createNativeActions,
+  getActionAvailability,
+  readCatalogSnapshot,
+  readDesktopCapabilities,
+  UNKNOWN_DESKTOP_CAPABILITIES,
+  UNSUPPORTED_INSERT_REASON,
+  WEB_DESKTOP_CAPABILITIES,
+} from "./actions";
 
 function entry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
@@ -57,6 +66,53 @@ describe("action availability", () => {
     expect(availability.insert).toBe(false);
     expect(availability.warning).toMatch(/danger|red/i);
   });
+
+  it("disables insertion with an explanation when the desktop cannot insert", () => {
+    // On X11, GNOME or macOS the wl-copy/hyprctl/wtype helpers do not exist. The operator
+    // previously saw a raw "could not start hyprctl" process error from the native side.
+    const availability = getActionAvailability(entry({ interface: "shell-command", safety_level: "green" }), "native", {
+      canCopy: true,
+      canInsert: false,
+    });
+
+    expect(availability.copy).toBe(true);
+    expect(availability.insert).toBe(false);
+    expect(availability.insertReason).toBe(UNSUPPORTED_INSERT_REASON);
+    expect(availability.insertReason).toMatch(/wayland/i);
+    // Search and copy remain available, so the app is still useful on that desktop.
+    expect(availability.insertReason).toMatch(/copy still work/i);
+  });
+
+  it("allows insertion when the desktop reports it is supported", () => {
+    const availability = getActionAvailability(entry({ interface: "shell-command", safety_level: "green" }), "native", {
+      canCopy: true,
+      canInsert: true,
+    });
+
+    expect(availability.insert).toBe(true);
+    expect(availability.insertReason).toBeUndefined();
+  });
+
+  it("treats an unknown desktop as unable to act rather than assuming success", () => {
+    expect(UNKNOWN_DESKTOP_CAPABILITIES).toEqual({ canCopy: false, canInsert: false });
+    expect(WEB_DESKTOP_CAPABILITIES).toEqual({ canCopy: true, canInsert: false });
+  });
+});
+
+describe("desktop capability probe", () => {
+  it("falls back to unknown capabilities when the native command is missing", async () => {
+    // An older native binary paired with a newer frontend must not break the UI.
+    const invoke = vi.fn().mockRejectedValue(new Error("command desktop_capabilities not found"));
+
+    await expect(readDesktopCapabilities(invoke)).resolves.toEqual(UNKNOWN_DESKTOP_CAPABILITIES);
+  });
+
+  it("reports the capabilities the native side returns", async () => {
+    const invoke = vi.fn().mockResolvedValue({ canCopy: true, canInsert: true });
+
+    await expect(readDesktopCapabilities(invoke)).resolves.toEqual({ canCopy: true, canInsert: true });
+    expect(invoke).toHaveBeenCalledWith("desktop_capabilities");
+  });
 });
 
 describe("native action bridge", () => {
@@ -111,5 +167,25 @@ describe("browser action bridge", () => {
 
   it("never inserts from a browser", async () => {
     await expect(createBrowserActions({}, document).insert(entry())).rejects.toThrow(/native Operator Key companion/i);
+  });
+});
+
+describe("catalog snapshot", () => {
+  it("returns the native catalog so both sides agree on command text", async () => {
+    // The native gate compares submitted command text against its own catalog exactly.
+    // If the UI kept build-time text while the native side applied an operator's sidecar,
+    // every copy and insert would fail as a mismatch.
+    const snapshot = { entries: [{ id: "a", command: "gh pr list --limit 50" }] };
+    const invoke = vi.fn().mockResolvedValue(snapshot);
+
+    await expect(readCatalogSnapshot(invoke)).resolves.toEqual(snapshot);
+    expect(invoke).toHaveBeenCalledWith("catalog_snapshot");
+  });
+
+  it("falls back to the build-time catalog when the native command is unavailable", async () => {
+    // An older native binary, or the browser build, must keep working.
+    const invoke = vi.fn().mockRejectedValue(new Error("command catalog_snapshot not found"));
+
+    await expect(readCatalogSnapshot(invoke)).resolves.toBeNull();
   });
 });

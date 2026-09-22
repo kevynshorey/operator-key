@@ -42,7 +42,7 @@ function plan(recommendations: SparkIntentPlan["recommendations"]): SparkIntentP
     assumptions: [],
     recommendations,
     gaps: [],
-    model: "gpt-5.6-luna",
+    model: "test-model:7b",
   };
 }
 
@@ -171,7 +171,7 @@ describe("intent reasoner adapters", () => {
     const status = {
       available: true,
       loggedIn: true,
-      model: "gpt-5.6-luna",
+      model: "test-model:7b",
       message: "Codex CLI is ready.",
     };
     const response = plan([]);
@@ -192,10 +192,12 @@ describe("intent reasoner adapters", () => {
     await expect(reasoner.status()).resolves.toEqual({
       available: false,
       loggedIn: false,
-      model: "gpt-5.6-luna",
-      message: "Luna reasoning requires the native Operator Key companion with an authenticated Codex CLI.",
+      model: "",
+      provider: "disabled",
+      configPath: "",
+      message: "Reasoning requires the native Operator Key app, which talks to a model you run and configure yourself.",
     });
-    await expect(reasoner.reason("review this", ["a"])).rejects.toThrow(/native Operator Key companion.*Codex CLI/i);
+    await expect(reasoner.reason("review this", ["a"])).rejects.toThrow(/native Operator Key app.*model you run/i);
   });
 });
 

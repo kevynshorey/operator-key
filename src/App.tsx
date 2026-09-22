@@ -17,6 +17,11 @@ import { createSearchIndex, searchCatalog } from "./search";
 import { hideOverlay, type HideOverlay } from "./overlay";
 import {
   getActionAvailability,
+  readCatalogSnapshot,
+  readDesktopCapabilities,
+  UNKNOWN_DESKTOP_CAPABILITIES,
+  WEB_DESKTOP_CAPABILITIES,
+  type DesktopCapabilities,
   createBrowserActions,
   nativeActions,
   type ActionAvailability,
@@ -80,6 +85,11 @@ interface AppProps {
   intentReasoner?: IntentReasoner;
   /** Advisory freshness report; injected in tests, read from data/freshness.json at build. */
   freshness?: unknown;
+  /**
+   * What the host desktop can do. Injected in tests so each case states the desktop it
+   * assumes; in the real app it is probed from the native side on mount.
+   */
+  desktopCapabilities?: DesktopCapabilities;
 }
 
 interface ActiveIntentPlan {
@@ -291,10 +301,10 @@ function IntentStructure({ activePlan, onReturn }: { activePlan: ActiveIntentPla
   const { plan, recommendations } = activePlan;
   return (
     <section className="intent-structure" role="region" aria-labelledby="intent-structure-heading">
-      <p className="sr-only" role="status" aria-live="polite">Luna reasoning complete with {recommendations.length} ordered {recommendations.length === 1 ? "command" : "commands"}.</p>
+      <p className="sr-only" role="status" aria-live="polite">Reasoning complete with {recommendations.length} ordered {recommendations.length === 1 ? "command" : "commands"}.</p>
       <div className="intent-structure-header">
         <div>
-          <span className="eyebrow">LUNA STRUCTURE / {plan.model}</span>
+          <span className="eyebrow">REASONED PLAN / {plan.model}</span>
           <h2 id="intent-structure-heading">INTENT STRUCTURE</h2>
         </div>
         <button type="button" onClick={onReturn}>Return to local search</button>
@@ -776,8 +786,13 @@ function FreshnessBanner({ summary }: { summary: FreshnessSummary }) {
   );
 }
 
-export default function App({ loading = false, catalogData = catalogJson, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData }: AppProps) {
-  const parsed = useMemo(() => parseCatalog(catalogData), [catalogData]);
+export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities }: AppProps) {
+  // The native side may have applied an operator's sidecar catalog. Until it answers, the
+  // build-time import stands; both sides must agree on command text or every action fails
+  // the native mismatch check.
+  const [nativeCatalog, setNativeCatalog] = useState<unknown | undefined>(undefined);
+  const catalogData = injectedCatalogData ?? catalogJson;
+  const parsed = useMemo(() => parseCatalog(nativeCatalog ?? catalogData), [nativeCatalog, catalogData]);
   const searchIndex = useMemo(
     () => parsed.ok ? createSearchIndex(parsed.catalog.entries) : undefined,
     [parsed],
@@ -822,6 +837,11 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const runtime = injectedRuntime ?? detectRuntime();
   const dismissOverlay = injectedHideOverlay ?? hideOverlay;
   const operatorActions = injectedActions ?? (runtime === "native" ? nativeActions : createBrowserActions());
+  // What this desktop can actually do. Unknown until the native side answers, so the
+  // affected controls start disabled rather than promising an action that would fail.
+  const [desktopCapabilities, setDesktopCapabilities] = useState<DesktopCapabilities>(
+    injectedDesktopCapabilities ?? (runtime === "native" ? UNKNOWN_DESKTOP_CAPABILITIES : WEB_DESKTOP_CAPABILITIES),
+  );
   const defaultIntentReasoner = useMemo(
     () => runtime === "native" ? createNativeIntentReasoner() : createBrowserIntentReasoner(),
     [runtime],
@@ -838,12 +858,31 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   }, []);
 
   useEffect(() => {
+    if (runtime !== "native" || injectedDesktopCapabilities) return;
+    let current = true;
+    void readDesktopCapabilities().then((capabilities) => {
+      if (current) setDesktopCapabilities(capabilities);
+    });
+    return () => { current = false; };
+  }, [runtime, injectedDesktopCapabilities]);
+
+  useEffect(() => {
+    // Tests inject `catalogData` directly and must not be overwritten by a native answer.
+    if (runtime !== "native" || injectedCatalogData !== undefined) return;
+    let current = true;
+    void readCatalogSnapshot().then((snapshot) => {
+      if (current && snapshot) setNativeCatalog(snapshot);
+    });
+    return () => { current = false; };
+  }, [runtime, injectedCatalogData]);
+
+  useEffect(() => {
     if (loading || !parsed.ok) return;
     let current = true;
     void intentReasoner.status()
       .then((status) => { if (current) setSparkStatus(status); })
       .catch((error: unknown) => {
-        if (current) setSparkStatus({ available: false, loggedIn: false, model: "gpt-5.6-luna", message: `Luna status unavailable: ${error instanceof Error ? error.message : String(error)}` });
+        if (current) setSparkStatus({ available: false, loggedIn: false, model: "", provider: "disabled", configPath: "", message: `Reasoning status unavailable: ${error instanceof Error ? error.message : String(error)}` });
       })
       .finally(() => { if (current) setSparkStatusPending(false); });
     return () => { current = false; };
@@ -998,13 +1037,13 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
       const plan = await intentReasoner.reason(intent, candidateIds);
       const mapped = mapIntentPlanEntries(plan, parsed.catalog.entries);
       if (!mapped.ok) {
-        setReasoningError(`Luna returned ${mapped.error.code === "unknown-entry-id" ? "unknown" : "duplicate"} catalog ID “${mapped.error.entryId}”. No plan was activated.`);
+        setReasoningError(`The model returned ${mapped.error.code === "unknown-entry-id" ? "an unknown" : "a duplicate"} catalog ID “${mapped.error.entryId}”. No plan was activated.`);
         return;
       }
       setActivePlan({ plan, recommendations: mapped.recommendations });
       setSelectedIndex(0);
     } catch (error) {
-      setReasoningError(`Luna reasoning failed: ${actionErrorMessage(error)}`);
+      setReasoningError(`Reasoning failed: ${actionErrorMessage(error)}`);
     } finally {
       setReasoningPending(false);
     }
@@ -1025,7 +1064,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
 
   const insertSelected = async () => {
     if (!actionSelection || controlsLocked) return;
-    const availability = getActionAvailability(actionSelection, runtime);
+    const availability = getActionAvailability(actionSelection, runtime, desktopCapabilities);
     if (!availability.insert) {
       setActionStatus({ kind: "status", message: availability.insertReason ?? "Terminal insertion is unavailable." });
       return;
@@ -1093,10 +1132,10 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
   const sparkUnavailableReason = runtime === "web"
     ? BROWSER_SPARK_ERROR
     : sparkStatusPending
-      ? "Checking Luna status…"
-      : sparkStatus?.message ?? "Luna status unavailable.";
+      ? "Checking reasoning status…"
+      : sparkStatus?.message ?? "Reasoning status unavailable.";
   const sparkDisabled = runtime !== "native" || !query.trim() || controlsLocked || sparkStatusPending || !sparkStatus?.available || !sparkStatus.loggedIn;
-  const lunaStatusMessage = reasoningPending ? "Luna reasoning in progress…" : sparkUnavailableReason;
+  const reasoningStatusMessage = reasoningPending ? "Reasoning in progress…" : sparkUnavailableReason;
 
   return (
     <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}${query.trim() ? " has-query" : ""}`} data-testid="operator-shell">
@@ -1185,12 +1224,12 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
           </div>
         )}
         <div className="intent-composer-actions">
-          <button type="button" className="spark-button" aria-label="Reason with Luna" aria-describedby="luna-availability" disabled={sparkDisabled} onClick={() => { void reasonAboutIntent(); }}>
-            <span aria-hidden="true">✦</span> {reasoningPending ? "Reasoning…" : "Reason with Luna"} <kbd>ALT+ENTER</kbd>
+          <button type="button" className="spark-button" aria-label="Reason about this intent" aria-describedby="reasoning-availability" disabled={sparkDisabled} onClick={() => { void reasonAboutIntent(); }}>
+            <span aria-hidden="true">✦</span> {reasoningPending ? "Reasoning…" : "Reason"} <kbd>ALT+ENTER</kbd>
           </button>
           <div className="spark-copy">
             <p>Reasoning sends the entered intent and bounded command fields shown in the local catalog to OpenAI through local Codex; never source paths, provenance, files, secrets, terminal contents, or history.</p>
-            <small id="luna-availability" aria-live="polite" aria-atomic="true" className={!reasoningPending && sparkStatus?.available && sparkStatus.loggedIn && runtime === "native" ? "spark-ready" : ""}>{lunaStatusMessage}</small>
+            <small id="reasoning-availability" aria-live="polite" aria-atomic="true" className={!reasoningPending && sparkStatus?.available && sparkStatus.loggedIn && runtime === "native" ? "spark-ready" : ""}>{reasoningStatusMessage}</small>
           </div>
           {reasoningError && <p className="spark-error" role="alert">{reasoningError}</p>}
         </div>
@@ -1284,7 +1323,7 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
                 <DetailCard
                   entry={selected}
                   catalog={parsed.catalog}
-                  availability={getActionAvailability(selected, runtime)}
+                  availability={getActionAvailability(selected, runtime, desktopCapabilities)}
                   actionPending={controlsLocked}
                   onCopy={() => { void copySelected(); }}
                   onInsert={() => { void insertSelected(); }}
@@ -1308,8 +1347,8 @@ export default function App({ loading = false, catalogData = catalogJson, hideOv
             </section>
           </section>
 
-          <aside className="result-lane" aria-label={activePlan ? "Luna recommended commands" : "Search results"}>
-            <div className="lane-heading"><span>{activePlan ? "LUNA STRUCTURE" : "LOCAL MATCH"}</span><strong>{displayedResults.length.toString().padStart(2, "0")}</strong></div>
+          <aside className="result-lane" aria-label={activePlan ? "Recommended commands" : "Search results"}>
+            <div className="lane-heading"><span>{activePlan ? "REASONED PLAN" : "LOCAL MATCH"}</span><strong>{displayedResults.length.toString().padStart(2, "0")}</strong></div>
             <ul id="result-list" role="listbox" aria-label="Command results" aria-busy={controlsLocked}>
               {displayedResults.map(({ entry }, index) => (
                 <ResultRow

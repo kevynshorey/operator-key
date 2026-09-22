@@ -13,3 +13,17 @@ test-results/
 # upstream. Committing it would make a fresh clone display another machine's drift as if
 # it were their own. An absent file correctly reads as "never checked".
 data/freshness.json
+
+# Operator reasoning configuration. This names a model you run and may name an
+# environment variable holding a key. It belongs on your machine, never in the repo.
+reasoning.json
+**/operator-key/reasoning.json
+
+# Internal audit reports.
+#
+# These describe unfixed findings, operator-specific infrastructure and disclosure
+# timelines. Publishing one hands an attacker a map, and the 2026-09-21 report in
+# particular names the author's notification setup — the exact class of detail that
+# report told us to remove from public docs. Keep them local; SECURITY.md is the
+# public-facing document.
+docs/AUDIT-*.md

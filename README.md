@@ -2,10 +2,33 @@
 
 Operator Key is a local-first command compass for operators who remember the task but not the shortcut.
 
-> **If you just cloned this repository, run `python3 scripts/build_catalog.py` first.**
-> The catalog shipped in `data/catalog.json` was generated on the author's machine. It
-> lets the app run immediately, but until you rebuild it, it describes software versions
-> that are not yours. The app says so on screen rather than implying otherwise.
+> **If you just cloned this repository, build a catalog from your own machine.**
+> The catalog shipped in `data/catalog.json` was generated elsewhere. It lets the app run
+> immediately, but until you rebuild it, it describes software versions that are not
+> yours. The app says so on screen rather than implying otherwise.
+>
+> ```bash
+> python3 scripts/build_catalog.py
+> ```
+>
+> You no longer need to rebuild the application to use it — see
+> [`docs/CATALOG.md`](docs/CATALOG.md).
+
+## What it does not contain
+
+Operator Key ships **no AI model, no account and no credential**. A clone contains nothing
+about whoever built it.
+
+Reasoning is optional and off by default. If you turn it on, it talks to a model **you**
+run, at an address that must be on loopback — the app cannot reach a remote server even if
+its configuration asks it to. Configuration lives outside the repository, and a small
+local model is enough: the model only ranks and explains entries from the catalog, and can
+never put command text in front of you that the catalog does not already contain. See
+[`docs/REASONING.md`](docs/REASONING.md).
+
+The app never executes a command. It searches, explains, copies, and on a supported
+desktop types text into a terminal you already have focused. Pressing Enter is always
+yours.
 
 It builds a version-aware catalog from the installed Omarchy, Hermes Agent, Claude Code, Codex CLI, Git, and GitHub CLI environments, then lets the operator search by intent.
 
@@ -208,6 +231,9 @@ cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
 Playwright keeps its portable shared-memory default. On a local Omarchy host where `/tmp` is constrained but `/dev/shm` has sufficient capacity, opt in explicitly with `OPERATOR_KEY_PLAYWRIGHT_USE_DEV_SHM=1 npm run test:e2e`.
+
+Reporting a vulnerability: [`SECURITY.md`](SECURITY.md). Contributing:
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Release history: [`CHANGELOG.md`](CHANGELOG.md).
 
 See [`docs/VERIFICATION.md`](docs/VERIFICATION.md) for the exact installed artifact, catalog counts, browser coverage, and native copy/insertion evidence.
 

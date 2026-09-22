@@ -33,7 +33,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "deb",
+      "rpm"
+    ],
     "category": "Utility",
     "shortDescription": "Intent search for local operator commands",
     "icon": [

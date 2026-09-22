@@ -25,6 +25,10 @@ export interface SparkStatus {
   available: boolean;
   loggedIn: boolean;
   model: string;
+  /** Which backend is configured: "disabled", "ollama", "openai-compatible", or "codex". */
+  provider: string;
+  /** Absolute path of the operator's reasoning config, for actionable UI messages. */
+  configPath: string;
   message: string;
 }
 
@@ -49,7 +53,7 @@ export type IntentPlanMappingResult =
 
 type Invoke = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 
-export const BROWSER_SPARK_ERROR = "Luna reasoning requires the native Operator Key companion with an authenticated Codex CLI.";
+export const BROWSER_SPARK_ERROR = "Reasoning requires the native Operator Key app, which talks to a model you run and configure yourself.";
 const MAX_CANDIDATES = 220;
 const INTENT_TERM_EXPANSIONS: Readonly<Record<string, readonly string[]>> = {
   check: ["status", "health", "doctor", "diagnose"],
@@ -235,7 +239,9 @@ export function createBrowserIntentReasoner(): IntentReasoner {
       return {
         available: false,
         loggedIn: false,
-        model: "gpt-5.6-luna",
+        model: "",
+        provider: "disabled",
+        configPath: "",
         message: BROWSER_SPARK_ERROR,
       };
     },

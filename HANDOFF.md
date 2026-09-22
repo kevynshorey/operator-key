@@ -196,62 +196,50 @@ No background processes running. Ports 1420 and 8899 closed. Scratch clones dele
 
 ---
 
-## 6. Live state of the machine
+## 6. Freshness state on a developer machine
 
-Measured 2026-09-21:
+`scripts/check_updates.py` compares the versions installed on the machine it runs on
+against each project's upstream release feed, and reports which tools have drifted.
 
-| product | installed | upstream | drift |
-|---|---|---|---|
-| omarchy | 4.0.3-1 | v4.0.4 | behind |
-| claude-code | 2.1.272 | v2.1.278 | behind |
-| codex | 0.154.0 | rust-v0.155.1 | behind |
-| gh | 2.100.0 | v2.101.0 | behind |
-| git | 2.55.0 | v2.55.0 | current (v2.56.0-rc1 correctly ignored) |
-| hermes | 0.21.3 | — | no public release feed |
+A measured snapshot is deliberately **not** recorded here. It describes one host, it is
+wrong the moment anyone updates anything, and a clone reading another operator's drift as
+if it were their own is precisely the confusion this project avoids elsewhere. Run the
+script to see your own state:
 
-Catalog matches installed versions (in sync). `data/freshness.json` exists locally and is
-**gitignored on purpose** — it describes THIS host, so committing it would show a clone
-someone else's drift as if it were their own.
+```bash
+python3 scripts/check_updates.py
+```
 
-**Suggested but not done:** `yay -Syu` then `python3 scripts/build_catalog.py` would clear
-the banner and pick up new commands. Left alone deliberately — updating the operator's
-tools is their call, not a side effect of a build.
+`data/freshness.json` is written locally and is **gitignored on purpose** for the same
+reason. Its absence reads correctly as "never checked here".
+
+Updating the tools themselves is the operator's decision, never a side effect of a build,
+so no build step upgrades anything. After you do update, rebuild the catalog to pick up
+new commands:
+
+```bash
+python3 scripts/build_catalog.py
+```
 
 ---
 
-## 7. Cron
+## 7. Scheduling the freshness check
 
-Job `e4e6e817551f` — "Operator Key upstream freshness check"
-- Schedule: **weekly, Mondays 09:00** (user-specified; next 2026-09-28T09:00-04:00)
-- Script: `~/.hermes/profiles/portfolio/scripts/operator-key-freshness.sh`
-- `no_agent=true`, `deliver=telegram` — silent unless there is genuinely something to report
-- Repo path from `${OPERATOR_KEY_REPO:-$HOME/Work/operator-key}`, not hardcoded
+The check is an ordinary script with no dependency on any particular scheduler. Anything
+that can run a command on a timer works: `cron`, a systemd timer, a CI schedule, or a
+manual run. The repository does not install or assume one.
 
-**Gateway: RESOLVED** (was the blocker in the previous handoff). Installed as a user
-systemd service (`hermes-gateway-portfolio.service`), enabled at boot with linger so it
-survives logout. Verified `active (running)`; `cronjob list` reports `gateway_running:
-true` and the job as `enabled`/`scheduled`. The script was run manually end-to-end and
-works.
+Two properties matter whichever you choose:
 
-Delivery is **Telegram** (user-chosen). `no_agent=true` means stdout is delivered verbatim
-and EMPTY stdout sends nothing at all — the watchdog pattern, so a week where every tool is
-current is a silent week rather than a "nothing to report" ping. A non-zero exit or timeout
-still raises an error alert, so genuine breakage is never silent.
+- **Silence means healthy.** The script prints nothing when every tool is current, so a
+  quiet week is a genuinely quiet week rather than a "nothing to report" notification.
+  A non-zero exit still signals real breakage.
+- **A scheduler reporting success does not prove a notification arrived.** Exit status
+  reflects the script, not the delivery path. If you rely on being notified, verify the
+  notification channel itself once, rather than trusting a green job record.
 
-**Known operational gotcha — Telegram bot-token conflict.** Telegram permits exactly ONE
-poller per bot token. A long-running interactive Hermes CLI session holds that token, so
-while one is open the gateway loses the race and logs
-`Conflict: terminated by other getUpdates request`, ending with
-`Gateway started with no connected platforms`. It retries about every 60s and connects on
-its own once the CLI session exits; no manual restart is needed.
-
-**A cron run can report `last_status: ok` while nothing was delivered.** That field reflects
-the SCRIPT's exit code, not the send. Verified on 2026-09-21: the job ran, produced correct
-drift output, and saved it to
-`~/.hermes/profiles/portfolio/cron/output/e4e6e817551f/` — but no message was sent, because
-no platform was connected. To confirm real delivery, check the gateway log for
-`[Telegram] Connected to Telegram (polling mode)` WITHOUT a following conflict, rather than
-trusting the cron status field.
+The repository path is read from `$OPERATOR_KEY_REPO`, falling back to the working
+directory, so nothing is hardcoded to one machine.
 
 ---
 
