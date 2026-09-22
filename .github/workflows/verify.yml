@@ -140,9 +140,22 @@ jobs:
           # gitleaks needs history to scan commits, not just the current tree.
           fetch-depth: 0
       - name: gitleaks
+        # Scan the WHOLE history, not the push delta.
+        #
+        # gitleaks-action defaults to scanning only the commits in the triggering event.
+        # A run on main reported "1 commits, scanned ~2133 bytes" against a 46-commit,
+        # 767 KiB repository — so a credential committed at any earlier point would never
+        # be looked at, and the job would still report "No leaks detected".
+        #
+        # GITLEAKS_ENABLE_SUMMARY=false avoids the Checks API call the action makes to
+        # publish a job summary, which needs permissions this workflow deliberately
+        # does not grant (the same failure that broke the cargo-audit job).
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_SUMMARY: "false"
+        with:
+          args: detect --source . --redact --verbose --exit-code 1
 
   no-machine-state:
     name: no machine state committed
