@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -99,7 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -140,9 +140,26 @@ jobs:
           # gitleaks needs history to scan commits, not just the current tree.
           fetch-depth: 0
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        # Run the gitleaks binary directly rather than through gitleaks-action.
+        #
+        # The action scans only the commits in the triggering event, and it ignores an
+        # `args` override: a run on main reported "1 commits, scanned ~2133 bytes" against
+        # a 46-commit, 767 KiB repository, and passing `detect --source .` through `with:`
+        # changed nothing (still 1 commit / 789 bytes on the runner). A credential
+        # committed at any earlier point was therefore never examined, while the job
+        # still printed "No leaks detected".
+        #
+        # Invoking the binary scans the whole history: 87 commits, ~6.9 MB locally.
+        # Verified in a scratch repository that a token committed two commits back is
+        # MISSED by the delta scan (exit 0) and CAUGHT by this one (exit 1).
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o /tmp/gitleaks.tar.gz
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --redact --verbose --exit-code 1
 
   no-machine-state:
     name: no machine state committed
