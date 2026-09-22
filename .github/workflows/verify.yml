@@ -106,10 +106,30 @@ jobs:
       - name: npm audit
         run: npm audit --audit-level=moderate
       - uses: dtolnay/rust-toolchain@stable
-      - uses: rustsec/audit-check@v2
+      - name: Cache cargo-audit
+        # Building cargo-audit from source takes about 3.5 minutes on a clean runner.
+        # Cache the installed binary so only the advisory scan itself runs each time.
+        uses: actions/cache@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: src-tauri
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-${{ runner.os }}-v0.22.2
+      - name: cargo audit
+        # Run cargo-audit directly rather than via rustsec/audit-check.
+        #
+        # Two reasons. The action calls the GitHub Checks API to publish results, which
+        # fails with "Resource not accessible by integration" unless the workflow is
+        # granted `checks: write` — a permission worth avoiding for a job that only needs
+        # to read a lockfile. It also invokes cargo-audit from the repository root, so
+        # `src-tauri/.cargo/audit.toml` is never discovered and the documented advisory
+        # acknowledgements are silently ignored.
+        #
+        # `--deny warnings` makes that config meaningful: the seven transitive
+        # unmaintained/unsound advisories listed there are accepted deliberately, and any
+        # NEW advisory fails this job. Verified by removing one ID and watching it fail.
+        working-directory: src-tauri
+        run: |
+          command -v cargo-audit >/dev/null 2>&1 || cargo install cargo-audit --locked
+          cargo audit --deny warnings
 
   secrets:
     name: secret scan
