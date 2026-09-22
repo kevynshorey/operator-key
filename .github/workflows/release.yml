@@ -68,14 +68,21 @@ jobs:
 
       - name: Collect artefacts and checksums
         run: |
-          mkdir -p dist
+          # Not dist/: that is the frontend build output. `tauri build` fills it with
+          # index.html and assets/, so reusing it here mixes web assets into the release
+          # and the rename loop below fails with "cannot move 'assets' to a subdirectory
+          # of itself". release-artefacts/ is created empty and holds only packages.
+          rm -rf release-artefacts
+          mkdir -p release-artefacts
           find src-tauri/target/release/bundle -type f \( -name '*.deb' -o -name '*.rpm' \) \
-            -exec cp {} dist/ \;
-          cd dist
+            -exec cp {} release-artefacts/ \;
+          cd release-artefacts
           # Spaces in the bundled filenames make shell globbing fragile; rename first.
           for f in *; do mv -- "$f" "$(echo "$f" | tr ' ' '.')"; done
           sha256sum * > SHA256SUMS
           cat SHA256SUMS
+          # Fail loudly rather than publishing an empty release.
+          test "$(ls *.deb *.rpm 2>/dev/null | wc -l)" -ge 2
 
       - name: Confirm the built binary carries no builder identity
         run: |
@@ -97,13 +104,13 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: packages
-          path: dist/
+          path: release-artefacts/
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/*
+          files: release-artefacts/*
           generate_release_notes: true
           body: |
             Install the `.deb` or `.rpm` for your distribution.
