@@ -7,6 +7,10 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-09-22
+
 ### Security
 
 - **Reasoning is now disabled by default and reads its configuration from outside the
@@ -86,6 +90,4 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   declares 1.77.2, which would have failed to build for anyone on an older toolchain.
 - Overlay tests no longer flake against a 5-second default timeout on a loaded machine.
 
-## [0.1.0]
-
-Initial development version. Not released as a tagged artifact.
+[0.1.0]: https://github.com/kevynshorey/operator-key/releases/tag/v0.1.0
