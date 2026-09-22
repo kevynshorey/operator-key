@@ -27,3 +27,4 @@ reasoning.json
 # report told us to remove from public docs. Keep them local; SECURITY.md is the
 # public-facing document.
 docs/AUDIT-*.md
+release-artefacts/
