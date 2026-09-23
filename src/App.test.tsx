@@ -516,7 +516,7 @@ describe("Operator Key overlay", () => {
     await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "Ctrl+B");
     expect(await screen.findByText(/binding conflict/i)).toBeInTheDocument();
     expect(screen.getByText(/safety level/i)).toBeInTheDocument();
-    expect(screen.getByText(/version/i)).toBeInTheDocument();
+    expect(screen.getByText("Version", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("Provenance", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: /alternatives/i })).toBeInTheDocument();
   });

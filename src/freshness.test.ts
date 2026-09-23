@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   affectedProducts,
+  entryVersionVerdict,
   highestLevel,
   parseFreshness,
   summarizeFreshness,
@@ -311,6 +312,236 @@ describe("freshness summary", () => {
       NOW,
     );
     expect(summary.notices.some((n) => /behind upstream/i.test(n.headline))).toBe(false);
+  });
+});
+
+describe("per-entry version verdict", () => {
+  it("says nothing when the entry's version is the one installed", () => {
+    const verdict = entryVersionVerdict("hermes", "0.21.3", report());
+
+    // A command that matches the machine needs no annotation. Marking every entry would
+    // make the one that genuinely disagrees indistinguishable from the rest.
+    expect(verdict).toBeUndefined();
+  });
+
+  it("warns when the entry was catalogued from a version that is not installed now", () => {
+    const verdict = entryVersionVerdict(
+      "hermes",
+      "0.21.3",
+      report({
+        products: {
+          hermes: {
+            installed: "0.22.0",
+            drift: "unknown",
+            upstream_status: "no-public-feed",
+            catalog_built_from: "0.21.3",
+            catalog_matches_installed: false,
+          },
+        },
+      }),
+    );
+
+    expect(verdict?.level).toBe("attention");
+    // It must name BOTH versions: "may not match" without numbers is unactionable.
+    expect(verdict?.detail).toContain("0.21.3");
+    expect(verdict?.detail).toContain("0.22.0");
+  });
+
+  it("states the tool is absent rather than implying the command is stale", () => {
+    const verdict = entryVersionVerdict(
+      "hermes",
+      "0.21.3",
+      report({
+        products: {
+          hermes: {
+            installed: "unknown",
+            drift: "unknown",
+            upstream_status: "not-installed",
+            catalog_built_from: "0.21.3",
+            catalog_matches_installed: false,
+            installed_here: false,
+          },
+        },
+      }),
+    );
+
+    // Skill rule 39: "not installed here" is not "out of date". Saying a version mismatch
+    // for a tool the operator never had sends them to upgrade something absent.
+    expect(verdict?.level).toBe("info");
+    expect(verdict?.detail).toMatch(/not installed/i);
+    expect(verdict?.detail).not.toMatch(/out of date|behind|regenerate/i);
+  });
+
+  it("stays quiet about a product the report never mentions", () => {
+    // An unknown product is not evidence of a mismatch. Silence is the honest answer.
+    expect(entryVersionVerdict("git", "2.55.0", report())).toBeUndefined();
+  });
+
+  it("stays quiet when there is no report at all", () => {
+    expect(entryVersionVerdict("hermes", "0.21.3", undefined)).toBeUndefined();
+  });
+
+  it("does not warn merely because the tool is behind upstream", () => {
+    // Being behind upstream does not make the catalogued command wrong: it still matches
+    // what is installed. Flagging it per entry is the nagging that breeds banner blindness.
+    const verdict = entryVersionVerdict(
+      "hermes",
+      "0.21.3",
+      report({
+        products: {
+          hermes: {
+            installed: "0.21.3",
+            latest: "0.30.0",
+            drift: "behind",
+            upstream_status: "ok",
+            catalog_built_from: "0.21.3",
+            catalog_matches_installed: true,
+          },
+        },
+      }),
+    );
+
+    expect(verdict).toBeUndefined();
+  });
+
+  it("treats an empty entry version as unknown rather than mismatched", () => {
+    const verdict = entryVersionVerdict(
+      "hermes",
+      "",
+      report({
+        products: {
+          hermes: {
+            installed: "0.22.0",
+            drift: "unknown",
+            upstream_status: "no-public-feed",
+            catalog_built_from: "0.21.3",
+            catalog_matches_installed: false,
+          },
+        },
+      }),
+    );
+
+    // With no version on the entry there is nothing to compare; inventing a verdict from
+    // the product-level record would attribute a mismatch this entry never claimed.
+    expect(verdict).toBeUndefined();
+  });
+  it("survives a malformed product record instead of crashing the panel", () => {
+    // parseFreshness validates the envelope but CASTS products, so a record missing
+    // `installed` reaches the verdict. Reading .trim() off it threw a TypeError and took
+    // down the whole detail panel — an advisory note must never be able to do that.
+    // The report is machine-written and can be truncated, hand-edited, or half-written by
+    // an interrupted check, so malformed shapes are reachable in practice.
+    const malformed = parseFreshness({
+      checked_at: "2026-09-21T06:00:00Z",
+      products: { hermes: {} },
+    });
+
+    expect(() => entryVersionVerdict("hermes", "0.21.3", malformed)).not.toThrow();
+    expect(entryVersionVerdict("hermes", "0.21.3", malformed)).toBeUndefined();
+  });
+
+  it("ignores a product record whose fields are the wrong type", () => {
+    const malformed = parseFreshness({
+      checked_at: "2026-09-21T06:00:00Z",
+      products: { hermes: { installed: 42, installed_here: "yes" } },
+    });
+
+    expect(() => entryVersionVerdict("hermes", "0.21.3", malformed)).not.toThrow();
+    expect(entryVersionVerdict("hermes", "0.21.3", malformed)).toBeUndefined();
+  });
+
+  it("still reports absence when a malformed record says the tool is missing", () => {
+    // installed_here is the one field that must survive an otherwise-unusable record:
+    // it is the difference between "not installed" and a false staleness claim.
+    const partial = parseFreshness({
+      checked_at: "2026-09-21T06:00:00Z",
+      products: { hermes: { installed_here: false } },
+    });
+
+    const verdict = entryVersionVerdict("hermes", "0.21.3", partial);
+    expect(verdict?.level).toBe("info");
+    expect(verdict?.detail).toMatch(/not installed/i);
+  });
+});
+
+describe("hostile freshness documents", () => {
+  /**
+   * The report is a machine-written file on disk. It can be truncated by an interrupted
+   * check, hand-edited, or carry shapes the writer never intended. None of that may crash
+   * the panel or produce a claim the data does not support, so the parser is exercised
+   * against deliberately hostile shapes rather than only well-formed ones.
+   */
+  const hostile: [string, unknown][] = [
+    ["array as the products map", []],
+    ["array as a record", { hermes: [] }],
+    ["function as a record", { hermes: () => undefined }],
+    ["Date as a record", { hermes: new Date() }],
+    ["null-prototype record", { hermes: Object.assign(Object.create(null), { installed: "1.0" }) }],
+    ["boxed String installed", { hermes: { installed: new String("1.0") } }],
+    ["empty installed", { hermes: { installed: "" } }],
+    ["whitespace-only installed", { hermes: { installed: "   " } }],
+    ["installed_here truthy but not true", { hermes: { installed_here: 1 } }],
+    ["upstream_status in the wrong case", { hermes: { upstream_status: "NOT-INSTALLED" } }],
+    ["__proto__ key", JSON.parse('{"__proto__":{"polluted":true},"hermes":{"installed":"1.0"}}')],
+    ["constructor key", { constructor: { installed: "x" }, hermes: { installed: "1.0" } }],
+    ["numeric keys", { 0: { installed: "1.0" }, hermes: { installed: "1.0" } }],
+    ["nulls in optional fields", { hermes: { installed: "1.0", drift: null, upstream_status: null, latest: null } }],
+    ["wrong types throughout", { hermes: { installed: "1.0", drift: 42, upstream_status: [], catalog_matches_installed: "no", last_known_drift: {} } }],
+  ];
+
+  for (const [name, products] of hostile) {
+    it(`neither crashes nor invents a claim: ${name}`, () => {
+      const parsed = parseFreshness({ checked_at: "2026-09-21T06:00:00Z", products });
+
+      expect(() => entryVersionVerdict("hermes", "0.21.3", parsed)).not.toThrow();
+      expect(() => summarizeFreshness(parsed, NOW)).not.toThrow();
+      expect(() => highestLevel(summarizeFreshness(parsed, NOW))).not.toThrow();
+
+      // Whatever it decides to say must not leak the shape of the bad data.
+      const verdict = entryVersionVerdict("hermes", "0.21.3", parsed);
+      if (verdict) expect(verdict.detail).not.toMatch(/undefined|NaN|\[object/);
+      for (const notice of summarizeFreshness(parsed, NOW).notices) {
+        expect(`${notice.headline} ${notice.detail}`).not.toMatch(/undefined|NaN|\[object/);
+      }
+    });
+  }
+
+  it("cannot smuggle a record in through the prototype chain", () => {
+    // Assigning a key named __proto__ onto a plain {} invokes the prototype setter, so the
+    // map itself inherits the attacker's object. A later lookup for a product named after
+    // any key on it would then find a record nobody wrote. The map is null-prototype and
+    // lookups are own-key only, so an unwritten product stays absent.
+    const parsed = parseFreshness({
+      checked_at: "2026-09-21T06:00:00Z",
+      products: JSON.parse('{"__proto__":{"installed":"9.9.9","installed_here":true}}'),
+    });
+
+    expect(parsed?.products.installed).toBeUndefined();
+    expect(Object.getPrototypeOf(parsed?.products ?? {})).toBeNull();
+
+    // And nothing inherited may surface as a verdict about a real catalog product.
+    expect(entryVersionVerdict("installed", "0.21.3", parsed)).toBeUndefined();
+  });
+
+  it("does not pollute Object.prototype through a __proto__ key", () => {
+    parseFreshness({
+      checked_at: "2026-09-21T06:00:00Z",
+      products: JSON.parse('{"__proto__":{"polluted":true}}'),
+    });
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("drops a record that throws on property access", () => {
+    // Unreachable from the JSON module the app loads (JSON has no getters), but the
+    // parser is total so no caller has to reason about whether its input is exotic.
+    const evil = { hermes: {} as Record<string, unknown> };
+    Object.defineProperty(evil.hermes, "installed", {
+      get() { throw new Error("hostile getter"); },
+      enumerable: true,
+    });
+
+    expect(() => parseFreshness({ checked_at: "2026-09-21T06:00:00Z", products: evil })).not.toThrow();
+    expect(parseFreshness({ checked_at: "2026-09-21T06:00:00Z", products: evil })?.products.hermes).toBeUndefined();
   });
 });
 

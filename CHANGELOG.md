@@ -9,11 +9,16 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Improved
 
+- Mark an individual command when it was catalogued from a version of its tool that is not the version installed now, so the warning reaches the operator at the command they are about to copy rather than only in the catalog-wide banner.
 - Report desktop compatibility as a supported/partly-supported mode with the exact missing prerequisite for each unavailable action, instead of only "Not confirmed".
 - Surface the reviewed global-shortcut installer in Settings as preview-first guidance, so the feature is discoverable without the app ever changing desktop configuration itself.
 - Keep local catalog search described as available on every desktop, including sessions where no native action can run.
 - Derive the displayed prerequisites and the native action gate from the same environment and PATH check, so guidance cannot disagree with what the app will allow.
 - Keep the compatibility report free of the operator's home directory, username, and environment, so it stays safe to include in a bug report.
+
+### Fixed
+
+- Stop the catalog freshness banner from claiming `role="alert"`. It is a standing advisory, and the alert channel belongs to transient action feedback; sitting in it stole announcements from real actions and made the alert role ambiguous across the app. This only surfaced when a real freshness report existed on disk, which CI never has because the report is machine-specific and gitignored.
 
 ## [0.2.2] - 2026-09-23
 
