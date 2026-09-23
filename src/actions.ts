@@ -97,6 +97,65 @@ function parseRequirement(value: unknown): DesktopRequirement | null {
   };
 }
 
+/** How this copy of the app was installed, which decides how it is upgraded. */
+export type InstallKind = "systemPackage" | "userBinary" | "developmentBuild" | "unknown";
+
+const INSTALL_KINDS: InstallKind[] = [
+  "systemPackage",
+  "userBinary",
+  "developmentBuild",
+  "unknown",
+];
+
+/** What this build is, as the operator can read it off the screen. */
+export interface BuildIdentity {
+  version: string;
+  installKind: InstallKind;
+}
+
+/**
+ * The honest answer when the native side cannot be reached or does not make sense.
+ *
+ * An empty version renders as "unknown", never as a plausible number. A wrong version is
+ * worse than no version: it is the same false all-clear the catalog freshness work exists
+ * to prevent, aimed at the app itself.
+ */
+export const UNKNOWN_BUILD_IDENTITY: BuildIdentity = {
+  version: "",
+  installKind: "unknown",
+};
+
+/**
+ * Read what this build is, so the app can answer the question it asks of everything else.
+ *
+ * Rebuilds the value field by field rather than passing the payload through: the native
+ * side deliberately sends no filesystem path, and reconstructing here means a future
+ * change there cannot leak a username into a screenshot by accident.
+ */
+export async function readBuildIdentity(
+  nativeInvoke: Invoke = invoke,
+): Promise<BuildIdentity> {
+  try {
+    const value = await nativeInvoke<unknown>("build_identity");
+    if (typeof value !== "object" || value === null) return UNKNOWN_BUILD_IDENTITY;
+    const identity = value as Record<string, unknown>;
+
+    if (typeof identity.version !== "string" || !identity.version.trim()) {
+      return UNKNOWN_BUILD_IDENTITY;
+    }
+    if (!INSTALL_KINDS.includes(identity.installKind as InstallKind)) {
+      return UNKNOWN_BUILD_IDENTITY;
+    }
+
+    return {
+      version: identity.version,
+      installKind: identity.installKind as InstallKind,
+    };
+  } catch {
+    return UNKNOWN_BUILD_IDENTITY;
+  }
+}
+
 /**
  * Read the structured desktop compatibility report from the native side.
  *

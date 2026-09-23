@@ -14,6 +14,7 @@ pub fn run() {
             native_settings::reset_reasoning_settings,
             actions::desktop_capabilities,
             actions::desktop_compatibility,
+            actions::build_identity,
             actions::copy_catalog_command,
             actions::insert_catalog_command,
             intent::spark_intent_status,

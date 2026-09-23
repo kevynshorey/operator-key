@@ -6,7 +6,9 @@ import {
   getActionAvailability,
   readCatalogSnapshot,
   readDesktopCapabilities,
+  readBuildIdentity,
   readDesktopCompatibility,
+  UNKNOWN_BUILD_IDENTITY,
   UNKNOWN_DESKTOP_CAPABILITIES,
   UNKNOWN_DESKTOP_COMPATIBILITY,
   UNSUPPORTED_INSERT_REASON,
@@ -422,5 +424,57 @@ describe("catalog snapshot", () => {
     const invoke = vi.fn().mockRejectedValue(new Error("command catalog_snapshot not found"));
 
     await expect(readCatalogSnapshot(invoke)).resolves.toBeNull();
+  });
+});
+
+describe("build identity", () => {
+  /**
+   * The app warns when a catalogued command came from a version that is not installed, yet
+   * could not state its OWN version — which is how an installed 0.2.2 sat unnoticed beside
+   * a published 0.2.3. These lock the reader's honesty, not the cosmetics.
+   */
+  it("reads the version and install kind the native side reports", async () => {
+    const invoke = vi.fn().mockResolvedValue({ version: "0.2.3", installKind: "userBinary" });
+
+    await expect(readBuildIdentity(invoke)).resolves.toEqual({
+      version: "0.2.3",
+      installKind: "userBinary",
+    });
+    expect(invoke).toHaveBeenCalledWith("build_identity");
+  });
+
+  it("reports an unknown build rather than inventing a version", async () => {
+    // A wrong version is worse than no version: it is the exact false all-clear the
+    // freshness work exists to prevent, aimed at the app itself.
+    for (const bad of [undefined, null, {}, { version: 5 }, { version: "" }, "0.2.3"]) {
+      const invoke = vi.fn().mockResolvedValue(bad);
+      await expect(readBuildIdentity(invoke)).resolves.toEqual(UNKNOWN_BUILD_IDENTITY);
+    }
+  });
+
+  it("falls back to unknown when the native call fails", async () => {
+    const invoke = vi.fn().mockRejectedValue(new Error("no native host"));
+    await expect(readBuildIdentity(invoke)).resolves.toEqual(UNKNOWN_BUILD_IDENTITY);
+  });
+
+  it("refuses an unrecognised install kind instead of passing it through", async () => {
+    // An unknown kind would reach the UI and select no upgrade instruction, or worse, be
+    // rendered raw as a label nobody wrote.
+    const invoke = vi.fn().mockResolvedValue({ version: "0.2.3", installKind: "snapPackage" });
+    await expect(readBuildIdentity(invoke)).resolves.toEqual(UNKNOWN_BUILD_IDENTITY);
+  });
+
+  it("never surfaces a filesystem path even if the native side sends one", async () => {
+    // Defence in depth: the Rust side already drops the path, but this reader is what the
+    // UI renders, and a screenshot of it must not carry a username.
+    const invoke = vi.fn().mockResolvedValue({
+      version: "0.2.3",
+      installKind: "userBinary",
+      path: "/home/someone/.local/bin/operator-key",
+    });
+
+    const identity = await readBuildIdentity(invoke);
+    expect(JSON.stringify(identity)).not.toContain("/home/");
+    expect(identity).toEqual({ version: "0.2.3", installKind: "userBinary" });
   });
 });

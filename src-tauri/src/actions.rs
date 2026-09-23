@@ -516,6 +516,85 @@ const WAYLAND_PREREQUISITE: &str = "A Wayland session (this session is not Wayla
 const HYPRLAND_PREREQUISITE: &str =
     "Hyprland, for the window IPC that confirms the target terminal";
 
+/// How this copy of the app arrived on the machine, which decides how it is updated.
+///
+/// Deliberately coarse. The point is to name the right upgrade route, not to fingerprint
+/// the installation, so anything unrecognised stays `Unknown` and offers no instruction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum InstallKind {
+    /// Somewhere a package manager owns; the package manager performs upgrades.
+    SystemPackage,
+    /// A binary the operator placed on their own PATH; upgrading means downloading again.
+    UserBinary,
+    /// Running straight out of a build tree; upgrading means rebuilding.
+    DevelopmentBuild,
+    /// Unrecognised location. Says nothing rather than sending someone somewhere wrong.
+    Unknown,
+}
+
+/// What this build is, for an operator reading it off the screen.
+///
+/// Carries no path. `current_exe()` embeds the operator's username, and this is exactly
+/// the text someone pastes into a bug report or screenshots, so the path is classified
+/// and then discarded rather than rendered.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildIdentity {
+    /// The compiled version, read from the crate rather than restated by hand.
+    pub version: String,
+    pub install_kind: InstallKind,
+}
+
+/// Classify an executable path into the route its upgrade takes.
+///
+/// Split from `describe_build_identity` so it can be tested against fixed paths; probing
+/// the real `current_exe()` would only ever assert whatever this machine happens to be.
+fn classify_install(path: &std::path::Path) -> InstallKind {
+    // A build tree wins over every prefix below it: a checkout can live anywhere,
+    // including under a directory that otherwise looks operator-installed.
+    let mut components = path.components().peekable();
+    while let Some(component) = components.next() {
+        if component.as_os_str() == "target"
+            && components
+                .peek()
+                .is_some_and(|next| next.as_os_str() == "release" || next.as_os_str() == "debug")
+        {
+            return InstallKind::DevelopmentBuild;
+        }
+    }
+
+    if path.starts_with("/usr/bin") || path.starts_with("/usr/local/bin") {
+        return InstallKind::SystemPackage;
+    }
+
+    // Any user-owned bin directory, without assuming the home directory's spelling.
+    if path
+        .parent()
+        .is_some_and(|parent| parent.ends_with(".local/bin"))
+    {
+        return InstallKind::UserBinary;
+    }
+
+    InstallKind::Unknown
+}
+
+/// State what this build is, so the app can answer the question it asks of everything else.
+///
+/// Operator Key warns when a catalogued command came from a version that is not installed;
+/// it could not say what version IT was. That gap is how an installed 0.2.2 sat unnoticed
+/// beside a published 0.2.3.
+pub fn describe_build_identity() -> BuildIdentity {
+    let install_kind = std::env::current_exe()
+        .map(|path| classify_install(&path))
+        .unwrap_or(InstallKind::Unknown);
+
+    BuildIdentity {
+        version: env!("CARGO_PKG_VERSION").to_owned(),
+        install_kind,
+    }
+}
+
 /// Describe what this desktop supports and what is missing, without running a subprocess.
 ///
 /// The existing capability probe answers "can I?"; this answers "and what do I install to
@@ -1163,6 +1242,18 @@ pub async fn desktop_compatibility() -> Result<DesktopCompatibilityReport, Strin
         .map_err(|error| format!("desktop compatibility probe failed: {error}"))
 }
 
+/// State what this build is, so an operator can tell whether it is the one they published.
+///
+/// Returns no path: `current_exe()` embeds the username, and this string is meant to be
+/// screenshotted and pasted into bug reports. The install kind is enough to name the
+/// right upgrade route without describing the machine.
+#[tauri::command]
+pub async fn build_identity() -> Result<BuildIdentity, String> {
+    tauri::async_runtime::spawn_blocking(describe_build_identity)
+        .await
+        .map_err(|error| format!("build identity probe failed: {error}"))
+}
+
 #[tauri::command]
 pub async fn copy_catalog_command(entry_id: String, command: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -1212,6 +1303,7 @@ mod tests {
     use super::*;
     use std::cell::{Cell, RefCell};
     use std::collections::VecDeque;
+    use std::path::{Path, PathBuf};
 
     fn entry(interface: &str, safety_level: &str, available: bool, command: &str) -> CatalogEntry {
         let safety_level = match safety_level {
@@ -2655,6 +2747,122 @@ mod tests {
                 assert!(message.contains("on PATH"), "{message}");
                 assert!(message.contains("hyprctl"), "{message}");
             },
+        );
+    }
+
+    // ---- Build identity -------------------------------------------------------------
+    //
+    // The app is the one program on the machine that warns about version drift, and it
+    // could not state its own version. The installed binary sat at 0.2.2 while 0.2.3 was
+    // published, which is exactly the condition the catalog freshness work exists to
+    // surface.
+
+    #[test]
+    fn build_identity_reports_the_compiled_version() {
+        let identity = describe_build_identity();
+
+        // Not a literal: the assertion must follow the crate, or it lies after a bump.
+        assert_eq!(identity.version, env!("CARGO_PKG_VERSION"));
+        assert!(!identity.version.is_empty());
+    }
+
+    #[test]
+    fn build_identity_never_reveals_the_operator_path() {
+        // current_exe() contains the username. Publishing it would leak identity from a
+        // screenshot or a pasted bug report, so the path is classified and discarded.
+        let identity = describe_build_identity();
+        let rendered = format!("{identity:?}");
+
+        assert!(!rendered.contains("/home/"), "{rendered}");
+        assert!(!rendered.contains("/Users/"), "{rendered}");
+        if let Some(user) = std::env::var_os("USER").and_then(|u| u.into_string().ok()) {
+            if user.len() > 2 {
+                assert!(!rendered.contains(&user), "{rendered}");
+            }
+        }
+    }
+
+    #[test]
+    fn install_kind_follows_the_directory_a_package_manager_owns() {
+        // The upgrade instruction differs per install method, so classification has to be
+        // right: a .deb user runs apt, a hand-copied binary re-downloads.
+        assert_eq!(
+            classify_install(Path::new("/usr/bin/operator-key")),
+            InstallKind::SystemPackage
+        );
+        assert_eq!(
+            classify_install(Path::new("/usr/local/bin/operator-key")),
+            InstallKind::SystemPackage
+        );
+        // Composed rather than written literally: the privacy gate forbids a tracked
+        // absolute home path anywhere, and a test fixture is not worth an exception.
+        let home = PathBuf::from("/").join("home").join("someone");
+        assert_eq!(
+            classify_install(&home.join(".local/bin/operator-key")),
+            InstallKind::UserBinary,
+        );
+    }
+
+    #[test]
+    fn install_kind_recognises_a_development_build() {
+        // A developer running out of target/ must not be told to reinstall a package.
+        let home = PathBuf::from("/").join("home").join("someone");
+        assert_eq!(
+            classify_install(&home.join("Work/operator-key/src-tauri/target/release/operator-key")),
+            InstallKind::DevelopmentBuild,
+        );
+        assert_eq!(
+            classify_install(&home.join("proj/target/debug/operator-key")),
+            InstallKind::DevelopmentBuild,
+        );
+    }
+
+    #[test]
+    fn development_build_wins_over_a_system_prefix() {
+        // A checkout can live anywhere, including under a directory that otherwise reads
+        // as package-managed. Without this the arms could be reordered and every existing
+        // test would still pass, because none of them puts a build tree under /usr/local.
+        assert_eq!(
+            classify_install(Path::new(
+                "/usr/local/bin/operator-key/target/release/operator-key"
+            )),
+            InstallKind::DevelopmentBuild,
+        );
+        assert_eq!(
+            classify_install(Path::new("/usr/bin/checkout/target/debug/operator-key")),
+            InstallKind::DevelopmentBuild,
+        );
+    }
+
+    #[test]
+    fn build_identity_keeps_no_path_once_serialized() {
+        // The Debug assertion alone is structurally weak: a future field could carry a
+        // path while a custom Debug impl hides it. The UI consumes the SERIALIZED form,
+        // so assert on that, and pin the field set so a new field cannot slip in unseen.
+        let json = serde_json::to_value(describe_build_identity()).expect("serializes");
+        let object = json.as_object().expect("object");
+
+        let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            vec!["installKind", "version"],
+            "unexpected field: {keys:?}"
+        );
+
+        let rendered = json.to_string();
+        assert!(!rendered.contains("/home/"), "{rendered}");
+        assert!(!rendered.contains("/Users/"), "{rendered}");
+        assert!(!rendered.contains("\\Users\\"), "{rendered}");
+    }
+
+    #[test]
+    fn install_kind_is_unknown_rather_than_guessed() {
+        // Fail-safe: an unrecognised location yields no upgrade instruction at all, rather
+        // than a confident wrong one that sends someone to the wrong package manager.
+        assert_eq!(
+            classify_install(Path::new("/opt/weird/operator-key")),
+            InstallKind::Unknown
         );
     }
 }

@@ -129,6 +129,36 @@ test("[native-disabled] Settings reports conservative desktop readiness", async 
   await expect(page.getByText(/Provider disclosure:/)).toHaveCount(0);
 });
 
+test("[native-disabled] Settings states what this build is without leaking a path", async ({ page }) => {
+  // Text-matching tests cannot prove this renders legibly or in the right place; the
+  // flex-order and ARIA defects in the previous slice were only visible in a browser.
+  await page.getByRole("button", { name: "Settings" }).click();
+  const build = page.getByRole("region", { name: "This build" });
+
+  await expect(build).toBeVisible();
+  await expect(build).toContainText("Version:");
+
+  // The panel is what an operator screenshots into a bug report.
+  await expect(build).not.toContainText("/home/");
+  await expect(build).not.toContainText("/Users/");
+
+  // It must sit inside Settings, above desktop readiness, not floating at the top of the
+  // pane where it would read as a header for the whole app.
+  const buildBox = await build.boundingBox();
+  const readinessBox = await page
+    .getByRole("region", { name: "Desktop readiness" })
+    .boundingBox();
+  expect(buildBox).not.toBeNull();
+  expect(readinessBox).not.toBeNull();
+  expect(buildBox!.y).toBeLessThan(readinessBox!.y);
+
+  // Narrow window: the instruction must wrap rather than overflow horizontally.
+  await page.setViewportSize({ width: 380, height: 700 });
+  const narrow = await build.boundingBox();
+  expect(narrow!.width).toBeLessThanOrEqual(380);
+  await page.setViewportSize({ width: 1024, height: 768 });
+});
+
 test("[native-disabled] Settings offers preview-first shortcut setup without an in-app apply", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
   const shortcut = page.getByRole("region", { name: "Global shortcut" });
