@@ -2,6 +2,8 @@
 
 Operator Key helps you find and understand commands. It never executes a command or presses Enter in your terminal. Optional reasoning is disabled until you configure it.
 
+On an empty Find screen, the compact task starters narrow the catalog to a useful task group and fill the search field. Selecting one does not copy, insert, or contact a reasoning provider; the rail disappears once a query is present.
+
 ## Desktop support
 
 | Environment | Search and learning | Copy | Guarded terminal insertion |
@@ -77,6 +79,8 @@ Set readability/learning preferences and inspect desktop capabilities and catalo
 The bundled catalog is reference data, not proof that a tool is installed on your computer. For an authoritative local catalog, follow [CATALOG.md](CATALOG.md). A failed local-catalog load falls back to bundled data; inspect catalog health before assuming a refresh succeeded.
 
 Optional reasoning talks to a model you run on loopback. It does not ship a model, endpoint, or credential. See [REASONING.md](REASONING.md) for configuration, supported providers, data boundaries, and disabling/resetting the feature. Never paste a secret into a search or model configuration field. A loopback service is separately operated software: check its own network/privacy behavior as well.
+
+When reasoning is off in the native app, choose **Configure reasoning** in Find to open and focus **Settings → Optional local reasoning**. Search continues to work without a model or account. Settings also reports desktop readiness from the loaded runtime capabilities: native copy requires Wayland and `wl-copy`, while insertion requires Hyprland and `wtype`. “Ready” means the required capability was reported, not that a clipboard or insertion operation has already succeeded. Browser copy remains permission-dependent and browser insertion is unsupported.
 
 ## Upgrade and rollback
 

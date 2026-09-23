@@ -35,7 +35,7 @@ describe("Apprentice learning surface", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const starters = await screen.findByLabelText(/try one of these/i);
+    const starters = await screen.findByLabelText(/task starters/i);
     const [firstStarter] = within(starters).getAllByRole("button");
     const label = firstStarter.textContent ?? "";
     expect(label.length).toBeGreaterThan(0);

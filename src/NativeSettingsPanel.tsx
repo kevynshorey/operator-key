@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Ref } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { OperatorRuntime } from "./runtime";
 import "./native-settings.css";
 
 type Invoke = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
-interface Props { runtime: OperatorRuntime; nativeInvoke?: Invoke; onChanged?: () => void; testCandidateId?: string }
+interface Props { runtime: OperatorRuntime; nativeInvoke?: Invoke; onChanged?: () => void; testCandidateId?: string; focusRef?: Ref<HTMLElement> }
 interface Settings {
   enabled: boolean;
   provider: "disabled" | "ollama" | "openai-compatible" | "codex";
@@ -43,7 +43,7 @@ function validate(settings: Settings): string | null {
   if (settings.provider === "codex") return "Legacy Codex configuration is managed outside this editor. It will not be overwritten.";
   return null;
 }
-export function NativeSettingsPanel({ runtime, nativeInvoke = invoke, onChanged, testCandidateId }: Props) {
+export function NativeSettingsPanel({ runtime, nativeInvoke = invoke, onChanged, testCandidateId, focusRef }: Props) {
   const [draft, setDraft] = useState<Settings>();
   const [saved, setSaved] = useState<Settings>();
   const [health, setHealth] = useState("Checking catalog source…");
@@ -105,7 +105,7 @@ export function NativeSettingsPanel({ runtime, nativeInvoke = invoke, onChanged,
     } catch { setError("The local model test failed. Confirm the saved endpoint, running model, and timeout. No command was executed."); }
     finally { setBusy(false); }
   };
-  return <section className="native-settings" aria-label="Native model and catalog settings">
+  return <section className="native-settings" aria-label="Optional local reasoning" ref={focusRef} tabIndex={-1}>
     <h2>Catalog health</h2><p>{health}</p>
     <h2>Optional local reasoning</h2>
     <p>Search works without a model. Enabling this sends your intent and bounded catalog fields to your configured service. HTTP providers are loopback-only; a service you operate may itself forward requests. No credentials belong in these fields.</p>

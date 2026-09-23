@@ -33,6 +33,91 @@ function nativeReasoner(overrides: Partial<IntentReasoner> = {}): IntentReasoner
 }
 
 describe("Operator Key overlay", () => {
+  it("turns an empty-state task starter into search only, then hides the rail", async () => {
+    const user = userEvent.setup();
+    const actions = { copy: vi.fn(), insert: vi.fn() };
+    render(<App actions={actions} />);
+    const rail = screen.getByLabelText("Task starters");
+    const starter = screen.getAllByRole("button", { name: /sessions and navigation/i })[0];
+    await user.click(starter);
+    expect(screen.getByRole("searchbox", { name: /operator intent/i })).toHaveValue("sessions and navigation");
+    expect(await screen.findByRole("option", { selected: true })).toHaveTextContent(/move/i);
+    expect(screen.getByRole("button", { name: "sessions and navigation" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByLabelText("Task starters")).not.toBeInTheDocument();
+    expect(actions.copy).not.toHaveBeenCalled();
+    expect(actions.insert).not.toHaveBeenCalled();
+    expect(rail).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["Enter", "{Enter}"],
+    ["Space", " "],
+  ])("returns focus to search when a task starter is accepted with %s", async (_key, key) => {
+    const user = userEvent.setup();
+    const actions = { copy: vi.fn(), insert: vi.fn() };
+    const reasoner = nativeReasoner();
+    render(<App actions={actions} intentReasoner={reasoner} />);
+    const starter = screen.getAllByRole("button", { name: /sessions and navigation/i })[0];
+
+    starter.focus();
+    await user.keyboard(key);
+
+    const search = screen.getByRole("searchbox", { name: /operator intent/i });
+    expect(search).toHaveFocus();
+    expect(search).toHaveValue("sessions and navigation");
+    expect(await screen.findByRole("option", { selected: true })).toHaveTextContent(/move/i);
+    expect(screen.getByRole("button", { name: "sessions and navigation" })).toHaveAttribute("aria-pressed", "true");
+    expect(actions.copy).not.toHaveBeenCalled();
+    expect(actions.insert).not.toHaveBeenCalled();
+    expect(reasoner.reason).not.toHaveBeenCalled();
+  });
+
+  it("offers disabled native reasoning configuration and focuses its Settings section", async () => {
+    const user = userEvent.setup();
+    const reasoner = nativeReasoner({
+      status: vi.fn().mockResolvedValue({ available: false, loggedIn: false, model: "", provider: "disabled", configPath: "/private/home/reasoning.json", message: "Reasoning is off." }),
+    });
+    render(<App runtime="native" intentReasoner={reasoner} />);
+    const configure = await screen.findByRole("button", { name: /configure reasoning/i });
+    await user.click(configure);
+    expect(screen.getByRole("region", { name: /optional local reasoning/i })).toHaveFocus();
+  });
+
+  it("keeps browser reasoning guidance truthful without native configuration IPC", async () => {
+    const reasoner = nativeReasoner();
+    render(<App runtime="web" intentReasoner={reasoner} />);
+    expect(await screen.findByText(/reasoning requires the native operator key app/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /configure reasoning/i })).not.toBeInTheDocument();
+    expect(reasoner.status).toHaveBeenCalledOnce();
+    expect(reasoner.reason).not.toHaveBeenCalled();
+    expect(screen.queryByText(/sends .* to openai through local codex/i)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [{ canCopy: true, canInsert: true }, /native copy: ready/i, /terminal insertion: ready/i],
+    [{ canCopy: false, canInsert: false }, /native copy: not confirmed/i, /terminal insertion: not confirmed/i],
+    [{ canCopy: false, canInsert: true }, /native copy: not confirmed/i, /terminal insertion: not confirmed/i],
+  ])("reports native desktop readiness from loaded capabilities", async (capabilities, copyText, insertText) => {
+    const user = userEvent.setup();
+    render(<App runtime="native" desktopCapabilities={capabilities} intentReasoner={nativeReasoner()} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    const readiness = screen.getByRole("region", { name: /desktop readiness/i });
+    expect(readiness).toHaveTextContent(/local catalog search: available/i);
+    expect(readiness).toHaveTextContent(copyText);
+    expect(readiness).toHaveTextContent(insertText);
+    expect(readiness).toHaveTextContent(/wayland.*wl-copy/i);
+    expect(readiness).toHaveTextContent(/hyprland.*wtype/i);
+    expect(readiness).toHaveTextContent(/does not press enter|no command is executed/i);
+  });
+
+  it("reports permission-dependent browser copy and unsupported insertion", async () => {
+    const user = userEvent.setup();
+    render(<App runtime="web" />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    const readiness = screen.getByRole("region", { name: /desktop readiness/i });
+    expect(readiness).toHaveTextContent(/browser copy: permission-dependent/i);
+    expect(readiness).toHaveTextContent(/terminal insertion: unsupported/i);
+  });
   it("renders the keyboard-first search shell and catalog status", () => {
     render(<App />);
     expect(screen.getByRole("searchbox", { name: /operator intent/i })).toHaveFocus();

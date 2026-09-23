@@ -74,7 +74,8 @@ def focus(address: str) -> None:
 
 
 def type_query(*, shift_enter: bool = False) -> None:
-    run(["wtype", "-M", "ctrl", "a", "-m", "ctrl"])
+    # Keep selection and deletion on one virtual-keyboard connection.
+    run(["wtype", "-k", "Home", "-M", "shift", "-k", "End", "-m", "shift", "-k", "BackSpace"])
     run(["wtype", "-d", "35", QUERY])
     time.sleep(0.25)
     if shift_enter:
