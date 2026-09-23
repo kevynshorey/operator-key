@@ -7,6 +7,10 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### CI
+
+- Keep all seven required verification jobs and the release package build on the known-good Ubuntu 24.04 runner instead of the moving `ubuntu-latest` label. Run an informational Ubuntu 26.04 package build on non-tag events to report Tauri package availability, the candidate binary's GLIBC floor and Debian runtime dependencies without changing the public package build environment or delaying tagged releases.
+
 ## [0.2.4] - 2026-09-23
 
 ### Added
