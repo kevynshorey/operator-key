@@ -62,3 +62,7 @@ push, `--dry-run` writes nothing.
 Recomputing would paint those red. A red badge that fires on safe commands is the one
 failure this product cannot afford: operators stop reading it, and then it cannot warn
 them about anything real.
+
+## Catalog health invoke contract
+
+`catalog_health` returns `{ "source": "embedded" | "sidecar", "failure": null | "path_unavailable" | "unreadable" | "unsafe_file_type" | "too_large" | "malformed" }`. It does not return paths, file contents, or parser details. Sidecar health is computed from the same merge/validation path used by the catalog snapshot; missing sidecar is a healthy embedded source (`failure: null`). An invalid sidecar reports embedded source plus a safe failure category.

@@ -1,4 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
+beforeEach(() => { window.localStorage.clear(); });
+
+function openProductGuides() {
+  fireEvent.click(screen.getByRole("button", { name: "Learn" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Product guides" }));
+}
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import App from "./App";
 
@@ -11,12 +18,13 @@ function typeQuery(text: string) {
 describe("guided onboarding path", () => {
   it("offers a guided route to newcomers in apprentice mode", () => {
     render(<App />);
-    expect(screen.getByText(/new to this\?/i)).toBeTruthy();
+    openProductGuides();
     expect(screen.getByRole("button", { name: /first 10 minutes: hermes/i })).toBeTruthy();
   });
 
   it("opens a numbered route with real commands when invited", () => {
     render(<App />);
+    openProductGuides();
     fireEvent.click(screen.getByRole("button", { name: /first 10 minutes: hermes/i }));
 
     const panel = screen.getByRole("region", { name: /first 10 minutes with hermes/i });
@@ -29,12 +37,14 @@ describe("guided onboarding path", () => {
 
   it("states plainly that nothing runs on its own", () => {
     render(<App />);
+    openProductGuides();
     fireEvent.click(screen.getByRole("button", { name: /first 10 minutes: hermes/i }));
     expect(screen.getByText(/nothing here runs on its own/i)).toBeTruthy();
   });
 
   it("closes the route when asked", () => {
     render(<App />);
+    openProductGuides();
     fireEvent.click(screen.getByRole("button", { name: /first 10 minutes: hermes/i }));
     fireEvent.click(screen.getByRole("button", { name: /close guided path/i }));
     expect(screen.queryByRole("region", { name: /first 10 minutes with hermes/i })).toBeNull();
@@ -45,6 +55,7 @@ describe("reverse lookup", () => {
   it("explains a pasted command that is not in the catalog", () => {
     render(<App />);
     typeQuery("tar -xzvf archive.tar.gz");
+    fireEvent.click(screen.getByRole("button", { name: /explain pasted command/i }));
 
     const panel = screen.getByRole("region", { name: /what this does/i });
     expect(within(panel).getByText(/not in catalog/i)).toBeTruthy();
@@ -55,6 +66,7 @@ describe("reverse lookup", () => {
   it("warns about a destructive command even when the catalog does not know it", () => {
     render(<App />);
     typeQuery("rm -rf ./build");
+    fireEvent.click(screen.getByRole("button", { name: /explain pasted command/i }));
 
     const panel = screen.getByRole("region", { name: /what this does/i });
     expect(within(panel).getByText(/before you run this/i)).toBeTruthy();
@@ -64,6 +76,7 @@ describe("reverse lookup", () => {
   it("warns when a download is piped straight into a shell", () => {
     render(<App />);
     typeQuery("curl -sSL https://example.com/i.sh | sh");
+    fireEvent.click(screen.getByRole("button", { name: /explain pasted command/i }));
     const panel = screen.getByRole("region", { name: /what this does/i });
     expect(within(panel).getByText(/downloads and runs code in one step/i)).toBeTruthy();
   });
@@ -76,7 +89,6 @@ describe("reverse lookup", () => {
 
   it("stays quiet in operator mode", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /apprentice/i }));
     typeQuery("rm -rf ./build");
     expect(screen.queryByRole("region", { name: /what this does/i })).toBeNull();
   });
@@ -96,6 +108,7 @@ describe("reverse lookup", () => {
     render(<App />);
     for (const command of ["git status", "ls -la", "cat notes.txt", "$ hermes chat"]) {
       typeQuery(command);
+      fireEvent.click(screen.getByRole("button", { name: /explain pasted command/i }));
       expect(screen.getByRole("region", { name: /what this does/i })).toBeTruthy();
     }
   });

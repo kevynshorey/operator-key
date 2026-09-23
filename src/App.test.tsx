@@ -150,7 +150,8 @@ describe("Operator Key overlay", () => {
   it("identifies the browser deck and disables insertion with a companion explanation", () => {
     render(<App runtime="web" />);
     expect(screen.getAllByText(/web deck · copy only/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/you remember the task/i)).toBeInTheDocument();
+    expect(screen.queryByText(/you remember the task/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /primary navigation/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /insert into confirmed terminal/i })).toBeDisabled();
     expect(screen.getByText(/install\/open the native operator key companion/i)).toBeInTheDocument();
   });
@@ -206,7 +207,7 @@ describe("Operator Key overlay", () => {
     expect(screen.getByRole("button", { name: /insert into confirmed terminal/i })).toBeDisabled();
     await user.keyboard("{Shift>}{Enter}{/Shift}");
     expect(actions.insert).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent(/copy-only/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/native clipboard needs wayland/i);
   });
 
   it("reports native copy failures without implying success", async () => {
@@ -501,5 +502,31 @@ describe("Operator Key overlay", () => {
     expect(input).toHaveValue(intent);
     expect(screen.queryByRole("region", { name: /intent structure/i })).not.toBeInTheDocument();
     expect(screen.getAllByRole("option").length).toBeGreaterThan(2);
+  });
+
+  it("supports an explicit pasted-command explanation in operator mode", async () => {
+    const user = userEvent.setup(); render(<App />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "rm -rf ./build");
+    await user.click(screen.getByRole("button", { name: /explain pasted command/i }));
+    expect(await screen.findByRole("region", { name: /what this does/i })).toBeInTheDocument();
+  });
+
+  it.each(["Learn", "Settings"])("returns to Find from %s with web Escape and Header Reset", async (destination) => {
+    const user = userEvent.setup();
+    render(<App runtime="web" />);
+    await user.click(screen.getByRole("button", { name: destination }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Find" })).toHaveAttribute("aria-current", "page");
+    await user.click(screen.getByRole("button", { name: destination }));
+    await user.click(screen.getByRole("button", { name: "Reset search" }));
+    expect(screen.getByRole("button", { name: "Find" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows product guides separately from workflow lessons", async () => {
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole("button", { name: "Learn" }));
+    await user.click(screen.getByRole("tab", { name: /product guides/i }));
+    expect(screen.getByRole("button", { name: /^First 10 minutes: Git$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /lesson/i })).not.toBeInTheDocument();
   });
 });

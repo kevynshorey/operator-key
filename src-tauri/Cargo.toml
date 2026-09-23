@@ -1,6 +1,6 @@
 [package]
 name = "operator-key"
-version = "0.1.0"
+version = "0.2.0"
 description = "Keyboard-first command intelligence overlay"
 authors = ["Operator Key contributors"]
 edition = "2021"

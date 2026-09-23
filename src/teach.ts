@@ -61,8 +61,8 @@ const GLOSSARY: ReadonlyArray<{ term: string; definition: string; triggers: read
 ];
 
 const SAFETY_BRIEFINGS: Record<SafetyLevel, string> = {
-  green: "Green means this reads or displays state without changing it. Safe to try while you are learning.",
-  amber: "Amber means this changes something. Not dangerous, but read what it will affect before you confirm.",
+  green: "Green indicates a lower-risk action, not a guarantee that nothing changes. Review its description and scope before trying it.",
+  amber: "Amber means this may change local or remote state. Review the affected scope, required inputs, and recovery options before proceeding.",
   red: "Red means this can destroy work or weaken protection. Understand it fully and have a recovery path before running it.",
 };
 
@@ -115,6 +115,7 @@ function describeFlag(token: string): string {
 export function classifyShellToken(token: string, index: number): TokenRole {
   // Operators must be checked before path/flag heuristics: ">" and "|" are not paths.
   if (["|", ">", ">>", "<", "<<", "&&", "||", ";", "&", "2>", "2>&1"].includes(token)) return "operator";
+  if (index === 0 && /^-/.test(token)) return "flag";
   if (index === 0) return "program";
   if (token.startsWith("--") || /^-[A-Za-z]/.test(token)) return "flag";
   if (/^[<[{].*[>\]}]$/.test(token) || /^[A-Z_]{2,}$/.test(token)) return "placeholder";
@@ -173,7 +174,15 @@ function buildChordAnatomy(entry: CatalogEntry): CommandToken[] {
 function buildShellAnatomy(teaching: TeachingIndex, entry: CatalogEntry): CommandToken[] {
   const programName = entry.command.split(/\s+/)[0];
   return entry.command.split(/\s+/).filter(Boolean).map((token, index) => {
+    if (entry.interface === "cli-flag" && token === "/") {
+      return { text: token, role: "operator", explanation: "Alternative option spelling separator in the catalog, not a shell operator. Choose one spelling; do not paste the slash." };
+    }
     const role = classifyShellToken(token, index);
+    // A short flag can mean different things in different parent commands. The
+    // current entry is authoritative; do not borrow another command's -v help.
+    if (entry.interface === "cli-flag" && role === "flag") {
+      return { text: token, role, explanation: `${entry.description}. Use with the parent command shown in context; alternate spellings are alternatives, not a combined command.` };
+    }
     const documented = teaching.byToken.get(tokenKey(entry.product, token.replace(/[=,].*$/, "")));
     if (documented && documented.id !== entry.id && (role === "flag" || index === 0)) {
       return { text: token, role, explanation: documented.description, sourcedFrom: documented.id };
@@ -215,16 +224,15 @@ function buildGlossary(entry: CatalogEntry, anatomy: readonly CommandToken[]): G
 }
 
 function practiceHint(entry: CatalogEntry): string {
-  if (entry.interface === "hotkey") {
-    return "Press it once and watch what changes on screen. Hotkeys are the fastest safe way to build muscle memory.";
-  }
   if (entry.safety_level === "red" || entry.destructive) {
     return "Do not practise this on real work. Read its help output first, then try it on a disposable copy.";
   }
   if (entry.safety_level === "amber") {
     return "Run it somewhere you can afford to be wrong, such as a scratch folder or a throwaway branch, before using it on real work.";
   }
-  return "Safe to run as-is. Copy it, run it, and read the output carefully before moving on.";
+  if (entry.interface === "hotkey") return "Try it once in a low-stakes context and observe what changes on screen.";
+  if (entry.interface === "cli-flag") return "Use this option with its parent command after reviewing what it does; a flag alone is not a complete command.";
+  return "Review what it does and the scope it affects before trying it in a low-stakes context.";
 }
 
 /** Explain a catalog entry so that using it teaches the operator something durable. */
@@ -235,7 +243,9 @@ export function buildCommandLesson(teaching: TeachingIndex, entry: CatalogEntry)
       ? buildSlashAnatomy(entry)
       : buildShellAnatomy(teaching, entry);
 
-  const surface = entry.interface === "hotkey"
+  const surface = entry.interface === "cli-flag"
+    ? "an option used with its parent command"
+    : entry.interface === "hotkey"
     ? "a desktop key combination"
     : entry.interface === "slash-command"
       ? `a command typed inside a running ${entry.product} session`

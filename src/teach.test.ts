@@ -44,6 +44,14 @@ describe("buildCommandLesson anatomy", () => {
     expect(anatomy.find((token) => token.text === "-q")?.role).toBe("flag");
   });
 
+  it("teaches a CLI flag as an option, not a standalone runnable command", () => {
+    const flag = entry({ interface: "cli-flag", command: "-v / --verbose", description: "Verbose output" });
+    const lesson = buildCommandLesson(createTeachingIndex([flag]), flag);
+    expect(lesson.anatomy.map((token) => token.role)).toEqual(["flag", "operator", "flag"]);
+    expect(lesson.headline).toContain("option");
+    expect(lesson.practiceHint).not.toContain("Safe to run as-is");
+  });
+
   it("classifies placeholders and paths", () => {
     const { anatomy } = buildCommandLesson(teaching, entry({ command: "hermes export <SESSION> ~/out" }));
     expect(anatomy.find((token) => token.text === "<SESSION>")?.role).toBe("placeholder");
@@ -112,12 +120,28 @@ describe("buildCommandLesson glossary and briefing", () => {
     expect(terms).toContain("elevated privilege");
   });
 
+  it("explains alternative flag notation without inventing a shell operator", () => {
+    const lesson = buildCommandLesson(teaching, entry({ interface: "cli-flag", command: "-v / --verbose" }));
+    expect(lesson.anatomy.find((token) => token.text === "/")?.explanation).toMatch(/alternative.*spelling/i);
+    expect(lesson.anatomy[0].explanation).not.toMatch(/show version/i);
+  });
+
+  it("keeps the filesystem root a path in ordinary shell commands", () => {
+    const lesson = buildCommandLesson(teaching, entry({ command: "ls /" }));
+    expect(lesson.anatomy[1].role).toBe("path");
+  });
+
+  it("does not promise amber actions are harmless", () => {
+    expect(buildCommandLesson(teaching, entry({ safety_level: "amber" })).safetyBriefing).not.toMatch(/not dangerous/i);
+  });
+
   it("gives a distinct safety briefing per level", () => {
     const green = buildCommandLesson(teaching, entry({ safety_level: "green" })).safetyBriefing;
     const amber = buildCommandLesson(teaching, entry({ safety_level: "amber" })).safetyBriefing;
     const red = buildCommandLesson(teaching, entry({ safety_level: "red" })).safetyBriefing;
     expect(new Set([green, amber, red]).size).toBe(3);
     expect(red).toContain("recovery path");
+    expect(green).toContain("lower-risk");
   });
 
   it("refuses to invite practice on a destructive command", () => {
@@ -126,7 +150,18 @@ describe("buildCommandLesson glossary and briefing", () => {
   });
 
   it("invites practice on a safe command", () => {
-    expect(buildCommandLesson(teaching, entry()).practiceHint).toContain("Safe to run");
+    expect(buildCommandLesson(teaching, entry()).practiceHint.toLowerCase()).toContain("review what it does");
+  });
+
+  it("lets red and destructive risk override the hotkey practice hint", () => {
+    const lesson = buildCommandLesson(teaching, entry({ interface: "hotkey", command: "SUPER + K", destructive: true, safety_level: "red" }));
+    expect(lesson.practiceHint).toContain("Do not practise this on real work");
+  });
+
+  it("does not present green as a read-only guarantee", () => {
+    const lesson = buildCommandLesson(teaching, entry({ description: "writes a setting" }));
+    expect(lesson.safetyBriefing).not.toContain("without changing it");
+    expect(lesson.safetyBriefing).toContain("not a guarantee");
   });
 
   it("states which surface the command belongs to", () => {
@@ -137,6 +172,13 @@ describe("buildCommandLesson glossary and briefing", () => {
 });
 
 describe("buildCommandLesson against the real catalog", () => {
+  it("keeps known mutating and cloud-write actions out of green", () => {
+    if (!realCatalog.ok) return;
+    const byCommand = new Map(realCatalog.catalog.entries.map((item) => [item.command, item]));
+    for (const command of ["hermes pets select", "hermes project archive", "/autofix-pr"]) {
+      expect(byCommand.get(command)?.safety_level, command).not.toBe("green");
+    }
+  });
   it("produces a complete lesson for every sampled real entry", () => {
     expect(realCatalog.ok).toBe(true);
     if (!realCatalog.ok) return;

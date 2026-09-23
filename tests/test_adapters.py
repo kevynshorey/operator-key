@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest import mock
 
 from scripts.adapters import claude, codex, hermes, omarchy
+from scripts.adapters.common import safety
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures"
@@ -65,6 +66,30 @@ class OmarchyAdapterTests(unittest.TestCase):
 
 
 class HermesAdapterTests(unittest.TestCase):
+    def test_mutating_command_verbs_are_not_classified_as_green(self):
+        for command in (
+            "hermes pets select", "hermes project archive", "hermes config set",
+            "hermes skills add",
+        ):
+            with self.subTest(command=command):
+                level, destructive = safety(command, "")
+                self.assertEqual(level, "amber")
+                self.assertFalse(destructive)
+
+    def test_memory_reset_remains_red_and_destructive_in_adapter_output(self):
+        from scripts.adapters.common import entry
+        reset = entry("hermes", "cli-command", "hermes memory reset", "Reset memory", "fixture", "0.21.3")
+        self.assertEqual((reset["safety_level"], reset["destructive"]), ("red", True))
+
+    def test_red_danger_takes_precedence_over_mutating_action_heuristic(self):
+        self.assertEqual(safety("hermes sessions delete", ""), ("red", True))
+
+    def test_cloud_command_that_pushes_fixes_is_not_green(self):
+        self.assertEqual(
+            safety("/autofix-pr", "Spawn a cloud session that watches a PR and pushes fixes"),
+            ("amber", False),
+        )
+
     def test_help_registry_and_key_control_sources_are_collected(self):
         rows = []
         rows += hermes.parse_help(text("hermes-help.txt"), "0.21.3")

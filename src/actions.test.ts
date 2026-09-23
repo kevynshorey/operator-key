@@ -100,6 +100,15 @@ describe("action availability", () => {
 });
 
 describe("desktop capability probe", () => {
+  it.each([null, undefined, {}, { canCopy: "yes", canInsert: true }])("fails closed for malformed native capabilities %j", async (value) => {
+    await expect(readDesktopCapabilities(vi.fn().mockResolvedValue(value))).resolves.toEqual(UNKNOWN_DESKTOP_CAPABILITIES);
+  });
+
+  it("does not promise native copy on an unsupported desktop", () => {
+    const availability = getActionAvailability(entry(), "native", { canCopy: false, canInsert: false });
+    expect(availability.copy).toBe(false);
+    expect(availability.insertReason).not.toMatch(/copy still work/i);
+  });
   it("falls back to unknown capabilities when the native command is missing", async () => {
     // An older native binary paired with a newer frontend must not break the UI.
     const invoke = vi.fn().mockRejectedValue(new Error("command desktop_capabilities not found"));

@@ -5,7 +5,7 @@ import type { OperatorRuntime } from "./runtime";
 const TERMINAL_INTERFACES: ReadonlySet<InterfaceType> = new Set(["shell-command", "cli-flag"]);
 
 export interface ActionAvailability {
-  copy: true;
+  copy: boolean;
   insert: boolean;
   insertReason?: string;
   warning?: string;
@@ -61,7 +61,12 @@ export async function readDesktopCapabilities(
   nativeInvoke: Invoke = invoke,
 ): Promise<DesktopCapabilities> {
   try {
-    return await nativeInvoke<DesktopCapabilities>("desktop_capabilities");
+    const value = await nativeInvoke<unknown>("desktop_capabilities");
+    if (typeof value !== "object" || value === null || !("canCopy" in value) || !("canInsert" in value)
+      || typeof value.canCopy !== "boolean" || typeof value.canInsert !== "boolean") {
+      return UNKNOWN_DESKTOP_CAPABILITIES;
+    }
+    return { canCopy: value.canCopy, canInsert: value.canInsert };
   } catch {
     // An older native build without this command must not break the UI: fall back to
     // "unknown", which disables the affected controls rather than promising them.
@@ -90,6 +95,14 @@ export function getActionAvailability(
       insert: false,
       insertReason: WEB_INSERT_REASON,
       warning: entry.safety_level === "red" ? "Danger-level (red) command: review carefully. Copy only; terminal insertion is disabled." : undefined,
+    };
+  }
+  if (!capabilities.canCopy) {
+    return {
+      copy: false,
+      insert: false,
+      insertReason: "Native clipboard needs Wayland and wl-copy. Search remains available; check desktop requirements in Settings.",
+      warning: entry.safety_level === "red" ? "Danger-level (red) command: review carefully." : undefined,
     };
   }
   if (entry.safety_level === "red") {

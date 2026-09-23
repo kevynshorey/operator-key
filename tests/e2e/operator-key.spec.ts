@@ -14,7 +14,7 @@ async function search(page: Page, query: string) {
 }
 
 async function operatorActionCalls(page: Page) {
-  return page.evaluate(() => window.__operatorKeyInvocations.filter(({ cmd }) => cmd !== "spark_intent_status" && cmd !== "reason_about_intent"));
+  return page.evaluate(() => window.__operatorKeyInvocations.filter(({ cmd }) => ["copy_catalog_command", "insert_catalog_command"].includes(cmd)));
 }
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -28,6 +28,8 @@ test.beforeEach(async ({ page }, testInfo) => {
       value: {
         invoke: async (cmd: string, args: Record<string, unknown> = {}) => {
           window.__operatorKeyInvocations.push({ cmd, args });
+          if (cmd === "desktop_capabilities") return { canCopy: true, canInsert: true };
+          if (cmd === "catalog_snapshot") return null;
           if (cmd === "spark_intent_status") return {
             available: true,
             loggedIn: true,

@@ -29,6 +29,9 @@ GREEN_WORDS = ("review", "diff", "status", "help", "show", "list", "context")
 # caught once matching becomes word-accurate. `uninstall` previously matched the AMBER
 # word `install`; losing it would silently downgrade a removal command to green.
 EXTRA_AMBER_WORDS = ("uninstall",)
+# Verbs that commonly persist a setting or change remote/local state. Keep these
+# separate from keyword heuristics: mention of a verb in prose is not sufficient.
+MUTATING_ACTIONS = ("set", "select", "archive", "reset", "add", "create", "login", "update", "write", "install", "edit", "move", "apply", "publish", "deploy")
 
 
 def _mentions_word(haystack: str, word: str) -> bool:
@@ -115,6 +118,12 @@ def safety(command: str, description: str) -> tuple[str, bool]:
     if (any(_mentions_word(command_text, word) for word in DANGER_WORDS)
             or description_text.startswith(DANGER_WORDS)):
         return "red", True
+    # A command action is not read-only just because its description lacks a keyword
+    # heuristic hit (e.g. `... set` described as "Set a configuration value").
+    if any(_mentions_word(command_text, word) for word in MUTATING_ACTIONS):
+        return "amber", False
+    if "cloud session" in description_text and re.search(r"\bpush(?:es)?\b", description_text):
+        return "amber", False
     if any(_mentions_word(command_text, word) for word in GREEN_WORDS):
         return "green", False
     if (any(_mentions_word(command_text, word) for word in AMBER_WORDS + EXTRA_AMBER_WORDS)
@@ -138,6 +147,8 @@ def entry(product: str, interface: str, command: str, description: str, source: 
     # while rewriting history and publishing work. An adapter that knows the real action
     # semantics of its product passes an explicit verdict instead of guessing.
     risk, destructive = safety_override if safety_override else safety(command, description)
+    if product == "hermes" and command == "hermes memory reset":
+        risk, destructive = "red", True
     # Same failure mode on the organising axis: `git commit` is filed under
     # capture-and-input because "Record changes" contains "record", and `git init` under
     # context-and-memory because it contains "init". Task group drives the product's

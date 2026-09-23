@@ -888,42 +888,84 @@ fn merge_sidecar_value(
 /// build-time import while this module used the merged one, an entry that came from an
 /// operator's sidecar would be visible and insertable in the UI yet rejected by reasoning
 /// as "not in the catalog". One loader keeps the two views honest.
-pub(crate) fn merged_catalog_value() -> Result<serde_json::Value, String> {
-    let embedded: serde_json::Value =
-        serde_json::from_str(CATALOG_JSON).map_err(|error| error.to_string())?;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CatalogSource {
+    Embedded,
+    Sidecar,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CatalogFailure {
+    PathUnavailable,
+    Unreadable,
+    UnsafeFileType,
+    TooLarge,
+    Malformed,
+    Empty,
+    InvalidSchema,
+}
+#[derive(Debug)]
+struct CatalogLoad {
+    value: serde_json::Value,
+    source: CatalogSource,
+    failure: Option<CatalogFailure>,
+}
 
-    let Some(path) = sidecar_catalog_path() else {
-        return Ok(embedded);
+fn load_catalog_from_path(path: Option<&std::path::Path>) -> Result<CatalogLoad, String> {
+    let embedded: serde_json::Value =
+        serde_json::from_str(CATALOG_JSON).map_err(|e| e.to_string())?;
+    let fallback = |failure| CatalogLoad {
+        value: embedded.clone(),
+        source: CatalogSource::Embedded,
+        failure,
     };
-    let Ok(metadata) = fs::metadata(&path) else {
-        return Ok(embedded);
+    let Some(path) = path else {
+        return Ok(fallback(Some(CatalogFailure::PathUnavailable)));
     };
-    // A symlink or a device node here would be someone else's decision about what this
-    // process reads; only a regular file is accepted.
-    if !metadata.is_file() || metadata.len() > MAX_SIDECAR_CATALOG_BYTES {
-        return Ok(embedded);
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(m) => m,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(fallback(None)),
+        Err(_) => return Ok(fallback(Some(CatalogFailure::Unreadable))),
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Ok(fallback(Some(CatalogFailure::UnsafeFileType)));
     }
-    let Ok(raw) = fs::read_to_string(&path) else {
-        return Ok(embedded);
-    };
-    match serde_json::from_str::<serde_json::Value>(&raw) {
-        Ok(sidecar)
-            if sidecar
-                .get("entries")
-                .and_then(|entries| entries.as_array())
-                .is_some_and(|entries| !entries.is_empty()) =>
-        {
-            let merged = merge_sidecar_value(&embedded, sidecar);
-            // The merged result must still satisfy the typed schema the gates rely on.
-            // If it does not, the sidecar is not usable and the embedded data stands.
-            match serde_json::from_value::<Catalog>(merged.clone()) {
-                Ok(_) => Ok(merged),
-                Err(_) => Ok(embedded),
-            }
-        }
-        // Parsed but empty, or unparsable: keep what we know is good.
-        _ => Ok(embedded),
+    if metadata.len() > MAX_SIDECAR_CATALOG_BYTES {
+        return Ok(fallback(Some(CatalogFailure::TooLarge)));
     }
+    let raw = match fs::read_to_string(path) {
+        Ok(v) => v,
+        Err(_) => return Ok(fallback(Some(CatalogFailure::Unreadable))),
+    };
+    let sidecar: serde_json::Value = match serde_json::from_str(&raw) {
+        Ok(v) => v,
+        Err(_) => return Ok(fallback(Some(CatalogFailure::Malformed))),
+    };
+    match sidecar.get("entries").and_then(|v| v.as_array()) {
+        None => return Ok(fallback(Some(CatalogFailure::InvalidSchema))),
+        Some(v) if v.is_empty() => return Ok(fallback(Some(CatalogFailure::Empty))),
+        _ => (),
+    }
+    let value = merge_sidecar_value(&embedded, sidecar);
+    if serde_json::from_value::<Catalog>(value.clone()).is_err() {
+        return Ok(fallback(Some(CatalogFailure::InvalidSchema)));
+    }
+    Ok(CatalogLoad {
+        value,
+        source: CatalogSource::Sidecar,
+        failure: None,
+    })
+}
+
+fn merged_catalog_value_from_path(
+    path: Option<&std::path::Path>,
+) -> Result<serde_json::Value, String> {
+    Ok(load_catalog_from_path(path)?.value)
+}
+
+pub(crate) fn merged_catalog_value() -> Result<serde_json::Value, String> {
+    merged_catalog_value_from_path(sidecar_catalog_path().as_deref())
 }
 
 fn load_catalog() -> Result<Catalog, String> {
@@ -949,6 +991,32 @@ pub async fn catalog_snapshot() -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(merged_catalog_value)
         .await
         .map_err(|error| format!("catalog snapshot failed: {error}"))?
+}
+
+/// Safe diagnostics for sidecar selection. Raw file contents and paths are never returned.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct CatalogHealth {
+    pub source: String,
+    pub failure: Option<String>,
+}
+#[tauri::command]
+pub async fn catalog_health() -> Result<CatalogHealth, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let loaded = load_catalog_from_path(sidecar_catalog_path().as_deref())?;
+        Ok(CatalogHealth {
+            source: match loaded.source {
+                CatalogSource::Embedded => "embedded",
+                CatalogSource::Sidecar => "sidecar",
+            }
+            .into(),
+            failure: loaded
+                .failure
+                .map(|failure| format!("{failure:?}").to_lowercase()),
+        })
+    })
+    .await
+    .map_err(|_| "Catalog health probe failed.".to_string())?
 }
 
 /// Report which desktop integrations work here, so the UI can disable what cannot.
@@ -1812,6 +1880,93 @@ mod tests {
             Some(value) => unsafe { env::set_var("XDG_DATA_HOME", value) },
             None => unsafe { env::remove_var("XDG_DATA_HOME") },
         }
+    }
+
+    #[test]
+    fn catalog_loader_reports_sidecar_even_when_equal_to_embedded() {
+        let embedded: serde_json::Value = serde_json::from_str(CATALOG_JSON).unwrap();
+        let temp = std::env::temp_dir().join(format!(
+            "catalog-health-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&temp).unwrap();
+        let path = temp.join("catalog.json");
+        fs::write(&path, serde_json::to_vec(&embedded).unwrap()).unwrap();
+        let loaded = load_catalog_from_path(Some(&path)).unwrap();
+        assert_eq!(loaded.source, CatalogSource::Sidecar);
+        assert_eq!(loaded.value, embedded);
+        assert_eq!(loaded.failure, None);
+    }
+
+    #[test]
+    fn catalog_loader_distinguishes_bad_json_empty_and_invalid_schema() {
+        let temp = std::env::temp_dir().join(format!(
+            "catalog-health-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&temp).unwrap();
+        let path = temp.join("catalog.json");
+        for (raw, expected) in [
+            ("{", CatalogFailure::Malformed),
+            (r#"{"entries":[]}"#, CatalogFailure::Empty),
+            (r#"{"entries":[{}]}"#, CatalogFailure::InvalidSchema),
+        ] {
+            fs::write(&path, raw).unwrap();
+            let loaded = load_catalog_from_path(Some(&path)).unwrap();
+            assert_eq!(loaded.source, CatalogSource::Embedded);
+            assert_eq!(loaded.failure, Some(expected));
+        }
+    }
+
+    #[test]
+    fn missing_sidecar_uses_embedded_without_failure() {
+        let temp = std::env::temp_dir().join(format!(
+            "catalog-health-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&temp).unwrap();
+        let loaded = load_catalog_from_path(Some(&temp.join("absent.json"))).unwrap();
+        assert_eq!(loaded.source, CatalogSource::Embedded);
+        assert_eq!(loaded.failure, None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_is_rejected_by_the_shared_loader() {
+        use std::os::unix::fs::symlink;
+        let temp = std::env::temp_dir().join(format!(
+            "catalog-health-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&temp).unwrap();
+        let target = temp.join("target.json");
+        let path = temp.join("catalog.json");
+        fs::write(
+            &target,
+            serde_json::to_vec(&serde_json::from_str::<serde_json::Value>(CATALOG_JSON).unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        symlink(&target, &path).unwrap();
+        let loaded = load_catalog_from_path(Some(&path)).unwrap();
+        assert_eq!(loaded.source, CatalogSource::Embedded);
+        assert_eq!(loaded.failure, Some(CatalogFailure::UnsafeFileType));
+        assert_eq!(
+            merged_catalog_value_from_path(Some(&path)).unwrap(),
+            loaded.value
+        );
     }
 
     #[test]

@@ -612,3 +612,96 @@ body:has(.runtime-web) { background: #0b0e10; }
 .freshness-notices li.freshness-attention b { color: var(--amber); }
 .freshness-notices span { max-width: 84ch; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .freshness-foot { margin: 8px 0 0; padding-top: 7px; border-top: 1px dashed var(--graphite-800); color: var(--graphite-600); font-size: 10px; line-height: 1.45; }
+
+/* Compact command workspace: one shared layout for native and browser. */
+.operator-shell .primary-nav { display:flex; flex:none; min-height:46px; gap:4px; padding:0 14px; border-bottom:1px solid var(--etched); background:#0b0f11; }
+.primary-nav button { min-width:88px; min-height:44px; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--muted); font:11px var(--mono); text-transform:uppercase; letter-spacing:.08em; }
+.primary-nav button[aria-current="page"] { border-bottom-color:var(--cyan); color:var(--white); }
+.operator-shell { min-width:0; }
+.operator-shell .masthead { flex:none; min-height:46px; }
+.operator-shell .masthead button { min-height:44px; min-width:44px; }
+.operator-shell .search-field { height:58px; padding:0 16px; }
+.operator-shell .search-field input { min-height:44px; font-size:28px; }
+.operator-shell .search-deck .freshness-banner, .operator-shell .search-deck .guide-invite { display:none; }
+.operator-shell .starter-prompts { display:none; }
+.operator-shell .prediction-rail { flex-wrap:nowrap; overflow-x:auto; padding:2px 14px; height:48px; }
+.operator-shell .prediction-rail button { flex:none; min-height:44px; }
+.operator-shell .prediction-hint { flex:none; }
+.operator-shell .intent-composer-actions { display:flex; flex-wrap:wrap; padding:4px 14px; gap:8px; }
+.operator-shell .spark-copy { flex:1; min-width:100px; }
+.operator-shell .spark-copy p { display:none; }
+.operator-shell .spark-copy small { font-size:10px; max-height:30px; overflow:auto; }
+.operator-shell .explain-paste-button, .operator-shell .spark-button { width:auto; min-height:44px; border:1px solid var(--etched); padding:7px 12px; background:#132126; color:var(--white); font:11px var(--mono); }
+.operator-shell .product-tabs { display:flex; min-width:0; overflow-x:auto; overflow-y:hidden; padding-right:32px; scrollbar-width:thin; }
+.operator-shell .product-tabs button { flex:none; min-height:44px; min-width:106px; }
+.operator-shell .control-rail { grid-template-columns:minmax(0,1fr) auto; }
+.operator-shell .task-chips { min-width:0; padding:2px 32px 5px 10px; }
+.operator-shell .task-chips button { min-height:44px; }
+.operator-shell .select-filters select { min-height:44px; }
+.operator-shell .workspace-grid { min-height:270px; }
+.operator-shell .command-stage { padding:14px 18px 0; }
+.operator-shell .detail-card { display:flex; flex-direction:column; gap:8px; }
+.operator-shell .detail-header { order:0; }
+.operator-shell .detail-card h2 { order:1; margin:0; font-size:clamp(28px,4vw,42px); line-height:1.1; }
+.operator-shell .command-context { order:2; margin:0; color:var(--cyan); font:11px/1.5 var(--mono); overflow-wrap:anywhere; }
+.operator-shell .detail-description { order:3; display:block; font-size:13px; line-height:1.5; }
+.operator-shell .action-warning, .operator-shell .availability-panel, .operator-shell .conflict-panel { order:4; }
+.operator-shell .action-panel { order:5; margin:0; }
+.operator-shell .action-panel button { min-height:44px; min-width:44px; }
+.operator-shell .action-panel .favorite-toggle { margin:0; background:transparent; border-color:var(--etched); color:var(--cyan); }
+.operator-shell .full-description { order:6; border-top:1px solid var(--etched); color:var(--muted); font-size:13px; }
+.operator-shell .full-description summary { cursor:pointer; min-height:44px; padding:12px 0; }
+.operator-shell .key-trace { order:7; margin:4px 0; }
+.operator-shell .telemetry-grid { order:8; }
+.operator-shell .quick-library { flex:none; display:flex; flex-wrap:wrap; gap:8px; padding:0 14px; border-bottom:1px solid var(--etched); }
+.quick-library details { flex:1; min-width:0; }
+.quick-library summary { min-height:44px; padding:12px 6px; color:var(--cyan); cursor:pointer; font:12px var(--mono); }
+.quick-library summary span { color:var(--steel); }
+.quick-library details > div { display:flex; gap:6px; flex-wrap:wrap; max-height:180px; overflow:auto; padding-bottom:8px; }
+.quick-library button { min-height:44px; padding:8px; border:1px solid var(--etched); background:#121a1d; color:var(--white); font:11px var(--mono); overflow-wrap:anywhere; }
+.quick-library small { display:block; color:var(--steel); }
+.learn-switch,.product-guide-library { display:flex; flex-wrap:wrap; gap:8px; padding:10px 14px; }
+.learn-switch button,.product-guide-library button { min-height:44px; padding:0 12px; border:1px solid var(--etched); background:#121a1d; color:var(--white); }
+.learn-switch button[aria-selected="true"] { border-color:var(--cyan); }
+.settings-panel { flex:1; padding:24px; background:var(--graphite-900); overflow:auto; }
+.settings-panel h1 { margin:0 0 8px; color:var(--white); font:32px var(--display); }
+.settings-panel h2 { margin:24px 0 8px; color:var(--cyan); font:13px var(--mono); }
+.settings-panel p { max-width:72ch; color:var(--muted); line-height:1.55; }
+.settings-panel label { display:flex; align-items:center; gap:10px; min-height:48px; border-bottom:1px solid var(--etched); color:var(--white); }
+.settings-panel input[type=checkbox] { accent-color:var(--cyan); width:22px; height:22px; }
+.settings-panel button { min-height:44px; margin-top:12px; padding:0 14px; border:1px solid var(--etched); background:#151b1e; color:var(--white); }
+.view-settings > .search-deck,.view-settings > .workspace-grid,.view-settings > .empty-panel,.view-settings > .explain-panel,.view-settings > .onboarding-panel,.view-settings > .status-footer,.view-learn > .search-deck,.view-learn > .workspace-grid,.view-learn > .empty-panel,.view-learn > .explain-panel,.view-learn > .status-footer { display:none!important; }
+.view-learn > .onboarding-panel { flex:1; overflow:auto; margin:0; }
+@media(max-height:720px) and (min-width:621px) {
+  .operator-shell .search-field { height:50px; }
+  .operator-shell .prediction-rail { display:none; }
+  .operator-shell .detail-card h2 { font-size:30px; }
+  .operator-shell .command-stage { padding-top:10px; }
+}
+@media(max-width:620px) {
+  .operator-shell.runtime-web,.operator-shell.runtime-native { width:100%; margin:0; height:auto; min-height:100vh; overflow-x:hidden; }
+  .operator-shell .masthead { gap:6px; padding:0 8px; font-size:9px; }
+  .operator-shell .system-readout { gap:3px; }
+  .operator-shell .wordmark-index,.operator-shell .search-index,.operator-shell .escape-key { display:none; }
+  .operator-shell .primary-nav { padding:0 8px; }
+  .operator-shell .primary-nav button { flex:1; min-width:0; }
+  .operator-shell .search-field input,.operator-shell .ghost-text { font-size:24px; }
+  .operator-shell .intent-composer-actions { flex-wrap:nowrap; padding:4px 10px; }
+  .operator-shell .spark-copy { display:none; }
+  .operator-shell .spark-button kbd { display:none; }
+  .operator-shell .control-rail { display:flex; flex-direction:column; }
+  .operator-shell .task-chips { max-width:100%; flex:none; }
+  .operator-shell .select-filters { display:flex; justify-content:space-between; min-height:48px; }
+  .operator-shell .select-filters label { flex:1; justify-content:space-between; }
+  .operator-shell .workspace-grid { display:flex; flex-direction:column; min-height:0; }
+  .operator-shell .command-stage { order:0; display:block; min-height:0; overflow:visible; padding:12px; }
+  .operator-shell .command-scroll { overflow:visible; }
+  .operator-shell .result-lane { order:1; height:240px; }
+  .operator-shell .result-lane ul { height:208px; max-height:208px; overflow:auto; }
+  .operator-shell .detail-card h2 { font-size:30px; }
+  .operator-shell .detail-header { gap:6px; }
+  .operator-shell .detail-description { font-size:13px; line-height:1.45; }
+  .operator-shell .action-panel button { width:auto; flex:1 1 140px; padding-inline:8px; }
+  .operator-shell .telemetry-grid { grid-template-columns:1fr 1fr; }
+  .operator-shell .settings-panel { padding:20px 14px; }
+}
