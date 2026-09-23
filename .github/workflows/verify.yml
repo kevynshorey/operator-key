@@ -8,8 +8,8 @@
 # Design notes:
 #   * The Python suite is stdlib-only and needs no install step.
 #   * The Rust jobs need GTK/WebKit because Tauri links against them on Linux.
-#   * `cargo test --lib` covers the security boundaries (provider isolation, insertion
-#     gates, process lifecycle) and does not need a display.
+#   * `cargo test --all-targets` covers security boundaries and renderer startup
+#     policy (library and binary tests) and does not need a display.
 #   * Audits run with `--deny warnings` so a new advisory fails the build instead of
 #     printing quietly into a log nobody reads.
 name: verify
@@ -112,7 +112,7 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Tests
         working-directory: src-tauri
-        run: cargo test --lib
+        run: cargo test --all-targets
 
   audit:
     name: dependency audits
