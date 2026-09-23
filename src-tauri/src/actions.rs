@@ -2480,18 +2480,24 @@ mod tests {
 
     #[test]
     fn a_wayland_session_without_hyprland_reports_degraded_with_copy_only() {
+        // Pin PATH: whether the host happens to have wl-copy installed must not decide
+        // this test's outcome. Here copy is available and insertion structurally is not.
+        let root = probe_path_with(&["wl-copy"]);
+
         with_environment(
             &[
                 ("WAYLAND_DISPLAY", Some("wayland-0")),
                 ("HYPRLAND_INSTANCE_SIGNATURE", None),
                 ("XDG_SESSION_TYPE", Some("wayland")),
+                ("PATH", Some(root.to_str().expect("probe path is utf-8"))),
             ],
             || {
                 let report = describe_desktop_compatibility();
 
-                // Copy may or may not be present depending on wl-copy, but insertion is
+                // Copy works, so this desktop is partly supported; insertion is
                 // structurally impossible here and must be named as such.
                 assert_eq!(report.mode, DesktopMode::Degraded);
+                assert!(report.capabilities.can_copy);
                 assert!(!report.capabilities.can_insert);
 
                 let insert = report
