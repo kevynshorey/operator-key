@@ -9,6 +9,15 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.2.2] - 2026-09-23
+
+### Improved
+
+- Guide disabled reasoning users to Settings with a native-only configuration action, without displaying a personal configuration path in the status message.
+- Show conservative desktop readiness, permission-dependent browser copy, and provider-specific disclosures.
+- Expose compact task starters that filter/search without copying, inserting, or executing anything.
+- Make native verification query replacement deterministic and cover it with unit tests.
+
 ## [0.2.1] - 2026-09-23
 
 ### Fixed

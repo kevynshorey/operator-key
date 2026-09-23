@@ -483,8 +483,8 @@ function PredictionRail({ suggestions, disabled, onAccept }: {
 function StarterPrompts({ prompts, disabled, onSelect }: { prompts: readonly string[]; disabled: boolean; onSelect: (prompt: string) => void }) {
   if (prompts.length === 0) return null;
   return (
-    <div className="starter-prompts" aria-label="Try one of these">
-      <span>New here? Try</span>
+    <div className="starter-prompts" aria-label="Task starters">
+      <span>Start a task</span>
       {prompts.map((prompt) => (
         <button type="button" key={prompt} disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(prompt)}>
           {prompt}
@@ -854,7 +854,9 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
   const [reasoningPending, setReasoningPending] = useState(false);
   const [activePlan, setActivePlan] = useState<ActiveIntentPlan>();
   const [reasoningError, setReasoningError] = useState<string>();
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const reasoningSettingsRef = useRef<HTMLElement | null>(null);
   const resultRefs = useRef(new Map<string, HTMLLIElement>());
   const runtime = injectedRuntime ?? detectRuntime();
   const dismissOverlay = injectedHideOverlay ?? hideOverlay;
@@ -917,11 +919,11 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
 
   const liveResults = useMemo(() => {
     if (!searchIndex) return [];
-    return searchCatalog(searchIndex, query, { product, interface: interfaceType, task, safety }, 50);
+    return searchCatalog(searchIndex, task && query === TASK_LABELS[task] ? "" : query, { product, interface: interfaceType, task, safety }, 50);
   }, [searchIndex, query, product, interfaceType, task, safety]);
   const results = useMemo(() => {
     if (!searchIndex) return [];
-    return searchCatalog(searchIndex, settledQuery, { product, interface: interfaceType, task, safety }, 50);
+    return searchCatalog(searchIndex, task && settledQuery === TASK_LABELS[task] ? "" : settledQuery, { product, interface: interfaceType, task, safety }, 50);
   }, [searchIndex, settledQuery, product, interfaceType, task, safety]);
   const displayedResults = useMemo(() => {
     const rows = activePlan
@@ -942,8 +944,8 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
   const ghost = predictions.find((item) => item.ghost.length > 0)?.ghost ?? "";
   const ghostCompletion = predictions.find((item) => item.ghost.length > 0)?.completion ?? "";
   const starters = useMemo(
-    () => predictionIndex && !query.trim() ? starterPrompts(predictionIndex, 5) : [],
-    [predictionIndex, query],
+    () => predictionIndex && !query.trim() && !product && !interfaceType && !task && !safety ? starterPrompts(predictionIndex, 5) : [],
+    [predictionIndex, query, product, interfaceType, task, safety],
   );
   const lesson = useMemo(
     () => teachingIndex && selected ? buildCommandLesson(teachingIndex, selected) : undefined,
@@ -987,6 +989,16 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
     setQuery(completion);
     setSelectedIndex(0);
     setActionStatus(undefined);
+  }, []);
+
+  const acceptStarter = useCallback((completion: string) => {
+    const selectedTask = TASK_GROUPS.find((candidate) => TASK_LABELS[candidate] === completion);
+    if (!selectedTask) return;
+    setTask(selectedTask);
+    setQuery(completion);
+    setSelectedIndex(0);
+    setActionStatus(undefined);
+    searchInputRef.current?.focus();
   }, []);
 
   const selectEntryById = useCallback((entryId: string) => {
@@ -1163,6 +1175,13 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
       : sparkStatus?.message ?? "Reasoning status unavailable.";
   const sparkDisabled = runtime !== "native" || !query.trim() || controlsLocked || sparkStatusPending || !sparkStatus?.available || !sparkStatus.loggedIn;
   const reasoningStatusMessage = reasoningPending ? "Reasoning in progress…" : sparkUnavailableReason;
+  const configureReasoning = () => {
+    setView("settings");
+    window.setTimeout(() => {
+      reasoningSettingsRef.current?.focus();
+      reasoningSettingsRef.current?.scrollIntoView?.({ block: "start" });
+    }, 0);
+  };
 
   return (
     <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}${query.trim() ? " has-query" : ""}${view !== "find" ? ` view-${view}` : ""}`} data-testid="operator-shell">
@@ -1174,7 +1193,21 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
       <nav className="primary-nav" aria-label="Primary navigation">{([ ["find", "Find"], ["learn", "Learn"], ["settings", "Settings"] ] as const).map(([key, label]) => <button type="button" key={key} aria-current={view === key ? "page" : undefined} onClick={() => { setView(key); if (key === "learn") { setShowLessons(true); setShowGuide(false); } }}>{label}</button>)}</nav>
       {view === "learn" && <div className="learn-switch" role="tablist" aria-label="Learning library"><button role="tab" aria-selected={learnSection === "workflows"} onClick={() => setLearnSection("workflows")}>Workflow lessons</button><button role="tab" aria-selected={learnSection === "products"} onClick={() => setLearnSection("products")}>Product guides</button></div>}
       {view === "learn" && learnSection === "products" && <div className="product-guide-library" aria-label="Product guides">{PRODUCT_TABS.filter((tab) => tab.value).map((tab) => <button type="button" key={tab.label} onClick={() => { setGuideProduct(tab.value!); setShowGuide(true); setShowLessons(false); }}>{`First 10 minutes: ${tab.label}`}</button>)}</div>}
-      {view === "settings" && <section className="settings-panel" aria-label="Settings"><h1>Settings</h1><p>Preferences stay on this device. No command is executed.</p><label><input type="checkbox" checked={largeText} onChange={(event) => setPreferences((p) => ({ ...p, largeText: event.target.checked }))} /> Large text</label><label><input type="checkbox" checked={apprenticeMode} onChange={(event) => setPreferences((p) => ({ ...p, apprenticeMode: event.target.checked }))} /> Explain commands</label><label><input type="checkbox" checked={historyEnabled} onChange={(event) => setPreferences((p) => ({ ...p, historyEnabled: event.target.checked, recentCopies: event.target.checked ? p.recentCopies : [] }))} /> Keep local history of successful copies (off by default)</label><button type="button" onClick={() => setPreferences((p) => ({ ...p, recentCopies: [] }))} disabled={!recentCopies.length}>Clear copy history</button><p>{recentCopies.length} recent copies saved locally.</p><h2>Runtime capabilities</h2><p>{runtime === "web" ? "Browser catalog · copy only · no insertion · no execution." : "Native companion · guarded insertion where supported · no execution."}</p><p>{sparkStatusPending ? "Checking reasoning capability…" : sparkStatus?.message ?? "Reasoning status unavailable."}</p><p>Provider disclosure: {sparkStatus?.provider === "codex" ? "Codex may contact its configured remote provider; review that provider's privacy terms." : sparkStatus?.provider === "ollama" || sparkStatus?.provider === "openai-compatible" ? "The configured local-compatible service may itself forward requests. Use a service you trust." : "No reasoning provider is currently confirmed."}</p><NativeSettingsPanel runtime={runtime} testCandidateId={parsed.catalog.entries.find((entry) => entry.available && entry.safety_level === "green" && entry.interface === "shell-command")?.id} onChanged={() => { setActivePlan(undefined); setReasoningError(undefined); setSparkStatusPending(true); void intentReasoner.status().then(setSparkStatus).catch((error: unknown) => setSparkStatus({ available: false, loggedIn: false, model: "", provider: "disabled", configPath: "", message: `Reasoning status unavailable: ${error instanceof Error ? error.message : String(error)}` })).finally(() => setSparkStatusPending(false)); }} /></section>}
+      {view === "settings" && <section className="settings-panel" aria-label="Settings">
+        <h1>Settings</h1><p>Preferences stay on this device. No command is executed.</p>
+        <label><input type="checkbox" checked={largeText} onChange={(event) => setPreferences((p) => ({ ...p, largeText: event.target.checked }))} /> Large text</label>
+        <label><input type="checkbox" checked={apprenticeMode} onChange={(event) => setPreferences((p) => ({ ...p, apprenticeMode: event.target.checked }))} /> Explain commands</label>
+        <label><input type="checkbox" checked={historyEnabled} onChange={(event) => setPreferences((p) => ({ ...p, historyEnabled: event.target.checked, recentCopies: event.target.checked ? p.recentCopies : [] }))} /> Keep local history of successful copies (off by default)</label>
+        <button type="button" onClick={() => setPreferences((p) => ({ ...p, recentCopies: [] }))} disabled={!recentCopies.length}>Clear copy history</button><p>{recentCopies.length} recent copies saved locally.</p>
+        <section className="desktop-readiness" aria-label="Desktop readiness"><h2>Desktop readiness</h2><dl>
+          <div><dt>Local catalog search: </dt><dd>Available</dd></div>
+          {runtime === "web" ? <><div><dt>Browser copy: </dt><dd>Permission-dependent</dd></div><div><dt>Terminal insertion: </dt><dd>Unsupported</dd></div></> : <><div><dt>Native copy: </dt><dd>{desktopCapabilities.canCopy ? "Ready" : "Not confirmed"}</dd></div><div><dt>Terminal insertion: </dt><dd>{desktopCapabilities.canCopy && desktopCapabilities.canInsert ? "Ready" : "Not confirmed"}</dd></div></>}
+        </dl>{runtime === "native" && <p>Native copy requires Wayland and wl-copy. Terminal insertion requires Hyprland and wtype.</p>}<p>Availability does not confirm that an operation succeeded. Operator Key does not press Enter and no command is executed.</p></section>
+        <h2>Reasoning status</h2><p>{sparkStatusPending ? "Checking reasoning capability…" : sparkStatus?.message ?? "Reasoning status unavailable."}</p>
+        {sparkStatus?.provider === "codex" && <p>Provider disclosure: Codex may contact its configured remote provider; review that provider's privacy terms.</p>}
+        {(sparkStatus?.provider === "ollama" || sparkStatus?.provider === "openai-compatible") && <p>Provider disclosure: The configured local-compatible service may itself forward requests. Use a service you trust.</p>}
+        <NativeSettingsPanel focusRef={reasoningSettingsRef} runtime={runtime} testCandidateId={parsed.catalog.entries.find((entry) => entry.available && entry.safety_level === "green" && entry.interface === "shell-command")?.id} onChanged={() => { setActivePlan(undefined); setReasoningError(undefined); setSparkStatusPending(true); void intentReasoner.status().then(setSparkStatus).catch((error: unknown) => setSparkStatus({ available: false, loggedIn: false, model: "", provider: "disabled", configPath: "", message: `Reasoning status unavailable: ${error instanceof Error ? error.message : String(error)}` })).finally(() => setSparkStatusPending(false)); }} />
+      </section>}
 
 
       {view === "find" && (favorites.length > 0 || (historyEnabled && recentCopies.length > 0)) && <div className="quick-library" aria-label="Saved commands">
@@ -1189,6 +1222,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
           <span className="sr-only">Operator intent</span>
           <span className="input-stack">
             <input
+              ref={searchInputRef}
               autoFocus
               type="search"
               role="searchbox"
@@ -1222,7 +1256,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
         </label>
         <FreshnessBanner summary={freshnessSummary} />
         <PredictionRail suggestions={predictions} disabled={controlsLocked} onAccept={acceptPrediction} />
-        <StarterPrompts prompts={starters} disabled={controlsLocked} onSelect={acceptPrediction} />
+        <StarterPrompts prompts={starters} disabled={controlsLocked} onSelect={acceptStarter} />
         {apprenticeMode && !showGuide && !showLessons && (
           <div className="guide-invite lessons-invite">
             <span>Never used git or GitHub? Learn the workflow, not just the commands.</span>
@@ -1262,8 +1296,10 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
           <button type="button" className="spark-button" aria-label="Reason about this intent" aria-describedby="reasoning-availability" disabled={sparkDisabled} onClick={() => { void reasonAboutIntent(); }}>
             <span aria-hidden="true">✦</span> {reasoningPending ? "Reasoning…" : "Reason"} <kbd>ALT+ENTER</kbd>
           </button>
+          {runtime === "native" && !sparkStatusPending && sparkStatus?.provider === "disabled" && <button type="button" className="configure-reasoning" onClick={configureReasoning}>Configure reasoning</button>}
           <div className="spark-copy">
-            <p>Reasoning sends the entered intent and bounded command fields shown in the local catalog to OpenAI through local Codex; never source paths, provenance, files, secrets, terminal contents, or history.</p>
+            {sparkStatus?.provider === "codex" && <p>Reasoning sends the entered intent and bounded command fields shown in the local catalog through local Codex; never source paths, provenance, files, secrets, terminal contents, or history.</p>}
+            {(sparkStatus?.provider === "ollama" || sparkStatus?.provider === "openai-compatible") && <p>Reasoning sends the entered intent and bounded command fields shown in the local catalog to your configured service; never source paths, provenance, files, secrets, terminal contents, or history.</p>}
             <small id="reasoning-availability" aria-live="polite" aria-atomic="true" className={!reasoningPending && sparkStatus?.available && sparkStatus.loggedIn && runtime === "native" ? "spark-ready" : ""}>{reasoningStatusMessage}</small>
           </div>
           {reasoningError && <p className="spark-error" role="alert">{reasoningError}</p>}

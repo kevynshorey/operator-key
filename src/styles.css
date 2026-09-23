@@ -623,7 +623,9 @@ body:has(.runtime-web) { background: #0b0e10; }
 .operator-shell .search-field { height:58px; padding:0 16px; }
 .operator-shell .search-field input { min-height:44px; font-size:28px; }
 .operator-shell .search-deck .freshness-banner, .operator-shell .search-deck .guide-invite { display:none; }
-.operator-shell .starter-prompts { display:none; }
+.operator-shell .starter-prompts { flex-wrap:nowrap; overflow-x:auto; padding:4px 14px; min-height:40px; background:rgba(49,215,232,.025); }
+.operator-shell .starter-prompts button { flex:none; min-height:32px; border-color:var(--cyan); color:#b9e8eb; }
+.operator-shell.has-query .starter-prompts { display:none; }
 .operator-shell .prediction-rail { flex-wrap:nowrap; overflow-x:auto; padding:2px 14px; height:48px; }
 .operator-shell .prediction-rail button { flex:none; min-height:44px; }
 .operator-shell .prediction-hint { flex:none; }
@@ -631,7 +633,7 @@ body:has(.runtime-web) { background: #0b0e10; }
 .operator-shell .spark-copy { flex:1; min-width:100px; }
 .operator-shell .spark-copy p { display:none; }
 .operator-shell .spark-copy small { font-size:10px; max-height:30px; overflow:auto; }
-.operator-shell .explain-paste-button, .operator-shell .spark-button { width:auto; min-height:44px; border:1px solid var(--etched); padding:7px 12px; background:#132126; color:var(--white); font:11px var(--mono); }
+.operator-shell .explain-paste-button, .operator-shell .spark-button, .operator-shell .configure-reasoning { width:auto; min-height:44px; border:1px solid var(--etched); padding:7px 12px; background:#132126; color:var(--white); font:11px var(--mono); }
 .operator-shell .product-tabs { display:flex; min-width:0; overflow-x:auto; overflow-y:hidden; padding-right:32px; scrollbar-width:thin; }
 .operator-shell .product-tabs button { flex:none; min-height:44px; min-width:106px; }
 .operator-shell .control-rail { grid-template-columns:minmax(0,1fr) auto; }
@@ -670,6 +672,11 @@ body:has(.runtime-web) { background: #0b0e10; }
 .settings-panel label { display:flex; align-items:center; gap:10px; min-height:48px; border-bottom:1px solid var(--etched); color:var(--white); }
 .settings-panel input[type=checkbox] { accent-color:var(--cyan); width:22px; height:22px; }
 .settings-panel button { min-height:44px; margin-top:12px; padding:0 14px; border:1px solid var(--etched); background:#151b1e; color:var(--white); }
+.desktop-readiness dl { display:grid; gap:6px; max-width:72ch; margin:0; }
+.desktop-readiness dl div { display:grid; grid-template-columns:minmax(150px, 1fr) 1fr; gap:12px; padding:7px 0; border-bottom:1px solid var(--etched); }
+.desktop-readiness dt { color:var(--white); font:11px var(--mono); text-transform:uppercase; }
+.desktop-readiness dd { margin:0; color:var(--cyan); font:11px var(--mono); }
+.native-settings:focus { outline:2px solid var(--cyan); outline-offset:5px; }
 .view-settings > .search-deck,.view-settings > .workspace-grid,.view-settings > .empty-panel,.view-settings > .explain-panel,.view-settings > .onboarding-panel,.view-settings > .status-footer,.view-learn > .search-deck,.view-learn > .workspace-grid,.view-learn > .empty-panel,.view-learn > .explain-panel,.view-learn > .status-footer { display:none!important; }
 .view-learn > .onboarding-panel { flex:1; overflow:auto; margin:0; }
 @media(max-height:720px) and (min-width:621px) {

@@ -19,10 +19,11 @@ async function operatorActionCalls(page: Page) {
 
 test.beforeEach(async ({ page }, testInfo) => {
   const webMode = testInfo.title.includes("[web]");
+  const disabledReasoning = testInfo.title.includes("[native-disabled]");
   await page.addInitScript(() => {
     window.__operatorKeyInvocations = [];
   });
-  if (!webMode) await page.addInitScript(() => {
+  if (!webMode) await page.addInitScript(({ disabledReasoning }) => {
     Object.defineProperty(window, "__TAURI_INTERNALS__", {
       configurable: true,
       value: {
@@ -31,10 +32,12 @@ test.beforeEach(async ({ page }, testInfo) => {
           if (cmd === "desktop_capabilities") return { canCopy: true, canInsert: true };
           if (cmd === "catalog_snapshot") return null;
           if (cmd === "spark_intent_status") return {
-            available: true,
-            loggedIn: true,
-            model: "gpt-5.6-luna",
-            message: "Luna ready.",
+            available: !disabledReasoning,
+            loggedIn: !disabledReasoning,
+            model: disabledReasoning ? "" : "gpt-5.6-luna",
+            provider: disabledReasoning ? "disabled" : "codex",
+            configPath: "/mock/native/reasoning.json",
+            message: disabledReasoning ? "Reasoning is off. Search works without it." : "Luna ready.",
           };
           if (cmd === "reason_about_intent") return {
             model: "gpt-5.6-luna",
@@ -49,7 +52,7 @@ test.beforeEach(async ({ page }, testInfo) => {
         },
       },
     });
-  });
+  }, { disabledReasoning });
   if (webMode) await page.addInitScript(() => {
     window.__operatorKeyClipboard = [];
     Object.defineProperty(navigator, "clipboard", {
@@ -77,6 +80,33 @@ test("task-first searches and chord reverse lookup rank expected commands", asyn
   await expect(options.nth(0)).toHaveAttribute("data-product", "hermes");
   await expect(options.nth(1)).toHaveAttribute("data-product", "claude-code");
   await expect(page.getByLabel("Binding conflict")).toBeVisible();
+});
+
+test("empty Find offers task starters that only narrow search", async ({ page }) => {
+  const starters = page.getByLabel("Task starters");
+  await expect(starters).toBeVisible();
+  await starters.getByRole("button", { name: "sessions and navigation" }).click();
+  await expect(page.getByRole("searchbox", { name: "Operator intent" })).toHaveValue("sessions and navigation");
+  await expect(page.getByRole("option", { selected: true })).toContainText("Move", { ignoreCase: true });
+  await expect(starters).toHaveCount(0);
+  expect(await operatorActionCalls(page)).toHaveLength(0);
+});
+
+test("[native-disabled] native configuration handoff focuses Optional local reasoning", async ({ page }) => {
+  await page.getByRole("button", { name: "Configure reasoning" }).click();
+  const settings = page.getByRole("region", { name: "Optional local reasoning" });
+  await expect(settings).toBeFocused();
+  await expect(settings).toBeInViewport();
+});
+
+test("[native-disabled] Settings reports conservative desktop readiness", async ({ page }) => {
+  await page.getByRole("button", { name: "Settings" }).click();
+  const readiness = page.getByRole("region", { name: "Desktop readiness" });
+  await expect(readiness).toContainText("Local catalog search: Available");
+  await expect(readiness).toContainText("Native copy: Ready");
+  await expect(readiness).toContainText("Terminal insertion: Ready");
+  await expect(readiness).toContainText("does not press Enter");
+  await expect(page.getByText(/Provider disclosure:/)).toHaveCount(0);
 });
 
 test("product, interface, task, and safety filters compose", async ({ page }) => {

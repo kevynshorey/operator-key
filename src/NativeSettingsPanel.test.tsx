@@ -63,4 +63,9 @@ describe("NativeSettingsPanel", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not load/i);
     expect(screen.queryByDisplayValue(/secret/)).not.toBeInTheDocument();
   });
+  it("does not expose legacy Codex disclosure for a disabled provider", async () => {
+    render(<NativeSettingsPanel runtime="native" nativeInvoke={bridge()} />);
+    await screen.findByLabelText("Loopback endpoint");
+    expect(screen.queryByText(/legacy codex/i)).not.toBeInTheDocument();
+  });
 });

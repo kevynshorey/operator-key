@@ -913,12 +913,20 @@ fn reason_about_intent_with(
 }
 
 fn disabled_message() -> String {
-    match provider::config_path() {
-        Some(path) => format!(
-            "Reasoning is off. Operator Key ships no model and no account. To enable it, point {} at a model you run.",
-            path.display()
-        ),
-        None => "Reasoning is off. Operator Key ships no model and no account.".to_owned(),
+    "Reasoning is off. Operator Key ships no model and no account. Search works without it. To enable it, open Settings → Optional local reasoning and choose a model you run.".to_owned()
+}
+
+#[cfg(test)]
+mod first_use_message_tests {
+    #[test]
+    fn disabled_reasoning_guides_to_settings_without_exposing_a_path() {
+        let message = super::disabled_message();
+        assert!(message.contains("Settings"));
+        assert!(message.contains("Optional local reasoning"));
+        assert!(message.contains("ships no model and no account"));
+        assert!(message.contains("Search works without it"));
+        assert!(!message.contains("reasoning.json"));
+        assert!(!message.contains("/home/"));
     }
 }
 
