@@ -19,9 +19,15 @@ import {
   getActionAvailability,
   readCatalogSnapshot,
   readDesktopCapabilities,
+  readDesktopCompatibility,
   UNKNOWN_DESKTOP_CAPABILITIES,
+  UNKNOWN_DESKTOP_COMPATIBILITY,
   WEB_DESKTOP_CAPABILITIES,
   type DesktopCapabilities,
+  type DesktopCompatibilityReport,
+  type DesktopFeature,
+  type DesktopMode,
+  type DesktopRequirement,
   createBrowserActions,
   nativeActions,
   type ActionAvailability,
@@ -92,6 +98,11 @@ interface AppProps {
    * assumes; in the real app it is probed from the native side on mount.
    */
   desktopCapabilities?: DesktopCapabilities;
+  /**
+   * The structured compatibility report. Injected in tests so each case states the exact
+   * desktop it describes, rather than depending on the machine running the suite.
+   */
+  desktopCompatibility?: DesktopCompatibilityReport;
 }
 
 interface ActiveIntentPlan {
@@ -795,7 +806,41 @@ function FreshnessBanner({ summary }: { summary: FreshnessSummary }) {
   );
 }
 
-export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities }: AppProps) {
+/**
+ * Say how much of Operator Key this desktop runs, and exactly what is missing.
+ *
+ * Mode wording is deliberately non-alarming: a Wayland desktop that cannot insert is
+ * "Partly supported", not broken, because search and copy genuinely work there.
+ */
+const DESKTOP_MODE_SUMMARY: Record<DesktopMode, string> = {
+  supported: "Fully supported: search, copy, and guarded terminal insertion are available.",
+  degraded: "Partly supported: search works, and some desktop actions need the prerequisites below.",
+  unsupported: "Search and learning work. Desktop actions need the prerequisites below.",
+};
+
+const DESKTOP_FEATURE_LABEL: Record<DesktopFeature, string> = {
+  search: "Local catalog search",
+  copy: "Native copy",
+  insert: "Terminal insertion",
+};
+
+/** List what the operator must add before an unavailable feature can work. */
+function DesktopPrerequisites({ requirements }: { requirements: DesktopRequirement[] }) {
+  const unmet = requirements.filter((item) => !item.met && item.unmetPrerequisites.length > 0);
+  if (!unmet.length) return null;
+  return (
+    <div className="desktop-prerequisites">
+      {unmet.map((item) => (
+        <div key={item.feature}>
+          <h3>To enable {DESKTOP_FEATURE_LABEL[item.feature].toLowerCase()}, install or switch to:</h3>
+          <ul>{item.unmetPrerequisites.map((prerequisite) => <li key={prerequisite}>{prerequisite}</li>)}</ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities, desktopCompatibility: injectedDesktopCompatibility }: AppProps) {
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences());
   useEffect(() => { savePreferences(preferences); }, [preferences]);
   // The native side may have applied an operator's sidecar catalog. Until it answers, the
@@ -866,6 +911,10 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
   const [desktopCapabilities, setDesktopCapabilities] = useState<DesktopCapabilities>(
     injectedDesktopCapabilities ?? (runtime === "native" ? UNKNOWN_DESKTOP_CAPABILITIES : WEB_DESKTOP_CAPABILITIES),
   );
+  // The actionable companion to the capability probe: what is missing and how to fix it.
+  const [desktopCompatibility, setDesktopCompatibility] = useState<DesktopCompatibilityReport>(
+    injectedDesktopCompatibility ?? UNKNOWN_DESKTOP_COMPATIBILITY,
+  );
   const defaultIntentReasoner = useMemo(
     () => runtime === "native" ? createNativeIntentReasoner() : createBrowserIntentReasoner(),
     [runtime],
@@ -889,6 +938,15 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
     });
     return () => { current = false; };
   }, [runtime, injectedDesktopCapabilities]);
+
+  useEffect(() => {
+    if (runtime !== "native" || injectedDesktopCompatibility) return;
+    let current = true;
+    void readDesktopCompatibility().then((report) => {
+      if (current) setDesktopCompatibility(report);
+    });
+    return () => { current = false; };
+  }, [runtime, injectedDesktopCompatibility]);
 
   useEffect(() => {
     // Tests inject `catalogData` directly and must not be overwritten by a native answer.
@@ -1201,8 +1259,8 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
         <button type="button" onClick={() => setPreferences((p) => ({ ...p, recentCopies: [] }))} disabled={!recentCopies.length}>Clear copy history</button><p>{recentCopies.length} recent copies saved locally.</p>
         <section className="desktop-readiness" aria-label="Desktop readiness"><h2>Desktop readiness</h2><dl>
           <div><dt>Local catalog search: </dt><dd>Available</dd></div>
-          {runtime === "web" ? <><div><dt>Browser copy: </dt><dd>Permission-dependent</dd></div><div><dt>Terminal insertion: </dt><dd>Unsupported</dd></div></> : <><div><dt>Native copy: </dt><dd>{desktopCapabilities.canCopy ? "Ready" : "Not confirmed"}</dd></div><div><dt>Terminal insertion: </dt><dd>{desktopCapabilities.canCopy && desktopCapabilities.canInsert ? "Ready" : "Not confirmed"}</dd></div></>}
-        </dl>{runtime === "native" && <p>Native copy requires Wayland and wl-copy. Terminal insertion requires Hyprland and wtype.</p>}<p>Availability does not confirm that an operation succeeded. Operator Key does not press Enter and no command is executed.</p></section>
+          {runtime === "web" ? <><div><dt>Browser copy: </dt><dd>Permission-dependent</dd></div><div><dt>Terminal insertion: </dt><dd>Unsupported</dd></div></> : <><div><dt>Native copy: </dt><dd>{desktopCapabilities.canCopy ? "Ready" : "Needs setup"}</dd></div><div><dt>Terminal insertion: </dt><dd>{desktopCapabilities.canCopy && desktopCapabilities.canInsert ? "Ready" : "Needs setup"}</dd></div></>}
+        </dl>{runtime === "native" && <><p>{DESKTOP_MODE_SUMMARY[desktopCompatibility.mode]}</p><DesktopPrerequisites requirements={desktopCompatibility.requirements} /><p>Native copy requires Wayland and wl-copy. Terminal insertion requires Hyprland and wtype.</p></>}<p>Availability does not confirm that an operation succeeded. Operator Key does not press Enter and no command is executed.</p></section>
         <h2>Reasoning status</h2><p>{sparkStatusPending ? "Checking reasoning capability…" : sparkStatus?.message ?? "Reasoning status unavailable."}</p>
         {sparkStatus?.provider === "codex" && <p>Provider disclosure: Codex may contact its configured remote provider; review that provider's privacy terms.</p>}
         {(sparkStatus?.provider === "ollama" || sparkStatus?.provider === "openai-compatible") && <p>Provider disclosure: The configured local-compatible service may itself forward requests. Use a service you trust.</p>}

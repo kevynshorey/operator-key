@@ -20,16 +20,36 @@ async function operatorActionCalls(page: Page) {
 test.beforeEach(async ({ page }, testInfo) => {
   const webMode = testInfo.title.includes("[web]");
   const disabledReasoning = testInfo.title.includes("[native-disabled]");
+  const degradedDesktop = testInfo.title.includes("[degraded-desktop]");
   await page.addInitScript(() => {
     window.__operatorKeyInvocations = [];
   });
-  if (!webMode) await page.addInitScript(({ disabledReasoning }) => {
+  if (!webMode) await page.addInitScript(({ disabledReasoning, degradedDesktop }) => {
     Object.defineProperty(window, "__TAURI_INTERNALS__", {
       configurable: true,
       value: {
         invoke: async (cmd: string, args: Record<string, unknown> = {}) => {
           window.__operatorKeyInvocations.push({ cmd, args });
-          if (cmd === "desktop_capabilities") return { canCopy: true, canInsert: true };
+          if (cmd === "desktop_capabilities") return degradedDesktop ? { canCopy: true, canInsert: false } : { canCopy: true, canInsert: true };
+          if (cmd === "desktop_compatibility") return degradedDesktop ? {
+            mode: "degraded",
+            capabilities: { canCopy: true, canInsert: false },
+            searchAvailable: true,
+            requirements: [
+              { feature: "search", met: true, unmetPrerequisites: [] },
+              { feature: "copy", met: true, unmetPrerequisites: [] },
+              { feature: "insert", met: false, unmetPrerequisites: ["Hyprland, for the window IPC that confirms the target terminal", "wtype, on PATH"] },
+            ],
+          } : {
+            mode: "supported",
+            capabilities: { canCopy: true, canInsert: true },
+            searchAvailable: true,
+            requirements: [
+              { feature: "search", met: true, unmetPrerequisites: [] },
+              { feature: "copy", met: true, unmetPrerequisites: [] },
+              { feature: "insert", met: true, unmetPrerequisites: [] },
+            ],
+          };
           if (cmd === "catalog_snapshot") return null;
           if (cmd === "spark_intent_status") return {
             available: !disabledReasoning,
@@ -52,7 +72,7 @@ test.beforeEach(async ({ page }, testInfo) => {
         },
       },
     });
-  }, { disabledReasoning });
+  }, { disabledReasoning, degradedDesktop });
   if (webMode) await page.addInitScript(() => {
     window.__operatorKeyClipboard = [];
     Object.defineProperty(navigator, "clipboard", {
@@ -107,6 +127,27 @@ test("[native-disabled] Settings reports conservative desktop readiness", async 
   await expect(readiness).toContainText("Terminal insertion: Ready");
   await expect(readiness).toContainText("does not press Enter");
   await expect(page.getByText(/Provider disclosure:/)).toHaveCount(0);
+});
+
+test("[native-disabled] a fully supported desktop lists no prerequisites to install", async ({ page }) => {
+  await page.getByRole("button", { name: "Settings" }).click();
+  const readiness = page.getByRole("region", { name: "Desktop readiness" });
+  await expect(readiness).toContainText("Fully supported");
+  // Nothing to fix here, so the guidance must stay out of the way.
+  await expect(readiness).not.toContainText("To enable");
+});
+
+test("[degraded-desktop] Settings names the exact prerequisite for an unavailable action", async ({ page }) => {
+  await page.getByRole("button", { name: "Settings" }).click();
+  const readiness = page.getByRole("region", { name: "Desktop readiness" });
+
+  // A partly supported desktop must stay usable, and say precisely what is missing.
+  await expect(readiness).toContainText("Partly supported");
+  await expect(readiness).toContainText("Local catalog search: Available");
+  await expect(readiness).toContainText("wtype, on PATH");
+  await expect(readiness).toContainText("Hyprland, for the window IPC that confirms the target terminal");
+  // The report is screenshot-safe: it must never expose the operator's environment.
+  await expect(readiness).not.toContainText("/home/");
 });
 
 test("product, interface, task, and safety filters compose", async ({ page }) => {

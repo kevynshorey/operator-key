@@ -13,6 +13,7 @@ pub fn run() {
             native_settings::save_reasoning_settings,
             native_settings::reset_reasoning_settings,
             actions::desktop_capabilities,
+            actions::desktop_compatibility,
             actions::copy_catalog_command,
             actions::insert_catalog_command,
             intent::spark_intent_status,
