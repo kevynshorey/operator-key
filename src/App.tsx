@@ -45,6 +45,8 @@ import { buildCommandLesson, createTeachingIndex, type CommandLesson } from "./t
 import { explainCommand, type CommandExplanation } from "./explain";
 import { buildLessons, type Lesson } from "./lessons";
 import { buildOnboardingPath, type OnboardingPath } from "./onboarding";
+import { loadPreferences, savePreferences, type Preferences } from "./preferences";
+import { NativeSettingsPanel } from "./NativeSettingsPanel";
 import {
   highestLevel,
   parseFreshness,
@@ -218,6 +220,8 @@ function DetailCard({
   actionPending,
   onCopy,
   onInsert,
+  favorite,
+  onFavorite,
 }: {
   entry: CatalogEntry;
   catalog: Catalog;
@@ -225,6 +229,8 @@ function DetailCard({
   actionPending: boolean;
   onCopy: () => void;
   onInsert: () => void;
+  favorite: boolean;
+  onFavorite: () => void;
 }) {
   const conflicts = catalog.conflicts.filter((conflict) => entry.conflict_ids.includes(conflict.id));
   return (
@@ -234,7 +240,9 @@ function DetailCard({
         <span className={`safety-pill safety-${entry.safety_level}`}>{entry.safety_level} · safety level</span>
       </div>
       <h2 id="active-command-heading">{entry.command}</h2>
-      <p className="detail-description">{entry.description}</p>
+      <p className="command-context">{PRODUCT_LABELS[entry.product]} · {entry.context}</p>
+      <p className="detail-description">{entry.description.length > 180 ? `${entry.description.slice(0, 177)}…` : entry.description}</p>
+      {entry.description.length > 180 && <details className="full-description"><summary>Read full description</summary><p>{entry.description}</p></details>}
       <KeyChord entry={entry} />
 
       <dl className="telemetry-grid">
@@ -278,7 +286,7 @@ function DetailCard({
         </aside>
       )}
       <section className="action-panel" aria-label="Selection actions">
-        <button type="button" disabled={actionPending} onClick={onCopy}>
+        <button type="button" disabled={actionPending || !availability.copy} title={!availability.copy ? "Clipboard access is unavailable in this runtime." : undefined} onClick={onCopy}>
           Copy command <kbd>Enter</kbd>
         </button>
         <button
@@ -290,6 +298,7 @@ function DetailCard({
         >
           Insert into confirmed terminal <kbd>Shift+Enter</kbd>
         </button>
+        <button type="button" className="favorite-toggle" disabled={actionPending} aria-pressed={favorite} onClick={onFavorite}>{favorite ? "Remove favorite" : "Save favorite"}</button>
         {availability.insertReason && <p id="insert-disabled-reason">{availability.insertReason}</p>}
         <small>Insertion types literal text only. Operator Key never sends Enter or executes it.</small>
       </section>
@@ -787,6 +796,8 @@ function FreshnessBanner({ summary }: { summary: FreshnessSummary }) {
 }
 
 export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities }: AppProps) {
+  const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences());
+  useEffect(() => { savePreferences(preferences); }, [preferences]);
   // The native side may have applied an operator's sidecar catalog. Until it answers, the
   // build-time import stands; both sides must agree on command text or every action fails
   // the native mismatch check.
@@ -812,10 +823,21 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
   const [task, setTask] = useState<TaskGroup>();
   const [safety, setSafety] = useState<SafetyLevel>();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [pinnedEntryId, setPinnedEntryId] = useState<string>();
+  const [explainPasted, setExplainPasted] = useState(false);
   const [actionStatus, setActionStatus] = useState<ActionStatus>();
   const [actionPending, setActionPending] = useState(false);
-  const [largeText, setLargeText] = useState(false);
-  const [apprenticeMode, setApprenticeMode] = useState(true);
+  const largeText = preferences.largeText;
+  const apprenticeMode = preferences.apprenticeMode;
+  const [view, setView] = useState<"find" | "learn" | "settings">("find");
+  const recentCopies = preferences.recentCopies;
+  const historyEnabled = preferences.historyEnabled;
+  const favorites = preferences.favorites;
+  const [learnSection, setLearnSection] = useState<"workflows" | "products">("workflows");
+  const toggleFavorite = (entry: CatalogEntry) => setPreferences((p) => {
+    const exists = p.favorites.some((item) => item.product === entry.product && item.command === entry.command);
+    return { ...p, favorites: exists ? p.favorites.filter((item) => item.product !== entry.product || item.command !== entry.command) : [...p.favorites, { product: entry.product, command: entry.command }].slice(-200) };
+  });
   const [showGuide, setShowGuide] = useState(false);
   const [guideProduct, setGuideProduct] = useState<Product>("hermes");
   const [showLessons, setShowLessons] = useState(false);
@@ -901,9 +923,14 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
     if (!searchIndex) return [];
     return searchCatalog(searchIndex, settledQuery, { product, interface: interfaceType, task, safety }, 50);
   }, [searchIndex, settledQuery, product, interfaceType, task, safety]);
-  const displayedResults = useMemo(() => activePlan
-    ? activePlan.recommendations.map(({ entry }) => ({ entry, score: 0, matchedTerms: [], unavailable: !entry.available }))
-    : results, [activePlan, results]);
+  const displayedResults = useMemo(() => {
+    const rows = activePlan
+      ? activePlan.recommendations.map(({ entry }) => ({ entry, score: 0, matchedTerms: [], unavailable: !entry.available }))
+      : results;
+    if (!pinnedEntryId) return rows;
+    const index = rows.findIndex(({ entry }) => entry.id === pinnedEntryId);
+    return index > 0 ? [rows[index], ...rows.slice(0, index), ...rows.slice(index + 1)] : rows;
+  }, [activePlan, results, pinnedEntryId]);
   const boundedIndex = Math.min(selectedIndex, Math.max(0, displayedResults.length - 1));
   const selected = displayedResults[boundedIndex]?.entry;
   const actionSelection = activePlan ? selected : query === settledQuery ? selected : liveResults[0]?.entry;
@@ -932,7 +959,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
   // "review my code" is three lowercase words and must NOT be treated as a command, so
   // bare word sequences do not qualify: there has to be real shell or CLI syntax.
   const explanation = useMemo(() => {
-    if (!searchIndex || !apprenticeMode) return undefined;
+    if (!searchIndex || (!apprenticeMode && !explainPasted)) return undefined;
     const text = query.trim();
     if (text.length < 2) return undefined;
     const looksLikeCommand = /^[$#>]\s/.test(text)          // copied shell prompt
@@ -941,9 +968,9 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
       || /\s-{1,2}[a-z]/i.test(text)                         // a flag argument
       || /[~/]\w|\.\w{2,4}\b/.test(text)                     // a path or filename
       || /^(sudo|git|npm|npx|docker|curl|wget|chmod|chown|rm|ls|cd|cat|grep|tar|ssh|kill|make|python3?|node|systemctl)\b/i.test(text);
-    if (!looksLikeCommand) return undefined;
+    if (!looksLikeCommand && !explainPasted) return undefined;
     return explainCommand(searchIndex, text) ?? undefined;
-  }, [searchIndex, query, apprenticeMode]);
+  }, [searchIndex, query, apprenticeMode, explainPasted]);
 
   const onboardingPath = useMemo(
     () => searchIndex && showGuide ? buildOnboardingPath(searchIndex, guideProduct) : undefined,
@@ -963,20 +990,13 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
   }, []);
 
   const selectEntryById = useCallback((entryId: string) => {
-    const position = displayedResults.findIndex((result) => result.entry.id === entryId);
-    if (position >= 0) {
-      setSelectedIndex(position);
-      return;
-    }
-    // A follow-up may point outside the current result lane; search for it directly.
-    if (!parsed.ok) return;
-    const target = parsed.catalog.entries.find((item) => item.id === entryId);
-    if (target) {
-      setQuery(target.command);
-      setSelectedIndex(0);
-      setActionStatus(undefined);
-    }
-  }, [displayedResults, parsed]);
+    const target = parsed.ok ? parsed.catalog.entries.find((item) => item.id === entryId) : undefined;
+    if (!target) return;
+    setView("find"); setShowLessons(false); setShowGuide(false);
+    setProduct(target.product); setInterfaceType(undefined); setTask(undefined); setSafety(undefined);
+    setActivePlan(undefined); setReasoningError(undefined); setExplainPasted(false);
+    setQuery(target.command); setSelectedIndex(0); setActionStatus(undefined); setPinnedEntryId(target.id);
+  }, [parsed]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -988,6 +1008,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
         setSelectedIndex(0);
         setActionStatus(undefined);
         clearReasoning();
+        setView("find");
       } else {
         void dismissOverlay();
       }
@@ -1051,10 +1072,16 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
 
   const copySelected = async () => {
     if (!actionSelection || controlsLocked) return;
+    const availability = getActionAvailability(actionSelection, runtime, desktopCapabilities);
+    if (!availability.copy) {
+      setActionStatus({ kind: "status", message: "Clipboard access is unavailable in this runtime." });
+      return;
+    }
     setActionPending(true);
     try {
       await operatorActions.copy(actionSelection);
       setActionStatus({ kind: "status", message: `Copied “${actionSelection.command}” to the clipboard.` });
+      if (historyEnabled) setPreferences((p) => ({ ...p, recentCopies: [{ product: actionSelection.product, command: actionSelection.command }, ...p.recentCopies.filter((item) => item.product !== actionSelection.product || item.command !== actionSelection.command)].slice(0, 20) }));
     } catch (error) {
       setActionStatus({ kind: "alert", message: `Copy failed: ${actionErrorMessage(error)}` });
     } finally {
@@ -1138,17 +1165,24 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
   const reasoningStatusMessage = reasoningPending ? "Reasoning in progress…" : sparkUnavailableReason;
 
   return (
-    <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}${query.trim() ? " has-query" : ""}`} data-testid="operator-shell">
-      <Header runtime={runtime} largeText={largeText} disabled={controlsLocked} apprenticeMode={apprenticeMode} onApprenticeMode={() => setApprenticeMode((value) => !value)} onLargeText={() => setLargeText((value) => !value)} onClose={() => {
+    <main className={`operator-shell runtime-${runtime}${largeText ? " large-text" : ""}${query.trim() ? " has-query" : ""}${view !== "find" ? ` view-${view}` : ""}`} data-testid="operator-shell">
+      <Header runtime={runtime} largeText={largeText} disabled={controlsLocked} apprenticeMode={apprenticeMode} onApprenticeMode={() => setPreferences((value) => ({ ...value, apprenticeMode: !value.apprenticeMode }))} onLargeText={() => setPreferences((value) => ({ ...value, largeText: !value.largeText }))} onClose={() => {
         if (runtime === "native") void dismissOverlay();
-        else { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); setSelectedIndex(0); setActionStatus(undefined); clearReasoning(); }
+        else { if (controlsLocked) return; setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); setSelectedIndex(0); setActionStatus(undefined); clearReasoning(); setView("find"); }
       }} />
 
-      {runtime === "web" && <section className="web-hero" aria-label="Operator Key promise">
-        <div><span>LOCAL COMMAND INSTRUMENT / {parsed.catalog.total.toLocaleString()} ENTRIES</span><h1>You remember the task. <strong>Operator Key remembers the keys.</strong></h1></div>
-        <b>WEB DECK · COPY ONLY</b>
-      </section>}
+      <nav className="primary-nav" aria-label="Primary navigation">{([ ["find", "Find"], ["learn", "Learn"], ["settings", "Settings"] ] as const).map(([key, label]) => <button type="button" key={key} aria-current={view === key ? "page" : undefined} onClick={() => { setView(key); if (key === "learn") { setShowLessons(true); setShowGuide(false); } }}>{label}</button>)}</nav>
+      {view === "learn" && <div className="learn-switch" role="tablist" aria-label="Learning library"><button role="tab" aria-selected={learnSection === "workflows"} onClick={() => setLearnSection("workflows")}>Workflow lessons</button><button role="tab" aria-selected={learnSection === "products"} onClick={() => setLearnSection("products")}>Product guides</button></div>}
+      {view === "learn" && learnSection === "products" && <div className="product-guide-library" aria-label="Product guides">{PRODUCT_TABS.filter((tab) => tab.value).map((tab) => <button type="button" key={tab.label} onClick={() => { setGuideProduct(tab.value!); setShowGuide(true); setShowLessons(false); }}>{`First 10 minutes: ${tab.label}`}</button>)}</div>}
+      {view === "settings" && <section className="settings-panel" aria-label="Settings"><h1>Settings</h1><p>Preferences stay on this device. No command is executed.</p><label><input type="checkbox" checked={largeText} onChange={(event) => setPreferences((p) => ({ ...p, largeText: event.target.checked }))} /> Large text</label><label><input type="checkbox" checked={apprenticeMode} onChange={(event) => setPreferences((p) => ({ ...p, apprenticeMode: event.target.checked }))} /> Explain commands</label><label><input type="checkbox" checked={historyEnabled} onChange={(event) => setPreferences((p) => ({ ...p, historyEnabled: event.target.checked, recentCopies: event.target.checked ? p.recentCopies : [] }))} /> Keep local history of successful copies (off by default)</label><button type="button" onClick={() => setPreferences((p) => ({ ...p, recentCopies: [] }))} disabled={!recentCopies.length}>Clear copy history</button><p>{recentCopies.length} recent copies saved locally.</p><h2>Runtime capabilities</h2><p>{runtime === "web" ? "Browser catalog · copy only · no insertion · no execution." : "Native companion · guarded insertion where supported · no execution."}</p><p>{sparkStatusPending ? "Checking reasoning capability…" : sparkStatus?.message ?? "Reasoning status unavailable."}</p><p>Provider disclosure: {sparkStatus?.provider === "codex" ? "Codex may contact its configured remote provider; review that provider's privacy terms." : sparkStatus?.provider === "ollama" || sparkStatus?.provider === "openai-compatible" ? "The configured local-compatible service may itself forward requests. Use a service you trust." : "No reasoning provider is currently confirmed."}</p><NativeSettingsPanel runtime={runtime} testCandidateId={parsed.catalog.entries.find((entry) => entry.available && entry.safety_level === "green" && entry.interface === "shell-command")?.id} onChanged={() => { setActivePlan(undefined); setReasoningError(undefined); setSparkStatusPending(true); void intentReasoner.status().then(setSparkStatus).catch((error: unknown) => setSparkStatus({ available: false, loggedIn: false, model: "", provider: "disabled", configPath: "", message: `Reasoning status unavailable: ${error instanceof Error ? error.message : String(error)}` })).finally(() => setSparkStatusPending(false)); }} /></section>}
 
+
+      {view === "find" && (favorites.length > 0 || (historyEnabled && recentCopies.length > 0)) && <div className="quick-library" aria-label="Saved commands">
+        {([["Favorites", favorites], ["Recent copies", historyEnabled ? recentCopies : []]] as const).map(([title, items]) => items.length > 0 && <details key={title}><summary>{title} <span>{items.length}</span></summary><div>{items.map((item) => {
+          const target = parsed.catalog.entries.find((entry) => entry.product === item.product && entry.command === item.command);
+          return <button type="button" key={`${item.product}:${item.command}`} disabled={!target || controlsLocked} onClick={() => target && selectEntryById(target.id)}>{item.command} <small>{PRODUCT_LABELS[item.product as Product] ?? item.product}{!target ? " · no longer in catalog" : ""}</small></button>;
+        })}</div></details>)}
+      </div>}
       <section className="search-deck" aria-label="Command search controls">
         <label className="search-field">
           <span className="search-index">DESCRIBE OUTCOME /</span>
@@ -1165,11 +1199,11 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
               autoComplete="off"
               value={query}
               disabled={controlsLocked}
-              placeholder="Describe the outcome you want to achieve in a full sentence."
+              placeholder="What do you want to do?"
               onChange={(event) => {
                 if (!controlsLocked) {
                   setQuery(event.target.value);
-                  setSelectedIndex(0);
+                  setExplainPasted(false); setPinnedEntryId(undefined); setSelectedIndex(0);
                   setActionStatus(undefined);
                   clearReasoning();
                 }
@@ -1224,6 +1258,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
           </div>
         )}
         <div className="intent-composer-actions">
+          <button type="button" className="explain-paste-button" onClick={() => { setExplainPasted(true); }} disabled={controlsLocked || query.trim().length < 2}>Explain pasted command</button>
           <button type="button" className="spark-button" aria-label="Reason about this intent" aria-describedby="reasoning-availability" disabled={sparkDisabled} onClick={() => { void reasonAboutIntent(); }}>
             <span aria-hidden="true">✦</span> {reasoningPending ? "Reasoning…" : "Reason"} <kbd>ALT+ENTER</kbd>
           </button>
@@ -1283,17 +1318,17 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
         </div>
       </section>
 
-      {showLessons && lessons.length > 0 && (
+      {view === "learn" && learnSection === "workflows" && showLessons && lessons.length > 0 && (
         <LessonsPanel
           lessons={lessons}
           selectedId={lessonId}
           onSelectLesson={setLessonId}
           onSelectEntry={(entry) => { selectEntryById(entry.id); }}
-          onClose={() => setShowLessons(false)}
+          onClose={() => { setShowLessons(false); setView("find"); }}
         />
       )}
 
-      {onboardingPath && (
+      {view === "learn" && learnSection === "products" && onboardingPath && (
         <OnboardingPanel
           path={onboardingPath}
           onSelectEntry={(entry) => { selectEntryById(entry.id); setShowGuide(false); }}
@@ -1322,6 +1357,8 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
               {selected && (
                 <DetailCard
                   entry={selected}
+                  favorite={favorites.some((item) => item.product === selected.product && item.command === selected.command)}
+                  onFavorite={() => toggleFavorite(selected)}
                   catalog={parsed.catalog}
                   availability={getActionAvailability(selected, runtime, desktopCapabilities)}
                   actionPending={controlsLocked}

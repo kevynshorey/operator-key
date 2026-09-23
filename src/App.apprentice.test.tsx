@@ -1,6 +1,12 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
+beforeEach(() => { window.localStorage.clear(); });
+
+function useApprenticeMode() {
+  window.localStorage.setItem("operator-key.preferences.v1", JSON.stringify({ apprenticeMode: true }));
+}
 import App from "./App";
 
 /**
@@ -40,6 +46,7 @@ describe("Apprentice learning surface", () => {
   });
 
   it("explains the selected command's anatomy and concepts", async () => {
+    useApprenticeMode();
     const user = userEvent.setup();
     render(<App />);
 
@@ -62,6 +69,7 @@ describe("Apprentice learning surface", () => {
   });
 
   it("proposes follow-up checks and navigates to a follow-up command", async () => {
+    useApprenticeMode();
     const user = userEvent.setup();
     render(<App />);
 
@@ -79,15 +87,16 @@ describe("Apprentice learning surface", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const toggle = await screen.findByRole("button", { name: /apprentice/i });
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const toggle = await screen.findByRole("button", { name: /operator/i });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
 
     await user.click(toggle);
-    const operatorToggle = screen.getByRole("button", { name: /operator/i });
-    expect(operatorToggle).toHaveAttribute("aria-pressed", "false");
+    const apprenticeToggle = screen.getByRole("button", { name: /apprentice/i });
+    expect(apprenticeToggle).toHaveAttribute("aria-pressed", "true");
   });
 
   it("never renders an execution control in the learning panels", async () => {
+    useApprenticeMode();
     const user = userEvent.setup();
     render(<App />);
 

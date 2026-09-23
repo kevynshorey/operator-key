@@ -2,6 +2,17 @@
 
 Operator Key is a local-first command compass for operators who remember the task but not the shortcut.
 
+## Start here
+
+- **Using the app:** [User guide, supported desktops, installation, upgrades and recovery](docs/USER_GUIDE.md).
+- **Download published packages:** [GitHub Releases](https://github.com/kevynshorey/operator-key/releases).
+- **Find:** a compact, keyboard-first command workspace.
+- **Learn:** guided workflows and explanations, separate from everyday search.
+- **Settings:** local preferences, saved-command controls, desktop capabilities and optional reasoning.
+
+Search does not require AI. Operator Key never executes a command or sends Enter to your terminal. Native insertion is a Hyprland-specific optional capability, not a universal Linux feature. This repository may contain unreleased changes; release tags identify the downloadable version.
+
+
 > **If you just cloned this repository, build a catalog from your own machine.**
 > The catalog shipped in `data/catalog.json` was generated elsewhere. It lets the app run
 > immediately, but until you rebuild it, it describes software versions that are not

@@ -106,3 +106,13 @@ address you configured, which must be on your own machine.
 
 No file paths, environment variables, shell history, terminal contents or installed
 package lists are ever included.
+
+## Native settings API
+
+Tauri invoke commands:
+
+- `get_reasoning_settings` returns `{enabled, provider, model, endpoint, timeout_seconds}`. Legacy `api_key_env`, `codex_version`, and `_comment` remain honored by native reasoning, but are never returned to the webview.
+- `save_reasoning_settings` accepts exactly those five fields; extra keys are refused. Providers: `disabled`, `ollama`, `openai-compatible`, `codex`. Enabled HTTP providers use the existing loopback and model validation. Timeout is 5–600 seconds, model is at most 256 bytes. Credentials cannot be configured in this UI API.
+- `reset_reasoning_settings` removes the settings file and returns disabled defaults.
+
+Writes use a same-directory exclusive temporary file, Unix mode 0600, fsync, and atomic rename. No separate connection-test API is provided; reasoning itself uses the existing bounded request path and catalog-limited candidates.

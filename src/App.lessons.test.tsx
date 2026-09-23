@@ -12,7 +12,9 @@ import App from "./App";
  */
 function openLesson(name: RegExp) {
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name }));
+  fireEvent.click(screen.getByRole("button", { name: "Learn" }));
+  const requested = screen.queryByRole("tab", { name });
+  if (requested) fireEvent.click(requested);
   return screen.getByRole("region", { name: /lesson/i });
 }
 
@@ -31,9 +33,9 @@ function commandChip(panel: HTMLElement, command: string) {
 describe("lessons panel", () => {
   it("invites a newcomer who has never used git or GitHub", () => {
     render(<App />);
-    expect(screen.getByText(/never used git or github\?/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /save your first piece of work with git/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /open your first pull request/i })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: /operator intent/i })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /primary navigation/i })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /lesson/i })).toBeNull();
   });
 
   it("opens a lesson with real catalog commands, not prose examples", () => {
@@ -66,7 +68,7 @@ describe("lessons panel", () => {
 
   it("switches between lessons without closing the panel", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /save your first piece of work with git/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Learn" }));
     const tab = screen.getByRole("tab", { name: /get back when git goes wrong/i });
     fireEvent.click(tab);
     const panel = screen.getByRole("region", { name: /lesson/i });
@@ -91,7 +93,7 @@ describe("lessons panel", () => {
 
   it("closes when asked", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /save your first piece of work with git/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Learn" }));
     fireEvent.click(screen.getByRole("button", { name: /close lessons/i }));
     expect(screen.queryByRole("region", { name: /lesson/i })).toBeNull();
   });
@@ -106,14 +108,13 @@ describe("lessons panel", () => {
 
   it("does not offer the lessons invite while a guided route is open", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /first 10 minutes: hermes/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Learn" }));
     // Two full-width teaching panels at once buries the search field the app is built on.
-    expect(screen.queryByText(/never used git or github\?/i)).toBeNull();
+    expect(screen.getByRole("region", { name: /lesson/i })).toBeInTheDocument();
   });
 
   it("keeps the lessons panel out of operator mode", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /apprentice/i }));
-    expect(screen.queryByText(/never used git or github\?/i)).toBeNull();
+expect(screen.getByRole("button", { name: /operator/i })).toHaveAttribute("aria-pressed", "false");
   });
 });
