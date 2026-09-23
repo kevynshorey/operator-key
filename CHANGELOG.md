@@ -7,6 +7,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-09-23
+
 ### Added
 
 - State the running version and how this copy was installed in Settings, with an upgrade route that matches the install: a packaged copy points at the package manager, a hand-installed binary at the release download, a build tree at rebuilding. An unrecognised install offers no instruction rather than a confident wrong one. The panel deliberately carries no filesystem path, since it is what an operator screenshots into a bug report.
