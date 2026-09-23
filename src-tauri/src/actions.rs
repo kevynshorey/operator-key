@@ -466,6 +466,131 @@ pub fn detect_desktop_capabilities() -> DesktopCapabilities {
     }
 }
 
+/// Which Operator Key feature a requirement row describes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DesktopFeature {
+    Search,
+    Copy,
+    Insert,
+}
+
+/// How much of Operator Key this desktop can actually run.
+///
+/// `Degraded` is deliberately distinct from `Unsupported`: a GNOME or KDE Wayland session
+/// can copy perfectly well even though it will never insert into a terminal, and telling
+/// that operator "unsupported" would be false.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DesktopMode {
+    Supported,
+    Degraded,
+    Unsupported,
+}
+
+/// One feature, whether it is available, and precisely what is missing if it is not.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopRequirement {
+    pub feature: DesktopFeature,
+    pub met: bool,
+    /// Exactly what the operator must add. Empty whenever `met` is true.
+    ///
+    /// These are fixed descriptive strings. They never interpolate the environment, so the
+    /// report stays safe to render and to paste into a bug report.
+    pub unmet_prerequisites: Vec<String>,
+}
+
+/// The full compatibility picture for this desktop.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopCompatibilityReport {
+    pub mode: DesktopMode,
+    pub capabilities: DesktopCapabilities,
+    /// Catalog search and learning run from bundled data and never need the desktop.
+    pub search_available: bool,
+    pub requirements: Vec<DesktopRequirement>,
+}
+
+const WAYLAND_PREREQUISITE: &str = "A Wayland session (this session is not Wayland)";
+const HYPRLAND_PREREQUISITE: &str =
+    "Hyprland, for the window IPC that confirms the target terminal";
+
+/// Describe what this desktop supports and what is missing, without running a subprocess.
+///
+/// The existing capability probe answers "can I?"; this answers "and what do I install to
+/// change that?". Both read the same environment and PATH so a rendered requirement can
+/// never disagree with the gate that actually refuses the action.
+pub fn describe_desktop_compatibility() -> DesktopCompatibilityReport {
+    let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some();
+    let hyprland = std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some();
+    let capabilities = detect_desktop_capabilities();
+
+    let mut copy_missing: Vec<String> = Vec::new();
+    if !wayland {
+        copy_missing.push(WAYLAND_PREREQUISITE.to_owned());
+    }
+    if !program_on_path("wl-copy") {
+        copy_missing.push("wl-copy, from the wl-clipboard package".to_owned());
+    }
+
+    let mut insert_missing: Vec<String> = Vec::new();
+    if !wayland {
+        insert_missing.push(WAYLAND_PREREQUISITE.to_owned());
+    }
+    if !hyprland {
+        insert_missing.push(HYPRLAND_PREREQUISITE.to_owned());
+    }
+    for program in ["hyprctl", "wtype"] {
+        if !program_on_path(program) {
+            insert_missing.push(format!("{program}, on PATH"));
+        }
+    }
+
+    // Report what the gate will actually do, not merely what is installed.
+    if capabilities.can_copy {
+        copy_missing.clear();
+    }
+    if capabilities.can_insert {
+        insert_missing.clear();
+    }
+
+    // Derive the mode from what the gate will actually allow, never from the session type
+    // alone: a Wayland desktop with no helper installed can perform no desktop action, and
+    // calling that "degraded" would overstate what is available.
+    let mode = if capabilities.can_copy && capabilities.can_insert {
+        DesktopMode::Supported
+    } else if capabilities.can_copy || capabilities.can_insert {
+        DesktopMode::Degraded
+    } else {
+        DesktopMode::Unsupported
+    };
+
+    DesktopCompatibilityReport {
+        mode,
+        capabilities,
+        // Search is bundled and deterministic: it is available on every desktop.
+        search_available: true,
+        requirements: vec![
+            DesktopRequirement {
+                feature: DesktopFeature::Search,
+                met: true,
+                unmet_prerequisites: Vec::new(),
+            },
+            DesktopRequirement {
+                feature: DesktopFeature::Copy,
+                met: capabilities.can_copy,
+                unmet_prerequisites: copy_missing,
+            },
+            DesktopRequirement {
+                feature: DesktopFeature::Insert,
+                met: capabilities.can_insert,
+                unmet_prerequisites: insert_missing,
+            },
+        ],
+    }
+}
+
 /// Explain an unsupported desktop in terms the operator can act on.
 fn unsupported_desktop_message(action: &str) -> String {
     let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some();
@@ -1025,6 +1150,17 @@ pub async fn desktop_capabilities() -> Result<DesktopCapabilities, String> {
     tauri::async_runtime::spawn_blocking(detect_desktop_capabilities)
         .await
         .map_err(|error| format!("desktop capability probe failed: {error}"))
+}
+
+/// Report what this desktop supports and exactly what is missing, for Settings.
+///
+/// This is the actionable companion to `desktop_capabilities`: both read the same
+/// environment and PATH, so a displayed prerequisite can never disagree with the gate.
+#[tauri::command]
+pub async fn desktop_compatibility() -> Result<DesktopCompatibilityReport, String> {
+    tauri::async_runtime::spawn_blocking(describe_desktop_compatibility)
+        .await
+        .map_err(|error| format!("desktop compatibility probe failed: {error}"))
 }
 
 #[tauri::command]
@@ -2200,6 +2336,296 @@ mod tests {
                 assert!(message.contains("Hyprland"), "{message}");
             },
         );
+    }
+
+    /// Build a PATH directory containing exactly the named executables.
+    fn probe_path_with(programs: &[&str]) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "operator-key-compat-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).expect("create probe dir");
+        for program in programs {
+            let path = root.join(program);
+            fs::write(&path, b"#!/bin/sh\nexit 0\n").expect("write probe program");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+                    .expect("mark probe executable");
+            }
+        }
+        root
+    }
+
+    #[test]
+    fn a_wayland_session_with_no_usable_action_reports_unsupported_not_degraded() {
+        // Degraded must mean "some desktop action works". A Wayland session missing every
+        // helper has none, so calling it Degraded would overstate what the gate allows.
+        let root = probe_path_with(&[]);
+
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", Some("wayland-0")),
+                ("HYPRLAND_INSTANCE_SIGNATURE", Some("test-signature")),
+                ("PATH", Some(root.to_str().expect("probe path is utf-8"))),
+            ],
+            || {
+                let report = describe_desktop_compatibility();
+
+                assert_eq!(report.mode, DesktopMode::Unsupported);
+                assert!(!report.capabilities.can_copy);
+                assert!(!report.capabilities.can_insert);
+                // Search is unaffected and must still be reported as available.
+                assert!(report.search_available);
+            },
+        );
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn a_wayland_session_that_can_only_copy_reports_degraded() {
+        let root = probe_path_with(&["wl-copy"]);
+
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", Some("wayland-0")),
+                ("HYPRLAND_INSTANCE_SIGNATURE", None),
+                ("PATH", Some(root.to_str().expect("probe path is utf-8"))),
+            ],
+            || {
+                let report = describe_desktop_compatibility();
+
+                // One action works, so this really is partly supported.
+                assert_eq!(report.mode, DesktopMode::Degraded);
+                assert!(report.capabilities.can_copy);
+                assert!(!report.capabilities.can_insert);
+            },
+        );
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn every_unavailable_desktop_action_names_at_least_one_prerequisite() {
+        // An unmet requirement with an empty list would be exactly the unactionable
+        // "Not confirmed" this report exists to replace.
+        let root = probe_path_with(&[]);
+
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", Some("wayland-0")),
+                ("HYPRLAND_INSTANCE_SIGNATURE", Some("test-signature")),
+                ("PATH", Some(root.to_str().expect("probe path is utf-8"))),
+            ],
+            || {
+                for requirement in describe_desktop_compatibility().requirements {
+                    if requirement.met {
+                        assert!(
+                            requirement.unmet_prerequisites.is_empty(),
+                            "{requirement:?}"
+                        );
+                    } else {
+                        assert!(
+                            !requirement.unmet_prerequisites.is_empty(),
+                            "an unavailable action must say what is missing: {requirement:?}"
+                        );
+                    }
+                }
+            },
+        );
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn a_non_wayland_report_names_the_session_prerequisite_not_a_raw_binary() {
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", None),
+                ("HYPRLAND_INSTANCE_SIGNATURE", None),
+                ("XDG_SESSION_TYPE", Some("x11")),
+            ],
+            || {
+                let report = describe_desktop_compatibility();
+
+                assert_eq!(report.mode, DesktopMode::Unsupported);
+                assert!(!report.capabilities.can_copy);
+                assert!(!report.capabilities.can_insert);
+
+                // Search must never be described as blocked: it works everywhere.
+                assert!(report.search_available, "search is always available");
+
+                let copy = report
+                    .requirements
+                    .iter()
+                    .find(|item| item.feature == DesktopFeature::Copy)
+                    .expect("copy requirement is reported");
+                assert!(!copy.met, "copy cannot be met without Wayland");
+                // The operator needs the session prerequisite, not a bare program name.
+                assert!(
+                    copy.unmet_prerequisites
+                        .iter()
+                        .any(|item| item.contains("Wayland")),
+                    "{:?}",
+                    copy.unmet_prerequisites
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_wayland_session_without_hyprland_reports_degraded_with_copy_only() {
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", Some("wayland-0")),
+                ("HYPRLAND_INSTANCE_SIGNATURE", None),
+                ("XDG_SESSION_TYPE", Some("wayland")),
+            ],
+            || {
+                let report = describe_desktop_compatibility();
+
+                // Copy may or may not be present depending on wl-copy, but insertion is
+                // structurally impossible here and must be named as such.
+                assert_eq!(report.mode, DesktopMode::Degraded);
+                assert!(!report.capabilities.can_insert);
+
+                let insert = report
+                    .requirements
+                    .iter()
+                    .find(|item| item.feature == DesktopFeature::Insert)
+                    .expect("insert requirement is reported");
+                assert!(!insert.met);
+                assert!(
+                    insert
+                        .unmet_prerequisites
+                        .iter()
+                        .any(|item| item.contains("Hyprland")),
+                    "{:?}",
+                    insert.unmet_prerequisites
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_hyprland_session_missing_helpers_names_each_missing_program_to_install() {
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", Some("wayland-0")),
+                ("HYPRLAND_INSTANCE_SIGNATURE", Some("test-signature")),
+                ("PATH", Some("/nonexistent-operator-key-probe")),
+            ],
+            || {
+                let report = describe_desktop_compatibility();
+
+                // No helper is installed, so no desktop action is possible here.
+                assert_eq!(report.mode, DesktopMode::Unsupported);
+                assert!(report.search_available);
+
+                let copy = report
+                    .requirements
+                    .iter()
+                    .find(|item| item.feature == DesktopFeature::Copy)
+                    .expect("copy requirement is reported");
+                assert!(
+                    copy.unmet_prerequisites
+                        .iter()
+                        .any(|item| item.contains("wl-copy")),
+                    "{:?}",
+                    copy.unmet_prerequisites
+                );
+
+                let insert = report
+                    .requirements
+                    .iter()
+                    .find(|item| item.feature == DesktopFeature::Insert)
+                    .expect("insert requirement is reported");
+                // Both helper programs are absent and both must be named, so the operator
+                // installs everything in one step instead of discovering them one at a time.
+                assert!(
+                    insert
+                        .unmet_prerequisites
+                        .iter()
+                        .any(|item| item.contains("wtype")),
+                    "{:?}",
+                    insert.unmet_prerequisites
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn a_fully_equipped_hyprland_session_reports_supported_with_no_unmet_prerequisites() {
+        let root = std::env::temp_dir().join(format!(
+            "operator-key-compat-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).expect("create probe dir");
+        for program in ["wl-copy", "hyprctl", "wtype"] {
+            let path = root.join(program);
+            fs::write(&path, b"#!/bin/sh\nexit 0\n").expect("write probe program");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+                    .expect("mark probe executable");
+            }
+        }
+
+        with_environment(
+            &[
+                ("WAYLAND_DISPLAY", Some("wayland-0")),
+                ("HYPRLAND_INSTANCE_SIGNATURE", Some("test-signature")),
+                ("PATH", Some(root.to_str().expect("probe path is utf-8"))),
+            ],
+            || {
+                let report = describe_desktop_compatibility();
+
+                assert_eq!(report.mode, DesktopMode::Supported);
+                assert!(report.capabilities.can_copy);
+                assert!(report.capabilities.can_insert);
+                assert!(
+                    report.requirements.iter().all(|item| item.met),
+                    "{:?}",
+                    report.requirements
+                );
+                assert!(
+                    report
+                        .requirements
+                        .iter()
+                        .all(|item| item.unmet_prerequisites.is_empty()),
+                    "a met requirement lists nothing to install"
+                );
+            },
+        );
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn the_compatibility_report_never_exposes_the_operators_home_path() {
+        // Public-release privacy: this report is rendered in the UI and may be pasted into
+        // a bug report, so it must describe prerequisites without leaking the environment.
+        let report = describe_desktop_compatibility();
+        let rendered = serde_json::to_string(&report).expect("report serializes");
+
+        if let Some(home) = std::env::var_os("HOME") {
+            let home = home.to_string_lossy().to_string();
+            if !home.is_empty() && home != "/" {
+                assert!(
+                    !rendered.contains(&home),
+                    "compatibility report must not embed the home directory"
+                );
+            }
+        }
     }
 
     #[test]

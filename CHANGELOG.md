@@ -7,7 +7,12 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Improved
+
+- Report desktop compatibility as a supported/partly-supported mode with the exact missing prerequisite for each unavailable action, instead of only "Not confirmed".
+- Keep local catalog search described as available on every desktop, including sessions where no native action can run.
+- Derive the displayed prerequisites and the native action gate from the same environment and PATH check, so guidance cannot disagree with what the app will allow.
+- Keep the compatibility report free of the operator's home directory, username, and environment, so it stays safe to include in a bug report.
 
 ## [0.2.2] - 2026-09-23
 

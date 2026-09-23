@@ -37,6 +37,134 @@ export const WEB_DESKTOP_CAPABILITIES: DesktopCapabilities = { canCopy: true, ca
 
 export const UNSUPPORTED_INSERT_REASON = "Terminal insertion needs a Wayland session running Hyprland. Search and copy still work.";
 
+/** Which Operator Key feature a requirement row describes. */
+export type DesktopFeature = "search" | "copy" | "insert";
+
+/** How much of Operator Key this desktop can run. */
+export type DesktopMode = "supported" | "degraded" | "unsupported";
+
+/**
+ * One feature, whether it is available, and exactly what is missing when it is not.
+ *
+ * `unmetPrerequisites` is what turns "Not confirmed" into something the operator can act
+ * on. It is always empty when `met` is true.
+ */
+export interface DesktopRequirement {
+  feature: DesktopFeature;
+  met: boolean;
+  unmetPrerequisites: string[];
+}
+
+/** The structured compatibility picture the native side reports. */
+export interface DesktopCompatibilityReport {
+  mode: DesktopMode;
+  capabilities: DesktopCapabilities;
+  searchAvailable: boolean;
+  requirements: DesktopRequirement[];
+}
+
+/**
+ * Assume no desktop action until the native side answers.
+ *
+ * Search stays available because it is bundled and never depends on the desktop; claiming
+ * otherwise would tell the operator the app is dead when it is not.
+ */
+export const UNKNOWN_DESKTOP_COMPATIBILITY: DesktopCompatibilityReport = {
+  mode: "unsupported",
+  capabilities: UNKNOWN_DESKTOP_CAPABILITIES,
+  searchAvailable: true,
+  requirements: [
+    { feature: "search", met: true, unmetPrerequisites: [] },
+    { feature: "copy", met: false, unmetPrerequisites: [] },
+    { feature: "insert", met: false, unmetPrerequisites: [] },
+  ],
+};
+
+const DESKTOP_MODES: readonly DesktopMode[] = ["supported", "degraded", "unsupported"];
+const DESKTOP_FEATURES: readonly DesktopFeature[] = ["search", "copy", "insert"];
+
+function parseRequirement(value: unknown): DesktopRequirement | null {
+  if (typeof value !== "object" || value === null) return null;
+  const row = value as Record<string, unknown>;
+  if (!DESKTOP_FEATURES.includes(row.feature as DesktopFeature)) return null;
+  if (typeof row.met !== "boolean") return null;
+  if (!Array.isArray(row.unmetPrerequisites)) return null;
+  if (!row.unmetPrerequisites.every((item) => typeof item === "string")) return null;
+  return {
+    feature: row.feature as DesktopFeature,
+    met: row.met,
+    unmetPrerequisites: [...(row.unmetPrerequisites as string[])],
+  };
+}
+
+/**
+ * Read the structured desktop compatibility report from the native side.
+ *
+ * Fails closed to {@link UNKNOWN_DESKTOP_COMPATIBILITY} for any malformed payload, for an
+ * older native build without the command, and — critically — for any internally
+ * inconsistent report. Type-checking alone is not enough: a payload whose mode or
+ * requirement rows disagree with its capabilities could render "Fully supported" for a
+ * desktop whose native gate would refuse the action, so consistency is enforced here.
+ */
+export async function readDesktopCompatibility(
+  nativeInvoke: Invoke = invoke,
+): Promise<DesktopCompatibilityReport> {
+  try {
+    const value = await nativeInvoke<unknown>("desktop_compatibility");
+    if (typeof value !== "object" || value === null) return UNKNOWN_DESKTOP_COMPATIBILITY;
+    const report = value as Record<string, unknown>;
+
+    if (!DESKTOP_MODES.includes(report.mode as DesktopMode)) return UNKNOWN_DESKTOP_COMPATIBILITY;
+    if (!Array.isArray(report.requirements)) return UNKNOWN_DESKTOP_COMPATIBILITY;
+    // Search is bundled and desktop-independent: a report denying it is not trustworthy.
+    if (report.searchAvailable !== true) return UNKNOWN_DESKTOP_COMPATIBILITY;
+
+    const capabilities = report.capabilities as Record<string, unknown> | undefined;
+    if (typeof capabilities !== "object" || capabilities === null
+      || typeof capabilities.canCopy !== "boolean" || typeof capabilities.canInsert !== "boolean") {
+      return UNKNOWN_DESKTOP_COMPATIBILITY;
+    }
+    const { canCopy, canInsert } = capabilities as { canCopy: boolean; canInsert: boolean };
+
+    // The mode must not claim more than the capabilities allow.
+    const expectedMode: DesktopMode = canCopy && canInsert
+      ? "supported"
+      : canCopy || canInsert ? "degraded" : "unsupported";
+    if (report.mode !== expectedMode) return UNKNOWN_DESKTOP_COMPATIBILITY;
+
+    const byFeature = new Map<DesktopFeature, DesktopRequirement>();
+    for (const row of report.requirements) {
+      const parsed = parseRequirement(row);
+      if (!parsed) return UNKNOWN_DESKTOP_COMPATIBILITY;
+      // Exactly one row per feature: a duplicate makes the rendered answer ambiguous.
+      if (byFeature.has(parsed.feature)) return UNKNOWN_DESKTOP_COMPATIBILITY;
+      // A met feature has nothing to install; an unmet one must say what is missing,
+      // otherwise it is the unactionable status this report exists to replace.
+      if (parsed.met && parsed.unmetPrerequisites.length > 0) return UNKNOWN_DESKTOP_COMPATIBILITY;
+      if (!parsed.met && parsed.unmetPrerequisites.length === 0) return UNKNOWN_DESKTOP_COMPATIBILITY;
+      byFeature.set(parsed.feature, parsed);
+    }
+
+    const search = byFeature.get("search");
+    const copy = byFeature.get("copy");
+    const insert = byFeature.get("insert");
+    if (!search || !copy || !insert) return UNKNOWN_DESKTOP_COMPATIBILITY;
+    if (!search.met) return UNKNOWN_DESKTOP_COMPATIBILITY;
+    // Each action row must agree with the capability the native gate actually enforces.
+    if (copy.met !== canCopy || insert.met !== canInsert) return UNKNOWN_DESKTOP_COMPATIBILITY;
+
+    return {
+      mode: report.mode as DesktopMode,
+      capabilities: { canCopy, canInsert },
+      searchAvailable: true,
+      requirements: [search, copy, insert],
+    };
+  } catch {
+    // An older native build without this command must not break the UI.
+    return UNKNOWN_DESKTOP_COMPATIBILITY;
+  }
+}
+
 
 /**
  * The catalog the native side will actually enforce.

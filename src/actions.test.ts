@@ -6,7 +6,9 @@ import {
   getActionAvailability,
   readCatalogSnapshot,
   readDesktopCapabilities,
+  readDesktopCompatibility,
   UNKNOWN_DESKTOP_CAPABILITIES,
+  UNKNOWN_DESKTOP_COMPATIBILITY,
   UNSUPPORTED_INSERT_REASON,
   WEB_DESKTOP_CAPABILITIES,
 } from "./actions";
@@ -121,6 +123,230 @@ describe("desktop capability probe", () => {
 
     await expect(readDesktopCapabilities(invoke)).resolves.toEqual({ canCopy: true, canInsert: true });
     expect(invoke).toHaveBeenCalledWith("desktop_capabilities");
+  });
+});
+
+describe("desktop compatibility report", () => {
+  const supported = {
+    mode: "supported",
+    capabilities: { canCopy: true, canInsert: true },
+    searchAvailable: true,
+    requirements: [
+      { feature: "search", met: true, unmetPrerequisites: [] },
+      { feature: "copy", met: true, unmetPrerequisites: [] },
+      { feature: "insert", met: true, unmetPrerequisites: [] },
+    ],
+  };
+
+  it("reports the structured compatibility the native side returns", async () => {
+    const invoke = vi.fn().mockResolvedValue(supported);
+
+    await expect(readDesktopCompatibility(invoke)).resolves.toEqual(supported);
+    expect(invoke).toHaveBeenCalledWith("desktop_compatibility");
+  });
+
+  it("keeps the named prerequisites for a degraded desktop", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      mode: "degraded",
+      capabilities: { canCopy: true, canInsert: false },
+      searchAvailable: true,
+      requirements: [
+        { feature: "search", met: true, unmetPrerequisites: [] },
+        { feature: "copy", met: true, unmetPrerequisites: [] },
+        { feature: "insert", met: false, unmetPrerequisites: ["Hyprland, for the window IPC that confirms the target terminal"] },
+      ],
+    });
+
+    const report = await readDesktopCompatibility(invoke);
+
+    expect(report.mode).toBe("degraded");
+    const insert = report.requirements.find((item) => item.feature === "insert");
+    expect(insert?.met).toBe(false);
+    // The operator must still be told exactly what is missing, not just "not confirmed".
+    expect(insert?.unmetPrerequisites).toContain("Hyprland, for the window IPC that confirms the target terminal");
+  });
+
+  it.each([
+    null,
+    undefined,
+    {},
+    { mode: "supported" },
+    { mode: "elsewhere", capabilities: { canCopy: true, canInsert: true }, searchAvailable: true, requirements: [] },
+    { mode: "supported", capabilities: { canCopy: true, canInsert: true }, searchAvailable: true, requirements: [{ feature: "copy", met: "yes", unmetPrerequisites: [] }] },
+    { mode: "supported", capabilities: { canCopy: true, canInsert: true }, searchAvailable: true, requirements: [{ feature: "copy", met: true, unmetPrerequisites: [3] }] },
+  ])("fails closed to an unknown desktop for malformed report %j", async (value) => {
+    const report = await readDesktopCompatibility(vi.fn().mockResolvedValue(value));
+
+    // Failing closed must never claim a capability the native gate would refuse.
+    expect(report).toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+    expect(report.capabilities).toEqual(UNKNOWN_DESKTOP_CAPABILITIES);
+    expect(report.searchAvailable).toBe(true);
+  });
+
+  it("falls back to unknown when an older native build lacks the command", async () => {
+    const invoke = vi.fn().mockRejectedValue(new Error("command desktop_compatibility not found"));
+
+    await expect(readDesktopCompatibility(invoke)).resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+  });
+
+  it("still reports search as available when every desktop action is unsupported", async () => {
+    // Search is bundled: an unsupported desktop must never read as a dead app.
+    const invoke = vi.fn().mockResolvedValue({
+      mode: "unsupported",
+      capabilities: { canCopy: false, canInsert: false },
+      searchAvailable: true,
+      requirements: [
+        { feature: "search", met: true, unmetPrerequisites: [] },
+        { feature: "copy", met: false, unmetPrerequisites: ["A Wayland session (this session is not Wayland)"] },
+        { feature: "insert", met: false, unmetPrerequisites: ["A Wayland session (this session is not Wayland)"] },
+      ],
+    });
+
+    const report = await readDesktopCompatibility(invoke);
+
+    expect(report.mode).toBe("unsupported");
+    expect(report.searchAvailable).toBe(true);
+    expect(report.requirements.find((item) => item.feature === "search")?.met).toBe(true);
+  });
+
+  describe("report invariants", () => {
+    function report(overrides: Record<string, unknown> = {}) {
+      return {
+        mode: "supported",
+        capabilities: { canCopy: true, canInsert: true },
+        searchAvailable: true,
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: true, unmetPrerequisites: [] },
+          { feature: "insert", met: true, unmetPrerequisites: [] },
+        ],
+        ...overrides,
+      };
+    }
+
+    it("rejects a mode that claims more than the capabilities allow", async () => {
+      // The exact fail-closed defect: "Fully supported" while the gate would refuse.
+      const lying = report({
+        mode: "supported",
+        capabilities: { canCopy: false, canInsert: false },
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: false, unmetPrerequisites: ["wl-copy, from the wl-clipboard package"] },
+          { feature: "insert", met: false, unmetPrerequisites: ["wtype, on PATH"] },
+        ],
+      });
+
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(lying)))
+        .resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+    });
+
+    it("rejects a requirement row that disagrees with the reported capability", async () => {
+      const inconsistent = report({
+        capabilities: { canCopy: true, canInsert: false },
+        mode: "degraded",
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: true, unmetPrerequisites: [] },
+          // Says insertion works while the capability says it does not.
+          { feature: "insert", met: true, unmetPrerequisites: [] },
+        ],
+      });
+
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(inconsistent)))
+        .resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+    });
+
+    it("rejects a report that omits or duplicates a feature row", async () => {
+      const missing = report({
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: true, unmetPrerequisites: [] },
+        ],
+      });
+      const duplicated = report({
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: true, unmetPrerequisites: [] },
+          { feature: "insert", met: true, unmetPrerequisites: [] },
+        ],
+      });
+
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(missing)))
+        .resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(duplicated)))
+        .resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+    });
+
+    it("rejects a report that denies bundled search", async () => {
+      const noSearch = report({ searchAvailable: false });
+      const searchUnmet = report({
+        requirements: [
+          { feature: "search", met: false, unmetPrerequisites: ["something"] },
+          { feature: "copy", met: true, unmetPrerequisites: [] },
+          { feature: "insert", met: true, unmetPrerequisites: [] },
+        ],
+      });
+
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(noSearch)))
+        .resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(searchUnmet)))
+        .resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+    });
+
+    it("rejects a met requirement that still lists prerequisites", async () => {
+      const contradictory = report({
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: true, unmetPrerequisites: ["wl-copy, from the wl-clipboard package"] },
+          { feature: "insert", met: true, unmetPrerequisites: [] },
+        ],
+      });
+
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(contradictory)))
+        .resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+    });
+
+    it("rejects an unavailable action that names nothing to fix", async () => {
+      // An empty list is exactly the unactionable "Not confirmed" this replaces.
+      const silent = report({
+        mode: "degraded",
+        capabilities: { canCopy: true, canInsert: false },
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: true, unmetPrerequisites: [] },
+          { feature: "insert", met: false, unmetPrerequisites: [] },
+        ],
+      });
+
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(silent)))
+        .resolves.toEqual(UNKNOWN_DESKTOP_COMPATIBILITY);
+    });
+
+    it("accepts each genuinely consistent mode", async () => {
+      const degraded = report({
+        mode: "degraded",
+        capabilities: { canCopy: true, canInsert: false },
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: true, unmetPrerequisites: [] },
+          { feature: "insert", met: false, unmetPrerequisites: ["wtype, on PATH"] },
+        ],
+      });
+      const unsupported = report({
+        mode: "unsupported",
+        capabilities: { canCopy: false, canInsert: false },
+        requirements: [
+          { feature: "search", met: true, unmetPrerequisites: [] },
+          { feature: "copy", met: false, unmetPrerequisites: ["A Wayland session (this session is not Wayland)"] },
+          { feature: "insert", met: false, unmetPrerequisites: ["A Wayland session (this session is not Wayland)"] },
+        ],
+      });
+
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(report()))).resolves.toMatchObject({ mode: "supported" });
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(degraded))).resolves.toMatchObject({ mode: "degraded" });
+      await expect(readDesktopCompatibility(vi.fn().mockResolvedValue(unsupported))).resolves.toMatchObject({ mode: "unsupported" });
+    });
   });
 });
 

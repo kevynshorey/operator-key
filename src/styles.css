@@ -676,6 +676,10 @@ body:has(.runtime-web) { background: #0b0e10; }
 .desktop-readiness dl div { display:grid; grid-template-columns:minmax(150px, 1fr) 1fr; gap:12px; padding:7px 0; border-bottom:1px solid var(--etched); }
 .desktop-readiness dt { color:var(--white); font:11px var(--mono); text-transform:uppercase; }
 .desktop-readiness dd { margin:0; color:var(--cyan); font:11px var(--mono); }
+.desktop-prerequisites { margin:10px 0 0; max-width:72ch; }
+.desktop-prerequisites h3 { margin:10px 0 4px; color:var(--white); font:11px var(--mono); text-transform:uppercase; }
+.desktop-prerequisites ul { margin:0; padding-left:18px; }
+.desktop-prerequisites li { color:var(--cyan); font:11px var(--mono); line-height:1.6; }
 .native-settings:focus { outline:2px solid var(--cyan); outline-offset:5px; }
 .view-settings > .search-deck,.view-settings > .workspace-grid,.view-settings > .empty-panel,.view-settings > .explain-panel,.view-settings > .onboarding-panel,.view-settings > .status-footer,.view-learn > .search-deck,.view-learn > .workspace-grid,.view-learn > .empty-panel,.view-learn > .explain-panel,.view-learn > .status-footer { display:none!important; }
 .view-learn > .onboarding-panel { flex:1; overflow:auto; margin:0; }

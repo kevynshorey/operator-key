@@ -95,8 +95,8 @@ describe("Operator Key overlay", () => {
 
   it.each([
     [{ canCopy: true, canInsert: true }, /native copy: ready/i, /terminal insertion: ready/i],
-    [{ canCopy: false, canInsert: false }, /native copy: not confirmed/i, /terminal insertion: not confirmed/i],
-    [{ canCopy: false, canInsert: true }, /native copy: not confirmed/i, /terminal insertion: not confirmed/i],
+    [{ canCopy: false, canInsert: false }, /native copy: needs setup/i, /terminal insertion: needs setup/i],
+    [{ canCopy: false, canInsert: true }, /native copy: needs setup/i, /terminal insertion: needs setup/i],
   ])("reports native desktop readiness from loaded capabilities", async (capabilities, copyText, insertText) => {
     const user = userEvent.setup();
     render(<App runtime="native" desktopCapabilities={capabilities} intentReasoner={nativeReasoner()} />);
@@ -105,9 +105,76 @@ describe("Operator Key overlay", () => {
     expect(readiness).toHaveTextContent(/local catalog search: available/i);
     expect(readiness).toHaveTextContent(copyText);
     expect(readiness).toHaveTextContent(insertText);
+    // A definite state, never an ambiguous "not confirmed" the operator cannot act on.
+    expect(readiness).not.toHaveTextContent(/not confirmed/i);
     expect(readiness).toHaveTextContent(/wayland.*wl-copy/i);
     expect(readiness).toHaveTextContent(/hyprland.*wtype/i);
     expect(readiness).toHaveTextContent(/does not press enter|no command is executed/i);
+  });
+
+  it("names the exact missing prerequisites when a desktop capability is unavailable", async () => {
+    const user = userEvent.setup();
+    // A GNOME/KDE Wayland session: copy works, insertion structurally cannot.
+    render(<App runtime="native" desktopCapabilities={{ canCopy: true, canInsert: false }} intentReasoner={nativeReasoner()} desktopCompatibility={{
+      mode: "degraded",
+      capabilities: { canCopy: true, canInsert: false },
+      searchAvailable: true,
+      requirements: [
+        { feature: "search", met: true, unmetPrerequisites: [] },
+        { feature: "copy", met: true, unmetPrerequisites: [] },
+        { feature: "insert", met: false, unmetPrerequisites: ["Hyprland, for the window IPC that confirms the target terminal", "wtype, on PATH"] },
+      ],
+    }} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    const readiness = screen.getByRole("region", { name: /desktop readiness/i });
+    // "Not confirmed" alone is not actionable: the operator must see what to install.
+    expect(readiness).toHaveTextContent(/hyprland, for the window ipc that confirms the target terminal/i);
+    expect(readiness).toHaveTextContent(/wtype, on path/i);
+    // A degraded desktop is not a broken one; search and copy must not read as blocked.
+    expect(readiness).toHaveTextContent(/partly supported|degraded/i);
+  });
+
+  it("does not list prerequisites for a fully supported desktop", async () => {
+    const user = userEvent.setup();
+    render(<App runtime="native" desktopCapabilities={{ canCopy: true, canInsert: true }} intentReasoner={nativeReasoner()} desktopCompatibility={{
+      mode: "supported",
+      capabilities: { canCopy: true, canInsert: true },
+      searchAvailable: true,
+      requirements: [
+        { feature: "search", met: true, unmetPrerequisites: [] },
+        { feature: "copy", met: true, unmetPrerequisites: [] },
+        { feature: "insert", met: true, unmetPrerequisites: [] },
+      ],
+    }} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    const readiness = screen.getByRole("region", { name: /desktop readiness/i });
+    expect(readiness).toHaveTextContent(/fully supported|supported/i);
+    expect(readiness).not.toHaveTextContent(/to enable this, install/i);
+    // Availability is still not a claim that an operation already succeeded.
+    expect(readiness).toHaveTextContent(/does not press enter|no command is executed/i);
+  });
+
+  it("keeps search described as available on a fully unsupported desktop", async () => {
+    const user = userEvent.setup();
+    render(<App runtime="native" desktopCapabilities={{ canCopy: false, canInsert: false }} intentReasoner={nativeReasoner()} desktopCompatibility={{
+      mode: "unsupported",
+      capabilities: { canCopy: false, canInsert: false },
+      searchAvailable: true,
+      requirements: [
+        { feature: "search", met: true, unmetPrerequisites: [] },
+        { feature: "copy", met: false, unmetPrerequisites: ["A Wayland session (this session is not Wayland)"] },
+        { feature: "insert", met: false, unmetPrerequisites: ["A Wayland session (this session is not Wayland)"] },
+      ],
+    }} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    const readiness = screen.getByRole("region", { name: /desktop readiness/i });
+    expect(readiness).toHaveTextContent(/local catalog search: available/i);
+    expect(readiness).toHaveTextContent(/a wayland session \(this session is not wayland\)/i);
+    // Never leak the operator's environment into a report they may paste into an issue.
+    expect(readiness).not.toHaveTextContent(/\/home\//);
   });
 
   it("reports permission-dependent browser copy and unsupported insertion", async () => {

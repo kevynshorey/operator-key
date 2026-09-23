@@ -76,6 +76,16 @@ Use the explicit command-explanation mode to inspect pasted text. Explanations a
 
 Set readability/learning preferences and inspect desktop capabilities and catalog information. Non-secret preferences and saved command references are stored locally. No account is required.
 
+Desktop readiness states how much of Operator Key this desktop runs:
+
+| Mode | Meaning |
+| --- | --- |
+| Fully supported | Search, copy, and guarded terminal insertion are all available. |
+| Partly supported | Search works; some desktop actions are missing a prerequisite. |
+| Search and learning work | No desktop action is available here, but the catalog is not affected. |
+
+When an action is unavailable, Settings names the exact prerequisite to install or switch to (for example `wl-copy, from the wl-clipboard package` or `wtype, on PATH`) instead of only reporting "Not confirmed". These prerequisite descriptions are fixed text: they never include your home directory, username, or environment, so the readiness section stays safe to screenshot for a bug report. A named prerequisite is what the same native gate checks before allowing the action, so the list can never disagree with what the app will actually do.
+
 The bundled catalog is reference data, not proof that a tool is installed on your computer. For an authoritative local catalog, follow [CATALOG.md](CATALOG.md). A failed local-catalog load falls back to bundled data; inspect catalog health before assuming a refresh succeeded.
 
 Optional reasoning talks to a model you run on loopback. It does not ship a model, endpoint, or credential. See [REASONING.md](REASONING.md) for configuration, supported providers, data boundaries, and disabling/resetting the feature. Never paste a secret into a search or model configuration field. A loopback service is separately operated software: check its own network/privacy behavior as well.
