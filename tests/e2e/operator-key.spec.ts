@@ -129,6 +129,32 @@ test("[native-disabled] Settings reports conservative desktop readiness", async 
   await expect(page.getByText(/Provider disclosure:/)).toHaveCount(0);
 });
 
+test("[native-disabled] Settings offers preview-first shortcut setup without an in-app apply", async ({ page }) => {
+  await page.getByRole("button", { name: "Settings" }).click();
+  const shortcut = page.getByRole("region", { name: "Global shortcut" });
+
+  // Exactly one displayed command across the whole page, independent of any CSS class:
+  // an unclassed code block or plain prose would slip past a class-based count.
+  const body = await page.locator("body").innerText();
+  expect(body.match(/install-omarchy-binding\.py/g) ?? []).toHaveLength(1);
+  expect(body).not.toMatch(/install-omarchy-binding\.py\s+--apply/);
+  await expect(page.locator(".shortcut-command")).toHaveCount(1);
+  // The exact command, with nothing beside it: whatever sits on this line is what a
+  // reader copies into a terminal to change their desktop configuration.
+  await expect(shortcut.locator(".shortcut-command")).toHaveText("python3 scripts/install-omarchy-binding.py");
+  await expect(shortcut).toContainText("read-only");
+  await expect(shortcut).toContainText("does not change your desktop configuration");
+
+  // Compositor changes stay behind the installer's typed confirmation in a terminal:
+  // no in-app control may become an alternative path to applying them.
+  await expect(shortcut.getByRole("button")).toHaveCount(0);
+});
+
+test("[web] the browser build does not advertise the Hyprland shortcut installer", async ({ page }) => {
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("region", { name: "Global shortcut" })).toHaveCount(0);
+});
+
 test("[native-disabled] a fully supported desktop lists no prerequisites to install", async ({ page }) => {
   await page.getByRole("button", { name: "Settings" }).click();
   const readiness = page.getByRole("region", { name: "Desktop readiness" });

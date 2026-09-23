@@ -840,6 +840,41 @@ function DesktopPrerequisites({ requirements }: { requirements: DesktopRequireme
   );
 }
 
+/**
+ * Point a native operator at the reviewed shortcut installer.
+ *
+ * Deliberately read-only guidance. Compositor configuration is changed only by the
+ * installer, in a terminal, after the operator types an exact confirmation phrase — so
+ * this section shows the command rather than offering a button that would bypass that
+ * gate. It also cannot know whether the shortcut is already installed, so it never
+ * claims a state: it describes the preview step, which changes nothing.
+ */
+function GlobalShortcutSetup() {
+  return (
+    <section className="shortcut-setup" aria-label="Global shortcut">
+      <h2>Global shortcut</h2>
+      <p>
+        To open Operator Key with a keyboard shortcut on Hyprland, run the installer from a
+        terminal in a checkout of the project repository. Operator Key does not change your
+        desktop configuration by itself.
+      </p>
+      <p className="shortcut-command"><code>python3 scripts/install-omarchy-binding.py</code></p>
+      <p>
+        That is the preview step and it is read-only: it prints the exact shortcut, the
+        config block, a backup path and a rollback plan without editing anything. Re-run it
+        with <code>--apply</code> to install, which asks you to type a confirmation phrase
+        first.
+      </p>
+      <p>
+        The installer is not part of the .deb and .rpm packages. If you use a package
+        build, get it and the full walkthrough in <code>docs/INSTALL.md</code> from the
+        repository at <code>github.com/kevynshorey/operator-key</code>, then run the
+        command above from that directory.
+      </p>
+    </section>
+  );
+}
+
 export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities, desktopCompatibility: injectedDesktopCompatibility }: AppProps) {
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences());
   useEffect(() => { savePreferences(preferences); }, [preferences]);
@@ -1257,7 +1292,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
         <label><input type="checkbox" checked={apprenticeMode} onChange={(event) => setPreferences((p) => ({ ...p, apprenticeMode: event.target.checked }))} /> Explain commands</label>
         <label><input type="checkbox" checked={historyEnabled} onChange={(event) => setPreferences((p) => ({ ...p, historyEnabled: event.target.checked, recentCopies: event.target.checked ? p.recentCopies : [] }))} /> Keep local history of successful copies (off by default)</label>
         <button type="button" onClick={() => setPreferences((p) => ({ ...p, recentCopies: [] }))} disabled={!recentCopies.length}>Clear copy history</button><p>{recentCopies.length} recent copies saved locally.</p>
-        <section className="desktop-readiness" aria-label="Desktop readiness"><h2>Desktop readiness</h2><dl>
+        {runtime === "native" && <GlobalShortcutSetup />}<section className="desktop-readiness" aria-label="Desktop readiness"><h2>Desktop readiness</h2><dl>
           <div><dt>Local catalog search: </dt><dd>Available</dd></div>
           {runtime === "web" ? <><div><dt>Browser copy: </dt><dd>Permission-dependent</dd></div><div><dt>Terminal insertion: </dt><dd>Unsupported</dd></div></> : <><div><dt>Native copy: </dt><dd>{desktopCapabilities.canCopy ? "Ready" : "Needs setup"}</dd></div><div><dt>Terminal insertion: </dt><dd>{desktopCapabilities.canCopy && desktopCapabilities.canInsert ? "Ready" : "Needs setup"}</dd></div></>}
         </dl>{runtime === "native" && <><p>{DESKTOP_MODE_SUMMARY[desktopCompatibility.mode]}</p><DesktopPrerequisites requirements={desktopCompatibility.requirements} /><p>Native copy requires Wayland and wl-copy. Terminal insertion requires Hyprland and wtype.</p></>}<p>Availability does not confirm that an operation succeeded. Operator Key does not press Enter and no command is executed.</p></section>
