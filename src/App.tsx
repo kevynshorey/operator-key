@@ -19,15 +19,19 @@ import {
   getActionAvailability,
   readCatalogSnapshot,
   readDesktopCapabilities,
+  readBuildIdentity,
   readDesktopCompatibility,
+  UNKNOWN_BUILD_IDENTITY,
   UNKNOWN_DESKTOP_CAPABILITIES,
   UNKNOWN_DESKTOP_COMPATIBILITY,
   WEB_DESKTOP_CAPABILITIES,
+  type BuildIdentity,
   type DesktopCapabilities,
   type DesktopCompatibilityReport,
   type DesktopFeature,
   type DesktopMode,
   type DesktopRequirement,
+  type InstallKind,
   createBrowserActions,
   nativeActions,
   type ActionAvailability,
@@ -105,6 +109,11 @@ interface AppProps {
    * desktop it describes, rather than depending on the machine running the suite.
    */
   desktopCompatibility?: DesktopCompatibilityReport;
+  /**
+   * What this build is. Injected in tests so each case states the install it describes,
+   * rather than reporting whatever machine happens to run the suite.
+   */
+  buildIdentity?: BuildIdentity;
 }
 
 interface ActiveIntentPlan {
@@ -894,7 +903,47 @@ function GlobalShortcutSetup() {
   );
 }
 
-export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities, desktopCompatibility: injectedDesktopCompatibility }: AppProps) {
+/**
+ * What to do to get a newer version, phrased for how this copy actually arrived.
+ *
+ * Keyed by install kind because the routes genuinely differ: a packaged install is the
+ * package manager's business, a hand-copied binary is downloaded again, a build tree is
+ * rebuilt. `unknown` maps to nothing at all — no instruction beats a confident wrong one
+ * that sends someone to a package manager that never installed this.
+ */
+const UPGRADE_ROUTE: Record<InstallKind, string | undefined> = {
+  systemPackage: "Installed by a package manager. Upgrade it the same way you installed it.",
+  userBinary: "Installed by hand. Download the current release and replace the binary.",
+  developmentBuild: "Running from a build tree. Rebuild to pick up newer code.",
+  unknown: undefined,
+};
+
+/**
+ * State what this build is, so the app answers the question it asks of every command.
+ *
+ * Operator Key marks a catalogued command whose tool version is not the installed one,
+ * while saying nothing about itself — the gap that let an installed 0.2.2 sit unnoticed
+ * beside a published 0.2.3. Deliberately carries no filesystem path: this panel is what
+ * someone screenshots into a bug report.
+ */
+function BuildIdentityPanel({ identity }: { identity: BuildIdentity }) {
+  const route = UPGRADE_ROUTE[identity.installKind];
+
+  return (
+    <section className="build-identity" aria-label="This build">
+      <h2>This build</h2>
+      <dl>
+        <div>
+          <dt>Version: </dt>
+          <dd>{identity.version || "Unknown"}</dd>
+        </div>
+      </dl>
+      {route && <p>{route}</p>}
+    </section>
+  );
+}
+
+export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities, desktopCompatibility: injectedDesktopCompatibility, buildIdentity: injectedBuildIdentity }: AppProps) {
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences());
   useEffect(() => { savePreferences(preferences); }, [preferences]);
   // The native side may have applied an operator's sidecar catalog. Until it answers, the
@@ -993,6 +1042,19 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
     });
     return () => { current = false; };
   }, [runtime, injectedDesktopCapabilities]);
+
+  const [buildIdentity, setBuildIdentity] = useState<BuildIdentity>(
+    injectedBuildIdentity ?? UNKNOWN_BUILD_IDENTITY,
+  );
+
+  useEffect(() => {
+    if (runtime !== "native" || injectedBuildIdentity) return;
+    let current = true;
+    void readBuildIdentity().then((identity) => {
+      if (current) setBuildIdentity(identity);
+    });
+    return () => { current = false; };
+  }, [runtime, injectedBuildIdentity]);
 
   useEffect(() => {
     if (runtime !== "native" || injectedDesktopCompatibility) return;
@@ -1312,7 +1374,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
         <label><input type="checkbox" checked={apprenticeMode} onChange={(event) => setPreferences((p) => ({ ...p, apprenticeMode: event.target.checked }))} /> Explain commands</label>
         <label><input type="checkbox" checked={historyEnabled} onChange={(event) => setPreferences((p) => ({ ...p, historyEnabled: event.target.checked, recentCopies: event.target.checked ? p.recentCopies : [] }))} /> Keep local history of successful copies (off by default)</label>
         <button type="button" onClick={() => setPreferences((p) => ({ ...p, recentCopies: [] }))} disabled={!recentCopies.length}>Clear copy history</button><p>{recentCopies.length} recent copies saved locally.</p>
-        {runtime === "native" && <GlobalShortcutSetup />}<section className="desktop-readiness" aria-label="Desktop readiness"><h2>Desktop readiness</h2><dl>
+        {runtime === "native" && <GlobalShortcutSetup />}{runtime === "native" && <BuildIdentityPanel identity={buildIdentity} />}<section className="desktop-readiness" aria-label="Desktop readiness"><h2>Desktop readiness</h2><dl>
           <div><dt>Local catalog search: </dt><dd>Available</dd></div>
           {runtime === "web" ? <><div><dt>Browser copy: </dt><dd>Permission-dependent</dd></div><div><dt>Terminal insertion: </dt><dd>Unsupported</dd></div></> : <><div><dt>Native copy: </dt><dd>{desktopCapabilities.canCopy ? "Ready" : "Needs setup"}</dd></div><div><dt>Terminal insertion: </dt><dd>{desktopCapabilities.canCopy && desktopCapabilities.canInsert ? "Ready" : "Needs setup"}</dd></div></>}
         </dl>{runtime === "native" && <><p>{DESKTOP_MODE_SUMMARY[desktopCompatibility.mode]}</p><DesktopPrerequisites requirements={desktopCompatibility.requirements} /><p>Native copy requires Wayland and wl-copy. Terminal insertion requires Hyprland and wtype.</p></>}<p>Availability does not confirm that an operation succeeded. Operator Key does not press Enter and no command is executed.</p></section>
