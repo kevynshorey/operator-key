@@ -192,19 +192,21 @@ export function summarizeFreshness(
         record.installed_here !== false &&
         (record.drift === "behind" || record.last_known_drift === "behind"),
     )
-    .map(([product]) => product);
+    .map(([product, record]) => [product, record] as const);
 
   if (behind.length > 0) {
-    const carriedOnly = behind.every(
-      (product) => report.products[product].drift !== "behind",
-    );
+    // Carries the record from the same iteration rather than re-indexing the map by name:
+    // a subscript lookup can serve an inherited value, and there is nothing to gain from
+    // asking the map again for something already in hand.
+    const carriedOnly = behind.every(([, record]) => record.drift !== "behind");
+    const behindProducts = behind.map(([product]) => product);
     notices.push({
       level: "info",
       headline: `${plural(behind.length, "tool")} behind upstream`,
       detail: carriedOnly
-        ? `As of the last online check, newer releases existed for ${behind.join(", ")}. The most recent check could not reach upstream, so this may have moved on.`
-        : `Newer releases exist for ${behind.join(", ")}. Updating then regenerating the catalog keeps these commands accurate.`,
-      products: behind,
+        ? `As of the last online check, newer releases existed for ${behindProducts.join(", ")}. The most recent check could not reach upstream, so this may have moved on.`
+        : `Newer releases exist for ${behindProducts.join(", ")}. Updating then regenerating the catalog keeps these commands accurate.`,
+      products: behindProducts,
     });
   }
 
@@ -254,6 +256,70 @@ export function summarizeFreshness(
   return { checkedAt: report.checked_at, daysSinceCheck, catalogAgeDays, notices, neverChecked: false };
 }
 
+/**
+ * What to tell the operator about ONE command's version, at the moment they read it.
+ *
+ * The banner speaks about the catalog as a whole. This speaks about the entry in front of
+ * them, which is the thing they are about to copy into a terminal.
+ */
+export interface EntryVersionVerdict {
+  readonly level: "info" | "attention";
+  readonly headline: string;
+  readonly detail: string;
+}
+
+/**
+ * Judge a single catalog entry against what is installed now.
+ *
+ * Deliberately narrow. It reports ONLY the case where the entry's own version disagrees
+ * with the installed one, because that is when the displayed command may not exist on this
+ * machine. Being behind upstream is not reported here: the command still matches what is
+ * installed, and annotating every entry for it would make the entries that genuinely
+ * disagree impossible to pick out — the same blindness a noisy banner creates.
+ *
+ * Returns undefined whenever there is nothing trustworthy to say: no report, no record for
+ * the product, or no version on the entry. Silence is the honest answer to missing
+ * evidence; a verdict assembled from absent data is a guess wearing a badge.
+ */
+export function entryVersionVerdict(
+  product: string,
+  entryVersion: string,
+  report: FreshnessReport | undefined,
+): EntryVersionVerdict | undefined {
+  if (!report) return undefined;
+
+  // Own-key lookup: entryVersionVerdict is exported and may be handed a report that did
+  // not come through parseFreshness, whose products map could still carry a prototype.
+  const record = Object.prototype.hasOwnProperty.call(report.products ?? {}, product)
+    ? report.products[product]
+    : undefined;
+  if (!record) return undefined;
+
+  // Nothing to compare against. Borrowing the product-level verdict here would attribute a
+  // mismatch to an entry that never claimed a version.
+  if (!entryVersion.trim()) return undefined;
+
+  // A tool that is absent is not a tool that is out of date. Saying "regenerate" or
+  // "out of date" would send someone to upgrade software they do not have.
+  if (record.installed_here === false || record.upstream_status === "not-installed") {
+    return {
+      level: "info",
+      headline: "Not installed here",
+      detail: `This command was catalogued from ${product} ${entryVersion}, which is not installed on this machine.`,
+    };
+  }
+
+  const installed = typeof record.installed === "string" ? record.installed.trim() : "";
+  if (!installed || installed === "unknown") return undefined;
+  if (installed === entryVersion.trim()) return undefined;
+
+  return {
+    level: "attention",
+    headline: "Version mismatch",
+    detail: `Catalogued from ${product} ${entryVersion}, but ${installed} is installed now. This command may differ on your machine. Regenerate the catalog with scripts/build_catalog.py.`,
+  };
+}
+
 /** The single most important level present, for deciding whether to show anything at all. */
 export function highestLevel(summary: FreshnessSummary): NoticeLevel {
   if (summary.notices.some((notice) => notice.level === "attention")) return "attention";
@@ -270,6 +336,54 @@ export function affectedProducts(summary: FreshnessSummary): ReadonlySet<string>
   return affected;
 }
 
+/**
+ * Keep only product records that are actually usable.
+ *
+ * parseFreshness validates the envelope; without this the `products` map was CAST, so a
+ * record missing `installed` reached every consumer and threw on first property access,
+ * taking down the panel that merely wanted to show an advisory note. The report is
+ * machine-written and can be truncated or half-written by an interrupted check, so
+ * malformed shapes are reachable rather than theoretical.
+ *
+ * `installed_here: false` survives on its own: it is the difference between "you do not
+ * have this tool" and a false staleness claim, and it needs no version to be meaningful.
+ */
+function sanitizeProducts(value: unknown): Record<string, ProductFreshness> {
+  if (typeof value !== "object" || value === null) return Object.create(null) as Record<string, ProductFreshness>;
+
+  // Null-prototype: a key literally named "__proto__" would otherwise hit the prototype
+  // setter on a plain {} and make the map INHERIT that object, so a lookup for a product
+  // nobody wrote could return a record nobody wrote.
+  const products = Object.create(null) as Record<string, ProductFreshness>;
+  for (const [name, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw !== "object" || raw === null) continue;
+
+    try {
+      const record = raw as Record<string, unknown>;
+
+      const absent = record.installed_here === false || record.upstream_status === "not-installed";
+      if (typeof record.installed !== "string" && !absent) continue;
+
+      Object.defineProperty(products, name, {
+        value: {
+          ...record,
+          installed: typeof record.installed === "string" ? record.installed : "unknown",
+          installed_here: typeof record.installed_here === "boolean" ? record.installed_here : undefined,
+        } as ProductFreshness,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    } catch {
+      // A record that throws on property access is unusable, exactly like a malformed one.
+      // Not reachable from the JSON module this is loaded from — JSON has no getters — but
+      // making the parser total means no caller has to wonder.
+      continue;
+    }
+  }
+  return products;
+}
+
 /** Parse and validate a freshness document, rejecting anything malformed. */
 export function parseFreshness(value: unknown): FreshnessReport | undefined {
   if (typeof value !== "object" || value === null) return undefined;
@@ -283,7 +397,7 @@ export function parseFreshness(value: unknown): FreshnessReport | undefined {
     reachable: record.reachable === true,
     catalog_generated_at:
       typeof record.catalog_generated_at === "string" ? record.catalog_generated_at : "",
-    products: record.products as Record<string, ProductFreshness>,
+    products: sanitizeProducts(record.products),
     docs: (typeof record.docs === "object" && record.docs !== null
       ? record.docs
       : {}) as Record<string, DocFreshness>,

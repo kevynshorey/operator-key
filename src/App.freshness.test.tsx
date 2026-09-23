@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import catalogJson from "../data/catalog.json";
+import stylesheet from "./styles.css?raw";
 import App from "./App";
 
 const IN_SYNC = {
@@ -20,7 +22,134 @@ const IN_SYNC = {
   docs: {},
 };
 
+/** A catalog built from versions that are no longer installed: the loud, "attention" tier. */
+const STALE_CATALOG = {
+  ...IN_SYNC,
+  products: {
+    hermes: {
+      installed: "0.22.0",
+      drift: "unknown",
+      upstream_status: "no-public-feed",
+      catalog_built_from: "0.21.3",
+      catalog_matches_installed: false,
+    },
+  },
+};
+
+describe("per-entry version mismatch", () => {
+  /**
+   * The app selects from ranked results, not catalog order, so the entry on screen is
+   * discovered from the rendered panel rather than assumed to be entries[0]. Asserting
+   * against a hardcoded entry would silently stop testing the real surface the day
+   * ranking changes.
+   */
+  function shownEntry(): { product: string; product_version: string } {
+    const { unmount } = render(<App freshness={IN_SYNC} />);
+    const detail = screen.getByRole("article");
+    const command = within(detail).getByRole("heading", { level: 2 }).textContent ?? "";
+    unmount();
+
+    const match = (catalogJson as { entries: { product: string; product_version: string; command: string }[] })
+      .entries.find((candidate) => candidate.command === command.trim());
+    if (!match) throw new Error(`no catalog entry for rendered command: ${command}`);
+    return match;
+  }
+
+  it("marks a command whose catalogued version is not the one installed", () => {
+    // The catalog ships from whichever machine built it, so a clone can display commands
+    // extracted from a version the reader does not have. The banner says the catalog is
+    // stale overall; this says WHICH command is affected, at the moment it is read.
+    const entry = shownEntry();
+
+    render(
+      <App
+        freshness={{
+          ...IN_SYNC,
+          products: {
+            [entry.product]: {
+              installed: "99.99.99",
+              drift: "unknown",
+              upstream_status: "no-public-feed",
+              catalog_built_from: entry.product_version,
+              catalog_matches_installed: false,
+            },
+          },
+        }}
+      />,
+    );
+
+    const detail = screen.getByRole("article");
+    const note = within(detail).getByRole("note", { name: /version mismatch/i });
+    expect(note).toHaveTextContent(entry.product_version);
+    expect(note).toHaveTextContent("99.99.99");
+  });
+
+  it("leaves a matching command unmarked", () => {
+    const entry = shownEntry();
+
+    render(
+      <App
+        freshness={{
+          ...IN_SYNC,
+          products: {
+            [entry.product]: {
+              installed: entry.product_version,
+              drift: "unknown",
+              upstream_status: "no-public-feed",
+              catalog_built_from: entry.product_version,
+              catalog_matches_installed: true,
+            },
+          },
+        }}
+      />,
+    );
+
+    const detail = screen.getByRole("article");
+    expect(within(detail).queryByRole("note", { name: /version mismatch/i })).toBeNull();
+  });
+});
+
+describe("detail card layout contract", () => {
+  it("gives every stacked detail element an explicit flex order", () => {
+    // .detail-card is a flex column whose children are positioned by explicit `order`
+    // rules, not DOM order. A new child without one silently defaults to order 0 and
+    // jumps ABOVE the command heading — so a warning about a command renders before the
+    // command is named. jsdom does not lay out, so no rendering test can see this; it was
+    // caught only by looking at a real browser. This asserts the rule instead.
+    // Collect every class named by a rule that sets `order`, including comma-separated
+    // selector lists like `.operator-shell .a, .operator-shell .b { order:4; }`.
+    const ordered = new Set<string>();
+    for (const rule of stylesheet.matchAll(/([^{}]+)\{[^}]*\border\s*:/g)) {
+      for (const cls of rule[1].matchAll(/\.operator-shell\s+\.([\w-]+)/g)) {
+        ordered.add(cls[1]);
+      }
+    }
+
+    // Every element the detail card stacks must be named by one of those rules.
+    for (const child of ["detail-header", "command-context", "detail-description", "version-verdict", "conflict-panel", "action-panel", "key-trace", "telemetry-grid"]) {
+      expect(ordered, `"${child}" has no explicit flex order and will jump to the top`).toContain(child);
+    }
+  });
+});
+
 describe("freshness banner", () => {
+  it("keeps the standing advisory out of the transient alert channel", () => {
+    // A persistent banner must not claim role="alert". That channel belongs to transient,
+    // action-triggered messages ("clipboard unavailable", "this command is red"), and a
+    // standing advisory sitting in it both steals those announcements from assistive tech
+    // and makes getByRole("alert") ambiguous for every other test. The banner's own source
+    // comment says exactly this; the attention tier contradicted it.
+    //
+    // Regression: with a real data/freshness.json present, five unrelated App tests failed
+    // because this banner answered their alert queries. CI never saw it, since the report
+    // is gitignored machine state and absent on a runner.
+    render(<App freshness={STALE_CATALOG} />);
+
+    const banner = screen.getByRole("note", { name: /catalog freshness/i });
+    expect(banner).toHaveTextContent(/out of date/i);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("stays out of the way when the catalog is in sync", () => {
     render(<App freshness={IN_SYNC} />);
     expect(screen.queryByLabelText(/catalog freshness/i)).toBeNull();
@@ -43,7 +172,7 @@ describe("freshness banner", () => {
   });
 
   // The loudest case, and the one that undermines every command on screen.
-  it("raises an alert when the catalog no longer matches installed tools", () => {
+  it("says loudly when the catalog no longer matches installed tools", () => {
     render(
       <App
         freshness={{
@@ -60,8 +189,11 @@ describe("freshness banner", () => {
         }}
       />,
     );
-    const banner = screen.getByRole("alert", { name: /catalog freshness/i });
+    // Loud in wording and styling, but still role="note": see the FreshnessBanner comment.
+    // A standing advisory in the alert channel answers other surfaces' alert queries.
+    const banner = screen.getByRole("note", { name: /catalog freshness/i });
     expect(within(banner).getByText(/out of date for claude-code/i)).toBeTruthy();
+    expect(banner).toHaveClass("freshness-attention");
   });
 
   it("uses a quieter status role for merely being behind upstream", () => {

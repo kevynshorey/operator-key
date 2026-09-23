@@ -54,9 +54,11 @@ import { buildOnboardingPath, type OnboardingPath } from "./onboarding";
 import { loadPreferences, savePreferences, type Preferences } from "./preferences";
 import { NativeSettingsPanel } from "./NativeSettingsPanel";
 import {
+  entryVersionVerdict,
   highestLevel,
   parseFreshness,
   summarizeFreshness,
+  type EntryVersionVerdict,
   type FreshnessSummary,
 } from "./freshness";
 
@@ -233,6 +235,7 @@ function DetailCard({
   onInsert,
   favorite,
   onFavorite,
+  versionVerdict,
 }: {
   entry: CatalogEntry;
   catalog: Catalog;
@@ -242,6 +245,7 @@ function DetailCard({
   onInsert: () => void;
   favorite: boolean;
   onFavorite: () => void;
+  versionVerdict?: EntryVersionVerdict;
 }) {
   const conflicts = catalog.conflicts.filter((conflict) => entry.conflict_ids.includes(conflict.id));
   return (
@@ -274,6 +278,17 @@ function DetailCard({
           <dd>{entry.provenance.kind} · {entry.provenance.status} · {entry.provenance.source}</dd>
         </div>
       </dl>
+
+      {versionVerdict && (
+        <aside
+          role="note"
+          aria-label={versionVerdict.headline}
+          className={`version-verdict version-${versionVerdict.level}`}
+        >
+          <span className="version-verdict-tag">{versionVerdict.headline}</span>
+          <span className="version-verdict-detail">{versionVerdict.detail}</span>
+        </aside>
+      )}
 
       {conflicts.length > 0 && (
         <aside className="conflict-panel" aria-label="Binding conflict">
@@ -766,9 +781,13 @@ const freshnessData = Object.values(freshnessModules)[0]?.default;
  * the installed tools undermines every command on screen, and a banner you can wave away
  * is one you will wave away.
  *
- * Only the attention tier claims a live region. `role="status"` is already the app's
- * channel for action feedback ("Copied"), and a standing advisory sitting in that channel
- * both steals announcements from real actions and makes "the status" ambiguous.
+ * Always `role="note"`, never `alert` or `status`. Those are the app's channels for
+ * transient, action-triggered feedback ("Copied", "clipboard unavailable"). A standing
+ * advisory sitting in one steals announcements from real actions, makes "the status"
+ * ambiguous, and answers every other surface's alert query — which is exactly what
+ * happened when the attention tier claimed `alert`: five unrelated tests broke the moment
+ * a real freshness report existed on disk. CI never caught it, because the report is
+ * gitignored machine state and absent on a runner.
  */
 function FreshnessBanner({ summary }: { summary: FreshnessSummary }) {
   const level = highestLevel(summary);
@@ -777,7 +796,7 @@ function FreshnessBanner({ summary }: { summary: FreshnessSummary }) {
   return (
     <section
       className={`freshness-banner freshness-${level}`}
-      role={level === "attention" ? "alert" : "note"}
+      role="note"
       aria-label="Catalog freshness"
     >
       <div className="freshness-head">
@@ -925,9 +944,10 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
 
   // Advisory only: this never gates or alters a catalog entry, it just tells the operator
   // how much to trust what they are looking at.
+  const freshnessReport = useMemo(() => parseFreshness(injectedFreshness), [injectedFreshness]);
   const freshnessSummary = useMemo(
-    () => summarizeFreshness(parseFreshness(injectedFreshness)),
-    [injectedFreshness],
+    () => summarizeFreshness(freshnessReport),
+    [freshnessReport],
   );
   const [sparkStatus, setSparkStatus] = useState<SparkStatus>();
   const [sparkStatusPending, setSparkStatusPending] = useState(true);
@@ -1493,6 +1513,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
                   actionPending={controlsLocked}
                   onCopy={() => { void copySelected(); }}
                   onInsert={() => { void insertSelected(); }}
+                  versionVerdict={entryVersionVerdict(selected.product, selected.product_version, freshnessReport)}
                 />
               )}
               {selected && lesson && <LearnPanel lesson={lesson} entry={selected} expanded={apprenticeMode} />}
