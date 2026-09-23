@@ -7,6 +7,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-23
+
 ### Improved
 
 - Mark an individual command when it was catalogued from a version of its tool that is not the version installed now, so the warning reaches the operator at the command they are about to copy rather than only in the catalog-wide banner.
