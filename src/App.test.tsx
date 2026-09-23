@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import catalogJson from "../data/catalog.json";
@@ -110,6 +110,72 @@ describe("Operator Key overlay", () => {
     expect(readiness).toHaveTextContent(/wayland.*wl-copy/i);
     expect(readiness).toHaveTextContent(/hyprland.*wtype/i);
     expect(readiness).toHaveTextContent(/does not press enter|no command is executed/i);
+  });
+
+  it("tells a native user how to set up the global shortcut, without claiming to have changed anything", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App runtime="native" desktopCapabilities={{ canCopy: true, canInsert: true }} intentReasoner={nativeReasoner()} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    const shortcut = screen.getByRole("region", { name: /global shortcut/i });
+
+    // Exactly one displayed command in the whole app, independent of any CSS class: an
+    // unclassed code block or plain prose naming a different invocation would otherwise
+    // slip past a class-based count.
+    expect(container.textContent?.match(/install-omarchy-binding\.py/g) ?? []).toHaveLength(1);
+    expect(container.querySelectorAll(".shortcut-command")).toHaveLength(1);
+    // The app must never hand the operator an applying command up front; preview first.
+    expect(container.textContent).not.toMatch(/install-omarchy-binding\.py\s+--apply/);
+    // Assert the EXACT rendered command, not a substring. This instruction tells a user
+    // how to modify their desktop configuration, so nothing may sit beside it: an option
+    // appended next to the code element is still on the line a reader copies. A Python
+    // test separately holds this string against the real installer parser.
+    const command = shortcut.querySelector(".shortcut-command");
+    expect(command?.textContent).toBe("python3 scripts/install-omarchy-binding.py");
+    // --binary means the prebuilt SOURCE executable and already defaults to the repo
+    // build, so naming the install destination there would be wrong and would fail.
+    expect(shortcut).not.toHaveTextContent(/--binary/);
+    // Preview-first: the safe read-only step is named before the applying one.
+    expect(shortcut).toHaveTextContent(/preview/i);
+    // Honest about state: the app must not imply the shortcut is already installed.
+    expect(shortcut).not.toHaveTextContent(/installed|applied|active|enabled/i);
+    // It must be clear the app itself changes nothing.
+    expect(shortcut).toHaveTextContent(/does not change|will not change|no changes/i);
+  });
+
+  it("tells a packaged user where the installer actually lives", async () => {
+    const user = userEvent.setup();
+    render(<App runtime="native" desktopCapabilities={{ canCopy: true, canInsert: true }} intentReasoner={nativeReasoner()} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    const shortcut = screen.getByRole("region", { name: /global shortcut/i });
+
+    // The .deb and .rpm packages do not ship scripts/ or docs/, so a user who installed
+    // from a package has no project directory. Naming a command they cannot run without
+    // saying what it needs would send them to a "No such file or directory" error.
+    expect(shortcut).toHaveTextContent(/repository|repo|source|clone/i);
+    expect(shortcut).toHaveTextContent(/github\.com\/kevynshorey\/operator-key/i);
+  });
+
+  it("does not offer a control that would change desktop configuration from inside the app", async () => {
+    const user = userEvent.setup();
+    render(<App runtime="native" desktopCapabilities={{ canCopy: true, canInsert: true }} intentReasoner={nativeReasoner()} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    const shortcut = screen.getByRole("region", { name: /global shortcut/i });
+
+    // Compositor configuration is applied only by the reviewed installer after typed
+    // confirmation in a terminal. An in-app button must never become that path.
+    expect(within(shortcut).queryByRole("button", { name: /install|apply|set up|enable/i })).toBeNull();
+  });
+
+  it("does not advertise the shortcut installer in the browser build", async () => {
+    const user = userEvent.setup();
+    render(<App runtime="web" />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    // The installer is Hyprland-specific and cannot apply to a browser session.
+    expect(screen.queryByRole("region", { name: /global shortcut/i })).toBeNull();
   });
 
   it("names the exact missing prerequisites when a desktop capability is unavailable", async () => {
