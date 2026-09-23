@@ -31,6 +31,7 @@ test.beforeEach(async ({ page }, testInfo) => {
         invoke: async (cmd: string, args: Record<string, unknown> = {}) => {
           window.__operatorKeyInvocations.push({ cmd, args });
           if (cmd === "desktop_capabilities") return degradedDesktop ? { canCopy: true, canInsert: false } : { canCopy: true, canInsert: true };
+          if (cmd === "build_identity") return { version: "0.2.3", installKind: "userBinary" };
           if (cmd === "desktop_compatibility") return degradedDesktop ? {
             mode: "degraded",
             capabilities: { canCopy: true, canInsert: false },
@@ -137,6 +138,13 @@ test("[native-disabled] Settings states what this build is without leaking a pat
 
   await expect(build).toBeVisible();
   await expect(build).toContainText("Version:");
+
+  // Prove the real value reaches the screen. Asserting only on the "Version:" label
+  // passes even when the probe fails and the panel falls back to "Unknown".
+  await expect(build).toContainText("0.2.3");
+  await expect(build).not.toContainText("Unknown");
+  // The instruction must match the install kind the native side reported.
+  await expect(build).toContainText(/download the current release/i);
 
   // The panel is what an operator screenshots into a bug report.
   await expect(build).not.toContainText("/home/");
