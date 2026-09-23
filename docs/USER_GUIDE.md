@@ -92,6 +92,8 @@ App updates and catalog/tool freshness checks are different operations. There is
 
 ## Troubleshooting
 
+Linux builds default to a conservative compositing mode to mitigate intermittent WebKitGTK renderer shutdown crashes. Explicit renderer environment settings remain respected. See [Linux renderer and shutdown](LINUX_RENDERER.md) for the scope, tradeoffs, and diagnostic override.
+
 - **Copy disabled:** confirm Wayland and `wl-copy` on PATH; browser copy uses browser permissions instead.
 - **Insert disabled:** check Hyprland, `hyprctl`, `wtype`, command risk/interface, and a supported terminal. Do not weaken the safety gate.
 - **Catalog fallback:** inspect health, repair the local catalog, and reopen. Keep the last known-good catalog until replacement validation succeeds.

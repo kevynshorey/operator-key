@@ -9,6 +9,17 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.2.1] - 2026-09-23
+
+### Fixed
+
+- Mitigate intermittent Linux WebKitGTK renderer shutdown crashes by disabling
+  accelerated compositing within Operator Key before GTK/WebKit starts. Preserve
+  explicit environment overrides and normal close behavior; no global graphics
+  changes or suppressed crash reporting. See `docs/LINUX_RENDERER.md` for the
+  performance tradeoff and evidence limits.
+- Run Rust binary-target renderer-policy tests in CI alongside the library tests.
+
 ## [0.1.0] - 2026-09-22
 
 ### Security
