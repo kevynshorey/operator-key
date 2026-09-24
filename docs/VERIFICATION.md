@@ -1,5 +1,9 @@
 # Verification evidence
 
+This is historical evidence for the specific commits and artifacts named below,
+not verification of the current OpenCode feature or a newly published release.
+See [Optional reasoning](REASONING.md) for current provider setup and disclosures.
+
 Verified on 2026-09-16 against Luna application-bearing source commit `a9ff3d3ab0f0f16c7d77573f824d539fb140cc01` on Omarchy 4.0.3-1.
 
 ## Luna intent reasoning release candidate

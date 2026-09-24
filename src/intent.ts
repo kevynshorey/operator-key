@@ -25,7 +25,7 @@ export interface SparkStatus {
   available: boolean;
   loggedIn: boolean;
   model: string;
-  /** Which backend is configured: "disabled", "ollama", "openai-compatible", or "codex". */
+  /** Which backend is configured: "disabled", "ollama", "openai-compatible", "codex", or "opencode". */
   provider: string;
   /** Absolute path of the operator's reasoning config, for actionable UI messages. */
   configPath: string;

@@ -1,30 +1,39 @@
-# Reasoning providers
+# Optional reasoning providers
 
-Operator Key ships **no model, no API key and no account**. Search, copy and insert work
-offline and always will. Reasoning is an optional extra that you point at a model **you**
-run and pay for.
+Operator Key ships no model, account, or credential. Search, copy, and insertion work without reasoning. A fresh install has `enabled: false`; it does not contact a provider. Reasoning is an opt-in way to rank and explain catalog entries that Operator Key has already selected. It never executes model-authored commands.
 
-This page explains what that means, how to turn it on, and what the app guarantees.
+On Linux, the operator-owned configuration is normally `~/.config/operator-key/reasoning.json`. The native app shows its actual path. Use a private file (mode 0600). `docs/reasoning.example.json` is a valid disabled starting point. Settings can edit local HTTP providers; version-pinned CLI providers are file-managed and read-only in the editor. Resetting explicitly removes the configuration.
 
-## What a fresh clone does
+## OpenCode with an economical cloud model
 
-Nothing. `enabled` defaults to `false` and `provider` defaults to `disabled`. The app
-starts no process and opens no socket until you write a config saying otherwise. The
-status line tells you so, and names the file to edit.
+This provider uses your separately signed-in OpenCode CLI and OpenAI account. It sends your typed intent plus bounded catalog candidate fields to OpenAI. Do not use it for sensitive intent text you would not send to OpenAI. Never paste a password, API key, token, or verification code into the app.
 
-If you cloned this repository from GitHub, you are running against **your own** model or
-none at all. There is no shared account, and there is nothing in this repository that
-could grant access to anyone else's.
+1. Install a trusted OpenCode executable and complete `opencode auth login` through OpenCode's normal sign-in flow. Check `opencode auth list` for an OpenAI OAuth entry; do not copy its credential file into this repository.
+2. Locate the actual executable, not a shell wrapper or version-manager shim. For a mise install, `mise which opencode` can point to it. Check its exact `--version` output — the reviewed 1.18.32 build exits 0 and prints exactly `1.18.32\n` on stdout with empty stderr; any leading space, vendor banner, or extra line means the executable on disk is not the reviewed build and `opencode_version` will reject it.
+3. Create your private reasoning configuration with the corresponding absolute executable path and version:
 
-## Turning it on
+```json
+{
+  "enabled": true,
+  "provider": "opencode",
+  "model": "openai/gpt-6-luna",
+  "opencode_path": "/absolute/path/to/reviewed/opencode",
+  "opencode_version": "1.18.32",
+  "timeout_seconds": 90
+}
+```
 
-Copy `docs/reasoning.example.json` to the path the app prints in its status line — on
-Linux that is normally `~/.config/operator-key/reasoning.json` — then edit it.
+The example version was tested with OpenCode 1.18.32; use the version that actually matches your reviewed executable, and re-review its permissions when upgrading. `endpoint` does not apply. The app requires an `openai/` model, a real absolute CLI path, and an exact version pin; `api_key_env` is not accepted for this provider. Test from Settings, then run a bounded search intent. The CLI provider is not editable in the local-HTTP settings form, so a webview cannot silently change its path or remove the pin.
 
-### Option 1 — Ollama (simplest)
+OpenAI [describes GPT-6 Luna as its efficient focused-task model](https://developers.openai.com/api/docs/models/gpt-6-luna). Its published API rates are $0.10 input and $0.50 output per million tokens, versus GPT-5.6 Luna's $0.20 and $1.20; see the [OpenAI release/pricing announcement](https://openai.com/index/introducing-gpt-6-sol-and-luna/). This app uses OpenCode's signed-in account, **not** an API-key billing setup. Subscription usage, credits, limits, and any additional charges depend on your account and may not match API rates. The model was verified with a live bounded Operator Key request; a listed model alone is not proof that an account can use it.
 
-```bash
-# install: https://ollama.com
+The app starts each `opencode run` in a private mode-0700 workspace. It redirects XDG config/data/cache/state into that workspace, passes only a minimal allowlisted environment, links OpenCode's existing private OAuth file for the CLI to use, disables external plugins with `--pure`, disables configured tools and MCP, denies all agent permissions, and sends the request over stdin rather than command-line arguments. Its NDJSON event stream must contain one complete text-only answer; any tool event, unknown event, malformed JSON, or invalid catalog ID fails closed. The temporary local session database is removed on return or timeout. This is **not** a kernel sandbox around the OpenCode binary, cryptographic deletion of temporary files, or deletion of data retained by OpenAI. Trust and pin the executable; consult OpenAI's data policy. The OpenCode CLI itself has no no-save flag, which is why the app isolates its writable directories.
+
+## Local HTTP models
+
+Only local HTTP providers are restricted to loopback (`127.0.0.1` or `::1`), with all resolved addresses checked before connecting. A local proxy may itself send data elsewhere; inspect the separate service. Example Ollama setup:
+
+```sh
 ollama serve
 ollama pull qwen2.5-coder:7b
 ```
@@ -34,85 +43,22 @@ ollama pull qwen2.5-coder:7b
   "enabled": true,
   "provider": "ollama",
   "model": "qwen2.5-coder:7b",
-  "endpoint": "http://127.0.0.1:11434"
+  "endpoint": "http://127.0.0.1:11434",
+  "timeout_seconds": 90
 }
 ```
 
-### Option 2 — any OpenAI-compatible local server
+An `openai-compatible` local server such as llama.cpp, LM Studio, or vLLM uses the same shape with its own model and loopback endpoint (for example `http://127.0.0.1:8080`). Small models may not reliably return the required structured output; a rejected response is not a command execution. `api_key_env`, if used for a local server, names an environment variable rather than storing its value.
 
-llama.cpp's `llama-server`, LM Studio, vLLM and others expose `/v1/chat/completions`:
+## Codex CLI
 
-```json
-{
-  "enabled": true,
-  "provider": "openai-compatible",
-  "model": "qwen2.5-coder-7b-instruct",
-  "endpoint": "http://127.0.0.1:8080"
-}
-```
+The separate `codex` provider uses its own sign-in and can send bounded intent data to its cloud provider. It is file-managed in Settings. An optional `codex_version` exact pin freezes the reviewed CLI surface; see the implementation and test suite for its restrictions. It is not the OpenCode integration above.
 
-### Option 3 — Codex CLI
+## Boundaries and troubleshooting
 
-Uses the Codex CLI's **own** sign-in. Operator Key never reads, stores or transmits your
-Codex credentials; it shells out to `codex`, which authenticates itself.
-
-```json
-{
-  "enabled": true,
-  "provider": "codex",
-  "model": "gpt-5.1-codex-max",
-  "codex_version": null
-}
-```
-
-Set `codex_version` to an exact string such as `"codex-cli 0.154.0"` to refuse any other
-build. That is the stricter, reviewed configuration: a future Codex release could enable
-a tool surface this app has not reviewed. Leave it `null` to accept whatever you have
-installed.
-
-## Which model should I use?
-
-A 7B local model is enough. This task is **ranking and explaining commands the app has
-already chosen**, not writing code. The app never executes, copies or inserts
-model-authored text — the model returns catalog IDs, and Operator Key renders the command
-text from its own trusted catalog. A model that hallucinates a command cannot put that
-command in front of you; the plan is rejected instead.
-
-That property is what makes a small local model a sound choice rather than a compromise.
-
-## Guarantees
-
-These are enforced by code and covered by tests in `src-tauri/src/provider.rs` and
-`src-tauri/src/intent.rs`, not by documentation:
-
-- **Loopback only.** Every endpoint is resolved and each address checked with
-  `IpAddr::is_loopback()` before a socket is opened. A remote host is refused, and the
-  error never echoes the hostname you configured.
-- **No credential is ever stored.** `api_key_env` names an environment variable. The
-  value is read at request time, sent only to your local server, and never written to
-  disk, logged, or included in an error message.
-- **Bounded in both directions.** Requests are capped at 256 KiB, responses at 1 MiB,
-  every string at 4 KiB, with a deadline on the whole exchange.
-- **Fail closed.** A plan is rejected unless every `entryId` is one the app supplied,
-  the sequence is contiguous, and every field is within bounds.
-- **The config is yours.** It lives outside the repository, is created mode `0600`, and
-  is listed in `.gitignore`. It cannot be committed by accident.
-
-## Privacy
-
-When reasoning is enabled, what leaves the app is your typed intent plus up to 220
-candidate catalog entries (command text, description, safety level). It goes to the
-address you configured, which must be on your own machine.
-
-No file paths, environment variables, shell history, terminal contents or installed
-package lists are ever included.
-
-## Native settings API
-
-Tauri invoke commands:
-
-- `get_reasoning_settings` returns `{enabled, provider, model, endpoint, timeout_seconds}`. Legacy `api_key_env`, `codex_version`, and `_comment` remain honored by native reasoning, but are never returned to the webview.
-- `save_reasoning_settings` accepts exactly those five fields; extra keys are refused. Providers: `disabled`, `ollama`, `openai-compatible`, `codex`. Enabled HTTP providers use the existing loopback and model validation. Timeout is 5–600 seconds, model is at most 256 bytes. Credentials cannot be configured in this UI API.
-- `reset_reasoning_settings` removes the settings file and returns disabled defaults.
-
-Writes use a same-directory exclusive temporary file, Unix mode 0600, fsync, and atomic rename. No separate connection-test API is provided; reasoning itself uses the existing bounded request path and catalog-limited candidates.
+- Intent text is at most 2,000 UTF-8 bytes; the app reconstructs metadata for at most 220 selected catalog entries. The total prompt is capped at 128 KiB. It does not attach local files, shell history, environment variables, terminal contents, or installed package lists; text you type yourself may of course contain a path or secret, so review it before enabling cloud reasoning.
+- The provider must return one to five ordered recommendations using only IDs supplied by the app. Every field is bounded; catalog command text is rendered from trusted app data, never from model output. Dangerous commands remain copy-only.
+- A CLI process has an overall 5–600-second configurable deadline, a 64-KiB stdout/stderr capture ceiling, and process-group termination on timeout. Direct local HTTP has bounded request and response bodies. A failed provider never causes a command to execute or insert.
+- `spark_intent_status` reports availability, account sign-in metadata, the selected provider/model, and a safe diagnostic; it does not return credentials. OpenCode's status checks its exact binary version and whether OpenAI OAuth is listed. Status is not proof that a particular model call will succeed; use the test button.
+- `get_reasoning_settings` returns `{enabled, provider, model, endpoint, timeout_seconds}` only. `save_reasoning_settings` accepts exactly those five fields for local HTTP settings and rejects overwriting file-managed CLI/legacy credential fields. `reset_reasoning_settings` explicitly removes the config and returns disabled defaults. Saved file writes use an exclusive same-directory temporary file (mode 0600), fsync, and atomic rename.
+- To turn reasoning off, set `enabled` to `false` in the private file or use the explicit Reset button. Search, copy, and insert continue to work. Disabling reasoning does not sign you out of OpenCode.

@@ -7,7 +7,7 @@ type Invoke = (command: string, args?: Record<string, unknown>) => Promise<unkno
 interface Props { runtime: OperatorRuntime; nativeInvoke?: Invoke; onChanged?: () => void; testCandidateId?: string; focusRef?: Ref<HTMLElement> }
 interface Settings {
   enabled: boolean;
-  provider: "disabled" | "ollama" | "openai-compatible" | "codex";
+  provider: "disabled" | "ollama" | "openai-compatible" | "codex" | "opencode";
   model: string;
   endpoint: string;
   timeout_seconds: number;
@@ -29,7 +29,7 @@ function loopback(value: string): boolean {
 function parseSettings(value: unknown): Settings {
   if (!value || typeof value !== "object") throw new Error("Invalid settings");
   const v = value as Record<string, unknown>;
-  if (typeof v.enabled !== "boolean" || !["disabled", "ollama", "openai-compatible", "codex"].includes(String(v.provider))
+  if (typeof v.enabled !== "boolean" || !["disabled", "ollama", "openai-compatible", "codex", "opencode"].includes(String(v.provider))
     || typeof v.model !== "string" || v.model.length > 256 || (v.model !== "" && !/^[A-Za-z0-9._:/-]+$/.test(v.model))
     || typeof v.endpoint !== "string" || !loopback(v.endpoint)
     || typeof v.timeout_seconds !== "number" || !Number.isInteger(v.timeout_seconds) || v.timeout_seconds < 5 || v.timeout_seconds > 600) throw new Error("Invalid settings");
@@ -40,7 +40,7 @@ function validate(settings: Settings): string | null {
   if (!Number.isInteger(settings.timeout_seconds) || settings.timeout_seconds < 5 || settings.timeout_seconds > 600) return "Choose a timeout between 5 and 600 seconds.";
   if (settings.model.length > 256 || (settings.model && !/^[A-Za-z0-9._:/-]+$/.test(settings.model))) return "Use a model identifier, not a credential or free-text prompt.";
   if (settings.enabled && (settings.provider === "disabled" || !settings.model)) return "Choose a local provider and model before enabling reasoning.";
-  if (settings.provider === "codex") return "Legacy Codex configuration is managed outside this editor. It will not be overwritten.";
+  if (settings.provider === "codex" || settings.provider === "opencode") return "CLI configuration is managed outside this editor. It will not be overwritten.";
   return null;
 }
 export function NativeSettingsPanel({ runtime, nativeInvoke = invoke, onChanged, testCandidateId, focusRef }: Props) {
@@ -68,7 +68,7 @@ export function NativeSettingsPanel({ runtime, nativeInvoke = invoke, onChanged,
     }).catch(() => { if (active) setHealth("Catalog health unavailable. Search can still use the loaded catalog."); });
     return () => { active = false; };
   }, [runtime, nativeInvoke]);
-  if (runtime !== "native") return <section className="native-settings"><h2>Catalog & reasoning</h2><p>Bundled reference catalog. Open the native app to configure a local model or inspect a local catalog. This browser does not call a model.</p></section>;
+  if (runtime !== "native") return <section className="native-settings"><h2>Catalog & reasoning</h2><p>Bundled reference catalog. Open the native app to configure optional reasoning or inspect a local catalog. This browser does not call a model.</p></section>;
   const update = (change: Partial<Settings>) => { if (draft) setDraft({ ...draft, ...change }); setMessage(""); setError(""); };
   const same = (a: Settings, b: Settings) => JSON.stringify(a) === JSON.stringify(b);
   const save = async () => {
@@ -101,27 +101,29 @@ export function NativeSettingsPanel({ runtime, nativeInvoke = invoke, onChanged,
     try {
       const result = await nativeInvoke("reason_about_intent", { intent: "Explain the selected catalog command without executing anything.", candidateIds: [testCandidateId] });
       if (!result || typeof result !== "object" || !("summary" in result) || typeof result.summary !== "string") throw new Error("Invalid result");
-      setMessage("Local model answered the sample request. No command was copied, inserted, or executed.");
-    } catch { setError("The local model test failed. Confirm the saved endpoint, running model, and timeout. No command was executed."); }
+      setMessage(`${saved.provider === "opencode" ? "Provider" : "Local model"} answered the sample request. No command was copied, inserted, or executed.`);
+    } catch { setError(saved.provider === "opencode" ? "OpenCode test failed. Check its OpenAI sign-in, pinned version, model and timeout. No command was executed." : "The local model test failed. Confirm the saved endpoint, running model, and timeout. No command was executed."); }
     finally { setBusy(false); }
   };
-  return <section className="native-settings" aria-label="Optional local reasoning" ref={focusRef} tabIndex={-1}>
+  return <section className="native-settings" aria-label="Optional reasoning" ref={focusRef} tabIndex={-1}>
     <h2>Catalog health</h2><p>{health}</p>
-    <h2>Optional local reasoning</h2>
+    <h2>Optional reasoning</h2>
     <p>Search works without a model. Enabling this sends your intent and bounded catalog fields to your configured service. HTTP providers are loopback-only; a service you operate may itself forward requests. No credentials belong in these fields.</p>
     {error && <p role="alert">{error}</p>}
     {message && <p role="status">{message}</p>}
     {!draft && !error && <p>Loading settings…</p>}
-    {draft && <fieldset disabled={busy || draft.provider === "codex"}>
+    {draft?.provider === "opencode" && <p>OpenCode uses your signed-in OpenAI account. Your intent and bounded catalog candidates are sent to OpenAI; this is not an offline model. Calls may count against your account usage. Model: {draft.model}. The pinned CLI settings are read-only here, and its temporary local session is removed after each call.</p>}
+    {draft && draft.provider !== "codex" && draft.provider !== "opencode" && <fieldset disabled={busy}>
       <legend>Local HTTP provider</legend>
       <label><input type="checkbox" checked={draft.enabled} onChange={(e) => update({ enabled: e.target.checked })} />Enable local reasoning</label>
-      <label>Local model provider<select value={draft.provider} onChange={(e) => update({ provider: e.target.value as Settings["provider"] })}><option value="disabled">Disabled</option><option value="ollama">Ollama</option><option value="openai-compatible">OpenAI-compatible local server</option>{draft.provider === "codex" && <option value="codex">Legacy Codex — file managed</option>}</select></label>
+      <label>Local model provider<select value={draft.provider} onChange={(e) => update({ provider: e.target.value as Settings["provider"] })}><option value="disabled">Disabled</option><option value="ollama">Ollama</option><option value="openai-compatible">OpenAI-compatible local server</option></select></label>
       <label>Model identifier<input value={draft.model} maxLength={256} autoComplete="off" placeholder="Your installed model name" onChange={(e) => update({ model: e.target.value })} /></label>
       <label>Loopback endpoint<input value={draft.endpoint} maxLength={2048} autoComplete="off" spellCheck={false} onChange={(e) => update({ endpoint: e.target.value })} /></label>
       <label>Request timeout (seconds)<input type="number" min={5} max={600} value={draft.timeout_seconds} onChange={(e) => update({ timeout_seconds: Number(e.target.value) })} /></label>
       <div className="settings-actions"><button type="button" onClick={() => void save()}>Save reasoning settings</button><button type="button" disabled={!saved?.enabled || !same(draft, saved) || !testCandidateId} onClick={() => void test()}>Test local model</button></div>
       <p className="settings-note">Test sends a fixed sample intent and one catalog reference through the saved provider. Save changes before testing.</p>
     </fieldset>}
+    {draft?.provider === "opencode" && <button type="button" disabled={busy || !saved?.enabled || !same(draft, saved) || !testCandidateId} onClick={() => void test()}>Test OpenCode reasoning</button>}
     {draft?.provider === "codex" && <p>Legacy Codex configuration may contact its provider. It is read-only here; review its configuration and privacy policy, or explicitly reset it.</p>}
     {!confirmReset ? <button type="button" disabled={busy} onClick={() => setConfirmReset(true)}>Reset reasoning</button> : <div className="reset-confirmation"><p>Remove the reasoning configuration, including legacy configuration fields, and return to disabled? This cannot restore your previous settings.</p><button type="button" disabled={busy} onClick={() => void reset()}>Confirm reset</button><button type="button" disabled={busy} onClick={() => setConfirmReset(false)}>Cancel reset</button></div>}
   </section>;

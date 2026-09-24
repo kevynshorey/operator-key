@@ -7,6 +7,12 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-09-24
+
+### Added
+
+- Add opt-in OpenCode reasoning with a version-pinned executable and economical GPT-6 Luna model selection. Keep credentials outside the app and repository; use a private per-call workspace, deny tools, validate a text-only event stream and catalog-bounded response, and disclose that typed intent is sent to OpenAI. Existing local search and actions work with reasoning off.
+
 ### CI
 
 - Pin the original seven required verification jobs and release package build to Ubuntu 24.04 rather than the moving `ubuntu-latest` label; keep the Ubuntu 26.04 build as a non-required, non-tag probe.

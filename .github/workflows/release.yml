@@ -140,6 +140,7 @@ jobs:
             sha256sum -c SHA256SUMS
             ```
 
-            Operator Key ships no model, no account and no credential. Reasoning is
-            optional, disabled by default, and talks only to a model you run yourself on
-            loopback — see `docs/REASONING.md`.
+            Operator Key ships no model, account, or credential. Reasoning is optional
+            and disabled by default. Local HTTP providers are loopback-only; optional
+            signed-in CLI providers can send bounded intent data to their cloud
+            providers. See `docs/REASONING.md` before enabling one.

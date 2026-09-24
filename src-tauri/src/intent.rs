@@ -16,7 +16,7 @@ use crate::provider::{
 };
 
 #[cfg(unix)]
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 
@@ -351,6 +351,71 @@ fn codex_args(cwd: &Path, schema: &Path, output: &Path, model: &str) -> Vec<OsSt
     args
 }
 
+fn opencode_args(cwd: &Path, model: &str) -> Vec<OsString> {
+    vec![
+        "--pure".into(),
+        "run".into(),
+        "--format".into(),
+        "json".into(),
+        "-m".into(),
+        model.into(),
+        "--agent".into(),
+        "operator-key-reasoner".into(),
+        "--title".into(),
+        "Operator Key intent".into(),
+        "--dir".into(),
+        cwd.as_os_str().to_owned(),
+        "-".into(),
+    ]
+}
+
+/// `opencode run --format json` emits NDJSON events, not one JSON answer. Only a
+/// complete single-session text-only step is acceptable; tool activity fails closed.
+fn extract_opencode_text(stream: &str) -> Result<Vec<u8>, IntentError> {
+    let mut seen_start = false;
+    let mut seen_finish = false;
+    let mut session: Option<String> = None;
+    let mut text = Vec::new();
+    for line in stream.lines() {
+        let event: serde_json::Value =
+            serde_json::from_str(line).map_err(|_| IntentError::malformed())?;
+        let event_session = event
+            .get("sessionID")
+            .and_then(serde_json::Value::as_str)
+            .filter(|id| id.starts_with("ses_") && id.len() <= 128)
+            .ok_or_else(IntentError::malformed)?;
+        if let Some(expected) = session.as_deref() {
+            if expected != event_session {
+                return Err(IntentError::malformed());
+            }
+        } else {
+            session = Some(event_session.to_owned());
+        }
+        match event.get("type").and_then(serde_json::Value::as_str) {
+            Some("step_start") if !seen_start && !seen_finish => seen_start = true,
+            Some("text") if seen_start && !seen_finish => {
+                let part = event
+                    .get("part")
+                    .and_then(|part| part.get("text"))
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(IntentError::malformed)?;
+                if part.len() > MAX_OUTPUT_BYTES.saturating_sub(text.len()) {
+                    return Err(IntentError::malformed());
+                }
+                text.extend_from_slice(part.as_bytes());
+            }
+            Some("step_finish") if seen_start && !seen_finish && !text.is_empty() => {
+                seen_finish = true;
+            }
+            _ => return Err(IntentError::malformed()),
+        }
+    }
+    if !seen_finish || text.is_empty() {
+        return Err(IntentError::malformed());
+    }
+    Ok(text)
+}
+
 fn valid_bounded_string(value: &str) -> bool {
     !value.trim().is_empty()
         && value.len() <= MAX_RESPONSE_STRING_BYTES
@@ -431,6 +496,8 @@ struct RunSpec<'a> {
     schema_path: Option<&'a Path>,
     #[cfg_attr(not(test), allow(dead_code))]
     output_path: Option<&'a Path>,
+    /// Some means discard inherited environment and pass ONLY these values.
+    environment: Option<&'a [(OsString, OsString)]>,
     deadline: Instant,
 }
 
@@ -508,6 +575,118 @@ impl Drop for TempDirectory {
     }
 }
 
+/// OpenCode's CLI has no no-save switch: it creates SQLite sessions even with
+/// `--pure`. Redirect every writable XDG directory to this mode-0700 workspace.
+/// Only its already-saved OAuth file is linked from the user's data directory;
+/// removing the workspace discards the session DB on success, failure and timeout.
+struct OpencodeWorkspace {
+    directory: TempDirectory,
+    environment: Vec<(OsString, OsString)>,
+    has_auth: bool,
+}
+
+impl OpencodeWorkspace {
+    fn new() -> Result<Self, IntentError> {
+        let home = std::env::var_os("HOME")
+            .filter(|home| !home.is_empty())
+            .map(PathBuf::from)
+            .ok_or_else(|| IntentError::safe("OpenCode's home directory is unavailable."))?;
+        let data = std::env::var_os("XDG_DATA_HOME")
+            .filter(|data| !data.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".local/share"));
+        Self::new_with_auth(&data.join("opencode/auth.json"))
+    }
+
+    fn new_with_auth(auth: &Path) -> Result<Self, IntentError> {
+        #[cfg(not(unix))]
+        {
+            let _ = auth;
+            return Err(IntentError::safe(
+                "Isolated OpenCode reasoning is currently supported on Unix only.",
+            ));
+        }
+        #[cfg(unix)]
+        {
+            let directory = TempDirectory::new()?;
+            let config = directory.path.join("config");
+            let data = directory.path.join("data");
+            let cache = directory.path.join("cache");
+            let state = directory.path.join("state");
+            for path in [&config, &data, &cache, &state, &data.join("opencode")] {
+                fs::create_dir(path).map_err(|_| {
+                    IntentError::safe("Could not create the isolated OpenCode workspace.")
+                })?;
+            }
+            let has_auth = match fs::symlink_metadata(auth) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+                Ok(metadata)
+                    if metadata.file_type().is_file()
+                        && metadata.mode() & 0o077 == 0
+                        && auth.is_absolute() =>
+                {
+                    std::os::unix::fs::symlink(auth, data.join("opencode/auth.json")).map_err(
+                        |_| IntentError::safe("Could not link OpenCode sign-in safely."),
+                    )?;
+                    true
+                }
+                _ => {
+                    return Err(IntentError::safe(
+                        "OpenCode's saved sign-in must be a private regular file (mode 0600).",
+                    ))
+                }
+            };
+            let mut environment = Vec::new();
+            for name in ["HOME", "PATH", "LANG", "XDG_RUNTIME_DIR"] {
+                if let Some(value) = std::env::var_os(name) {
+                    environment.push((OsString::from(name), value));
+                }
+            }
+            for (name, value) in [
+                ("XDG_CONFIG_HOME", config.as_os_str()),
+                ("XDG_DATA_HOME", data.as_os_str()),
+                ("XDG_CACHE_HOME", cache.as_os_str()),
+                ("XDG_STATE_HOME", state.as_os_str()),
+                ("OPENCODE_CONFIG_DIR", config.as_os_str()),
+            ] {
+                environment.push((name.into(), value.to_owned()));
+            }
+            environment.push(("OPENCODE_CONFIG_CONTENT".into(), opencode_config().into()));
+            environment.push(("NO_COLOR".into(), "1".into()));
+            Ok(Self {
+                directory,
+                environment,
+                has_auth,
+            })
+        }
+    }
+}
+
+fn opencode_config() -> String {
+    let tools = serde_json::json!({
+        "bash":false,"read":false,"grep":false,"glob":false,"write":false,
+        "edit":false,"apply_patch":false,"webfetch":false,"websearch":false,
+        "skill":false,"task":false,"lsp":false,"todowrite":false,"question":false
+    });
+    serde_json::json!({
+        "autoupdate": false,
+        "share": "disabled",
+        "plugin": [],
+        "mcp": {},
+        "enabled_providers": ["openai"],
+        "permission": {"*": "deny"},
+        "tools": tools,
+        "agent": {"operator-key-reasoner": {
+            "description": "Bounded catalog planner; no tools",
+            "mode": "primary",
+            "prompt": "Do not use tools. Output only the requested JSON response.",
+            "permission": {"*": "deny"},
+            "tools": tools
+        }}
+    })
+    .to_string()
+}
+
 fn create_private_file(path: &Path, contents: &[u8]) -> Result<File, IntentError> {
     let mut options = OpenOptions::new();
     options.read(true).write(true).create_new(true);
@@ -581,6 +760,10 @@ impl Runner for NativeRunner {
             let _ = fs::remove_file(&stderr_path);
         };
         let mut command = Command::new(spec.program);
+        if let Some(environment) = spec.environment {
+            command.env_clear();
+            command.envs(environment.iter().cloned());
+        }
         command
             .args(spec.args)
             .current_dir(spec.cwd)
@@ -719,6 +902,7 @@ fn verify_codex_version(
             cwd,
             schema_path: None,
             output_path: None,
+            environment: None,
             deadline,
         })
         .map_err(classify_run_error)?;
@@ -765,7 +949,7 @@ fn extract_content(body: &[u8], provider: ProviderKind) -> Result<Vec<u8>, Inten
             .and_then(|choice| choice.get("message"))
             .and_then(|message| message.get("content"))
             .and_then(serde_json::Value::as_str),
-        ProviderKind::Codex | ProviderKind::Disabled => None,
+        ProviderKind::Codex | ProviderKind::Opencode | ProviderKind::Disabled => None,
     }
     .ok_or_else(IntentError::malformed)?;
 
@@ -813,7 +997,7 @@ fn http_reason(
                 "messages": [{"role": "user", "content": prompt}],
             }),
         ),
-        ProviderKind::Codex | ProviderKind::Disabled => {
+        ProviderKind::Codex | ProviderKind::Opencode | ProviderKind::Disabled => {
             return Err(IntentError::safe("This provider does not use HTTP."))
         }
     };
@@ -877,6 +1061,7 @@ fn codex_reason(
             cwd: &workspace.path,
             schema_path: Some(&schema_path),
             output_path: Some(&output_path),
+            environment: None,
             deadline,
         })
         .map_err(classify_run_error)?;
@@ -884,6 +1069,139 @@ fn codex_reason(
         return Err(classify_unsuccessful(&process.stderr));
     }
     read_bounded(&output_path, MAX_OUTPUT_BYTES).map_err(classify_run_error)
+}
+
+fn verify_opencode_version(
+    config: &ReasoningConfig,
+    workspace: &OpencodeWorkspace,
+    runner: &impl Runner,
+    deadline: Instant,
+) -> Result<(), IntentError> {
+    let binary = config
+        .opencode_path
+        .as_deref()
+        .ok_or_else(|| IntentError::safe("OpenCode executable is not configured."))?;
+    let required = config
+        .opencode_version
+        .as_deref()
+        .ok_or_else(|| IntentError::safe("OpenCode version is not pinned."))?;
+    let result = runner
+        .run(RunSpec {
+            program: binary,
+            args: &[OsString::from("--version")],
+            stdin: None,
+            cwd: &workspace.directory.path,
+            schema_path: None,
+            output_path: None,
+            environment: Some(&workspace.environment),
+            deadline,
+        })
+        .map_err(|error| match error {
+            RunError::NotFound => {
+                IntentError::safe("The configured OpenCode executable was not found.")
+            }
+            other => classify_run_error(other),
+        })?;
+    // Exact-byte match against the pinned value, or the documented trailing-newline
+    // shape verified for the reviewed OpenCode 1.18.32 executable. trim() would
+    // silently accept a leading space, a vendor banner, or a debug prefix and let
+    // an unreviewed build impersonate the pinned one.
+    let accepted = result.success
+        && (result.stdout == required
+            || result.stdout == format!("{required}\n")
+            || result.stdout == format!("{required}\r\n"));
+    if accepted {
+        Ok(())
+    } else {
+        Err(IntentError::safe(format!(
+            "OpenCode must be exactly {required}; install the reviewed build or update the version pin after review."
+        )))
+    }
+}
+
+fn opencode_prompt(prompt: &[u8]) -> Result<Vec<u8>, IntentError> {
+    let prompt = std::str::from_utf8(prompt).map_err(|_| IntentError::malformed())?;
+    let (instruction, payload) = prompt
+        .split_once(PAYLOAD_MARKER)
+        .ok_or_else(IntentError::malformed)?;
+    let joined = format!(
+        "{instruction}\nDo not include the optional `model` property; the app will stamp its configured model after validation.\nOUTPUT_JSON_SCHEMA:\n{}{PAYLOAD_MARKER}{payload}",
+        output_schema()
+    );
+    if joined.len() > MAX_PROMPT_BYTES {
+        return Err(IntentError::safe(
+            "The bounded OpenCode reasoning prompt exceeds the 128 KiB limit.",
+        ));
+    }
+    Ok(joined.into_bytes())
+}
+
+fn classify_opencode_failure(result: &ProcessResult) -> IntentError {
+    // CLI diagnostics can contain operator data, request IDs or credentials. Classify
+    // known classes; never echo an untrusted stderr line or event payload to the UI.
+    let lower = format!("{} {}", result.stdout, result.stderr).to_ascii_lowercase();
+    if lower.contains("model")
+        && (lower.contains("not supported")
+            || lower.contains("not available")
+            || lower.contains("not found"))
+    {
+        IntentError::safe("This model is not available through the signed-in OpenCode account.")
+    } else if lower.contains("unauthorized") || lower.contains("401") || lower.contains("oauth") {
+        IntentError::safe("OpenCode sign-in needs attention. Run `opencode auth login` and retry.")
+    } else {
+        IntentError::safe(
+            "OpenCode could not complete reasoning. Check its sign-in and model availability.",
+        )
+    }
+}
+
+fn opencode_reason_in(
+    config: &ReasoningConfig,
+    prompt: &[u8],
+    runner: &impl Runner,
+    deadline: Instant,
+    workspace: &OpencodeWorkspace,
+) -> Result<Vec<u8>, IntentError> {
+    verify_opencode_version(config, workspace, runner, deadline)?;
+    if !workspace.has_auth {
+        return Err(IntentError::safe(
+            "OpenCode is signed out. Run `opencode auth login` before enabling reasoning.",
+        ));
+    }
+    let input = opencode_prompt(prompt)?;
+    let args = opencode_args(&workspace.directory.path, &config.model);
+    let binary = config.opencode_path.as_deref().unwrap_or_default();
+    let result = runner
+        .run(RunSpec {
+            program: binary,
+            args: &args,
+            stdin: Some(&input),
+            cwd: &workspace.directory.path,
+            schema_path: None,
+            output_path: None,
+            environment: Some(&workspace.environment),
+            deadline,
+        })
+        .map_err(|error| match error {
+            RunError::NotFound => {
+                IntentError::safe("The configured OpenCode executable was not found.")
+            }
+            other => classify_run_error(other),
+        })?;
+    if !result.success {
+        return Err(classify_opencode_failure(&result));
+    }
+    extract_opencode_text(&result.stdout)
+}
+
+fn opencode_reason(
+    config: &ReasoningConfig,
+    prompt: &[u8],
+    runner: &impl Runner,
+    deadline: Instant,
+) -> Result<Vec<u8>, IntentError> {
+    let workspace = OpencodeWorkspace::new()?;
+    opencode_reason_in(config, prompt, runner, deadline, &workspace)
 }
 
 fn reason_about_intent_with(
@@ -904,6 +1222,7 @@ fn reason_about_intent_with(
 
     let output = match config.provider {
         ProviderKind::Codex => codex_reason(config, &prompt, runner, deadline)?,
+        ProviderKind::Opencode => opencode_reason(config, &prompt, runner, deadline)?,
         ProviderKind::Ollama | ProviderKind::OpenaiCompatible => {
             http_reason(config, &prompt, http, deadline)?
         }
@@ -913,7 +1232,7 @@ fn reason_about_intent_with(
 }
 
 fn disabled_message() -> String {
-    "Reasoning is off. Operator Key ships no model and no account. Search works without it. To enable it, open Settings → Optional local reasoning and choose a model you run.".to_owned()
+    "Reasoning is off. Operator Key ships no model and no account. Search works without it. To enable it, open Settings → Optional reasoning and choose a provider you control.".to_owned()
 }
 
 #[cfg(test)]
@@ -922,7 +1241,7 @@ mod first_use_message_tests {
     fn disabled_reasoning_guides_to_settings_without_exposing_a_path() {
         let message = super::disabled_message();
         assert!(message.contains("Settings"));
-        assert!(message.contains("Optional local reasoning"));
+        assert!(message.contains("Optional reasoning"));
         assert!(message.contains("ships no model and no account"));
         assert!(message.contains("Search works without it"));
         assert!(!message.contains("reasoning.json"));
@@ -994,6 +1313,7 @@ fn codex_status(config: &ReasoningConfig, runner: &impl Runner) -> SparkIntentSt
         cwd: &workspace.path,
         schema_path: None,
         output_path: None,
+        environment: None,
         deadline: Instant::now() + STATUS_DEADLINE,
     }) {
         Err(RunError::NotFound) => status_value(
@@ -1027,6 +1347,141 @@ fn codex_status(config: &ReasoningConfig, runner: &impl Runner) -> SparkIntentSt
             "Codex is signed out. Run `codex login` to sign in before using reasoning.",
         ),
     }
+}
+
+fn opencode_status(config: &ReasoningConfig, runner: &impl Runner) -> SparkIntentStatus {
+    let workspace = match OpencodeWorkspace::new() {
+        Ok(workspace) => workspace,
+        Err(error) => return status_value(false, false, config, error.to_string()),
+    };
+    opencode_status_in(config, runner, &workspace)
+}
+
+fn opencode_status_in(
+    config: &ReasoningConfig,
+    runner: &impl Runner,
+    workspace: &OpencodeWorkspace,
+) -> SparkIntentStatus {
+    let deadline = Instant::now() + STATUS_DEADLINE;
+    if let Err(error) = verify_opencode_version(config, workspace, runner, deadline) {
+        return status_value(false, false, config, error.to_string());
+    }
+    if !workspace.has_auth {
+        return status_value(
+            true,
+            false,
+            config,
+            "OpenCode is signed out. Run `opencode auth login` to sign in.",
+        );
+    }
+    let binary = config.opencode_path.as_deref().unwrap_or_default();
+    let args = [OsString::from("auth"), OsString::from("list")];
+    match runner.run(RunSpec {
+        program: binary,
+        args: &args,
+        stdin: None,
+        cwd: &workspace.directory.path,
+        schema_path: None,
+        output_path: None,
+        environment: Some(&workspace.environment),
+        deadline,
+    }) {
+        Ok(result)
+            if result.success
+                && opencode_auth_list_signals_openai_oauth(&result.stdout) =>
+        {
+            status_value(
+                true,
+                true,
+                config,
+                format!("OpenCode is ready. Reasoning uses {} through your signed-in OpenAI account; intent is sent to OpenAI.", config.model),
+            )
+        }
+        Ok(_) => status_value(
+            true,
+            false,
+            config,
+            "OpenCode has no usable OpenAI sign-in. Run `opencode auth login`.",
+        ),
+        Err(RunError::Timeout) => status_value(false, false, config, "OpenCode status timed out."),
+        Err(_) => status_value(
+            false,
+            false,
+            config,
+            "OpenCode sign-in could not be checked safely.",
+        ),
+    }
+}
+
+/// Strip a single CSI/SGR escape sequence (`ESC [ … letter`) from a slice.
+///
+/// OpenCode 1.18.32 wraps the provider name in `\x1b[90m…\x1b[0m` colour codes so
+/// a literal substring test would miss the bullet line entirely. Only the SGR
+/// shape is recognised here; non-colour escapes are left untouched so an
+/// unexpected control sequence cannot accidentally alter the parsed line.
+fn strip_sgr(line: &str) -> std::borrow::Cow<'_, str> {
+    if !line.contains('\x1b') {
+        return std::borrow::Cow::Borrowed(line);
+    }
+    // Scan with a sliding window so multi-byte UTF-8 sequences around the escape
+    // (the bullet glyph is three bytes) are preserved intact.
+    let mut out = String::with_capacity(line.len());
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == 0x1B && i + 2 < bytes.len() && bytes[i + 1] == b'[' {
+            let mut j = i + 2;
+            while j < bytes.len() && !bytes[j].is_ascii_alphabetic() {
+                j += 1;
+            }
+            if j < bytes.len() {
+                i = j + 1;
+                continue;
+            }
+        }
+        // Copy one full UTF-8 character starting at i.
+        let ch_end = if bytes[i] < 0x80 {
+            i + 1
+        } else if bytes[i] & 0xE0 == 0xC0 {
+            i + 2
+        } else if bytes[i] & 0xF0 == 0xE0 {
+            i + 3
+        } else {
+            i + 4
+        };
+        let ch_end = ch_end.min(bytes.len());
+        out.push_str(&line[i..ch_end]);
+        i = ch_end;
+    }
+    std::borrow::Cow::Owned(out)
+}
+
+/// Does the captured `opencode auth list` output contain a real OpenAI OAuth entry?
+///
+/// The reviewed 1.18.32 executable prints one bullet line per provider whose
+/// ANSI-stripped shape is `● OpenAI oauth` (a trailing parenthesised token is
+/// permitted). Earlier substring matching (`contains("OpenAI") && contains("oauth")`)
+/// would falsely sign the operator in whenever any help, hint, or error line
+/// merely mentioned both words — including unrelated text that happens to talk
+/// about OpenAI and the OAuth flow. The narrow check requires the bullet marker,
+/// `OpenAI` as a standalone token, and `oauth` as a standalone token, all on
+/// the same line in that order. Anything else fails closed.
+fn opencode_auth_list_signals_openai_oauth(stdout: &str) -> bool {
+    stdout.lines().any(|raw_line| {
+        let line = strip_sgr(raw_line);
+        let trimmed = line.trim_start();
+        let Some(after_bullet) = trimmed.strip_prefix('●').map(str::trim_start) else {
+            return false;
+        };
+        let mut tokens = after_bullet.split_whitespace();
+        let Some(name) = tokens.next() else {
+            return false;
+        };
+        let Some(kind) = tokens.next() else {
+            return false;
+        };
+        name == "OpenAI" && kind == "oauth"
+    })
 }
 
 fn http_status(config: &ReasoningConfig, http: &impl HttpTransport) -> SparkIntentStatus {
@@ -1069,6 +1524,7 @@ fn spark_intent_status_with(
     }
     match config.provider {
         ProviderKind::Codex => codex_status(config, runner),
+        ProviderKind::Opencode => opencode_status(config, runner),
         ProviderKind::Ollama | ProviderKind::OpenaiCompatible => http_status(config, http),
         ProviderKind::Disabled => status_value(false, false, config, disabled_message()),
     }
@@ -1419,6 +1875,266 @@ mod tests {
             OsString::from("-"),
         ]);
         assert_eq!(args, expected);
+    }
+
+    #[test]
+    fn opencode_argv_uses_stdin_not_prompt_and_never_auto_approves_tools() {
+        let args = opencode_args(Path::new("/private"), "openai/gpt-6-luna");
+        assert_eq!(
+            args,
+            vec![
+                "--pure",
+                "run",
+                "--format",
+                "json",
+                "-m",
+                "openai/gpt-6-luna",
+                "--agent",
+                "operator-key-reasoner",
+                "--title",
+                "Operator Key intent",
+                "--dir",
+                "/private",
+                "-",
+            ]
+            .into_iter()
+            .map(OsString::from)
+            .collect::<Vec<_>>()
+        );
+        assert!(!args
+            .iter()
+            .any(|arg| arg == "--auto" || arg == "--continue"));
+    }
+
+    #[test]
+    fn opencode_event_stream_rejects_tools_errors_and_ambiguous_output() {
+        let plan = valid_output(FIRST_ID);
+        let stream = format!(
+            "{}\n{}\n{}\n",
+            json!({"type":"step_start","sessionID":"ses_test","part":{"type":"step-start"}}),
+            json!({"type":"text","sessionID":"ses_test","part":{"type":"text","text":plan}}),
+            json!({"type":"step_finish","sessionID":"ses_test","part":{"type":"step-finish"}})
+        );
+        assert_eq!(extract_opencode_text(&stream).unwrap(), plan.as_bytes());
+        for extra in [
+            json!({"type":"tool_use","sessionID":"ses_test","part":{"type":"tool"}}),
+            json!({"type":"error","sessionID":"ses_test","error":{"data":{"message":"secret"}}}),
+            json!({"type":"text","sessionID":"ses_other","part":{"text":"{}"}}),
+            json!({"type":"unknown","sessionID":"ses_test"}),
+        ] {
+            let bad = stream.replacen("\n", &format!("\n{extra}\n"), 1);
+            let error = extract_opencode_text(&bad).unwrap_err().to_string();
+            assert!(!error.contains("secret"));
+        }
+        assert!(extract_opencode_text(&stream.replace("step_finish", "step_start")).is_err());
+        assert!(extract_opencode_text("not json\n").is_err());
+        assert!(extract_opencode_text("").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn opencode_workspace_is_private_and_disposes_only_its_own_data() {
+        let fixture = TempDirectory::new().unwrap();
+        let auth = fixture.path.join("auth.json");
+        create_private_file(&auth, b"{} ").unwrap();
+        let workspace = OpencodeWorkspace::new_with_auth(&auth).unwrap();
+        let root = workspace.directory.path.clone();
+        assert!(workspace.has_auth);
+        assert_eq!(fs::metadata(&root).unwrap().mode() & 0o777, 0o700);
+        assert_eq!(
+            fs::read_link(root.join("data/opencode/auth.json")).unwrap(),
+            auth
+        );
+        let environment: std::collections::HashMap<_, _> =
+            workspace.environment.iter().cloned().collect();
+        for name in [
+            "XDG_CONFIG_HOME",
+            "XDG_DATA_HOME",
+            "XDG_CACHE_HOME",
+            "XDG_STATE_HOME",
+            "OPENCODE_CONFIG_DIR",
+        ] {
+            assert!(
+                Path::new(environment.get(std::ffi::OsStr::new(name)).unwrap()).starts_with(&root)
+            );
+        }
+        assert!(!environment.contains_key(std::ffi::OsStr::new("OPENAI_API_KEY")));
+        assert!(!environment.contains_key(std::ffi::OsStr::new("OPENCODE_DISABLE_DEFAULT_PLUGINS")));
+        let config: serde_json::Value = serde_json::from_str(
+            environment
+                .get(std::ffi::OsStr::new("OPENCODE_CONFIG_CONTENT"))
+                .unwrap()
+                .to_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(config["permission"]["*"], "deny");
+        assert_eq!(
+            config["agent"]["operator-key-reasoner"]["permission"]["*"],
+            "deny"
+        );
+        assert_eq!(config["enabled_providers"], json!(["openai"]));
+        assert_eq!(config["plugin"], json!([]));
+        assert_eq!(config["mcp"], json!({}));
+        assert!(config["tools"]
+            .as_object()
+            .unwrap()
+            .values()
+            .all(|v| v == false));
+        drop(workspace);
+        assert!(!root.exists());
+        assert_eq!(fs::read(&auth).unwrap(), b"{} ");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn opencode_runner_receives_only_stdin_and_private_environment_with_pinned_version() {
+        type OpenCodeCall = (Vec<OsString>, Vec<u8>, Vec<(OsString, OsString)>);
+        struct OpenCodeRunner {
+            version: &'static str,
+            stream: String,
+            calls: RefCell<Vec<OpenCodeCall>>,
+        }
+        impl Runner for OpenCodeRunner {
+            fn run(&self, spec: RunSpec<'_>) -> Result<ProcessResult, RunError> {
+                self.calls.borrow_mut().push((
+                    spec.args.to_vec(),
+                    spec.stdin.unwrap_or_default().to_vec(),
+                    spec.environment.unwrap_or_default().to_vec(),
+                ));
+                Ok(ProcessResult {
+                    success: true,
+                    stdout: if spec.args == [OsString::from("--version")] {
+                        self.version.to_owned()
+                    } else {
+                        self.stream.clone()
+                    },
+                    stderr: String::new(),
+                })
+            }
+        }
+        let fixture = TempDirectory::new().unwrap();
+        let auth = fixture.path.join("auth.json");
+        create_private_file(&auth, b"{} ").unwrap();
+        let workspace = OpencodeWorkspace::new_with_auth(&auth).unwrap();
+        let workspace_path = workspace.directory.path.clone();
+        let config = ReasoningConfig {
+            enabled: true,
+            provider: ProviderKind::Opencode,
+            model: "openai/gpt-6-luna".into(),
+            opencode_path: Some("/opt/opencode/1.18.32/opencode".into()),
+            opencode_version: Some("1.18.32".into()),
+            ..ReasoningConfig::default()
+        };
+        let fixture_catalog = catalog();
+        let request = validate_request("help", &ids(&[FIRST_ID]), &fixture_catalog).unwrap();
+        let prompt = build_prompt(&request).unwrap();
+        let mut plan: serde_json::Value = serde_json::from_str(&valid_output(FIRST_ID)).unwrap();
+        plan.as_object_mut().unwrap().remove("model");
+        let stream = format!(
+            "{}\n{}\n{}\n",
+            json!({"type":"step_start","sessionID":"ses_test"}),
+            json!({"type":"text","sessionID":"ses_test","part":{"text":plan.to_string()}}),
+            json!({"type":"step_finish","sessionID":"ses_test"})
+        );
+        let runner = OpenCodeRunner {
+            version: "1.18.32",
+            stream,
+            calls: RefCell::new(Vec::new()),
+        };
+        let output = opencode_reason_in(
+            &config,
+            &prompt,
+            &runner,
+            Instant::now() + Duration::from_secs(10),
+            &workspace,
+        )
+        .unwrap();
+        let parsed =
+            parse_and_validate_response(&output, &HashSet::from([FIRST_ID.into()]), &config.model)
+                .unwrap();
+        assert_eq!(parsed.model, config.model);
+        let calls = runner.calls.borrow();
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].0, vec![OsString::from("--version")]);
+        assert!(calls[0].1.is_empty());
+        assert_eq!(calls[1].0, opencode_args(&workspace_path, &config.model));
+        assert!(calls[1]
+            .1
+            .starts_with(b"You are a command-planning reasoner."));
+        assert!(calls[1]
+            .1
+            .windows(PAYLOAD_MARKER.len())
+            .any(|part| part == PAYLOAD_MARKER.as_bytes()));
+        assert!(calls[1]
+            .1
+            .windows(b"OUTPUT_JSON_SCHEMA".len())
+            .any(|part| part == b"OUTPUT_JSON_SCHEMA"));
+        assert!(calls[1]
+            .2
+            .iter()
+            .any(|(key, value)| key == "XDG_DATA_HOME"
+                && Path::new(value).starts_with(&workspace_path)));
+        assert!(!calls[1].2.iter().any(|(key, _)| key == "OPENAI_API_KEY"));
+        drop(calls);
+        drop(workspace);
+        assert!(!workspace_path.exists());
+        assert!(auth.exists());
+        let wrong = OpenCodeRunner {
+            version: "1.18.33",
+            stream: String::new(),
+            calls: RefCell::new(Vec::new()),
+        };
+        let workspace = OpencodeWorkspace::new_with_auth(&auth).unwrap();
+        let error = opencode_reason_in(
+            &config,
+            &prompt,
+            &wrong,
+            Instant::now() + Duration::from_secs(10),
+            &workspace,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("exactly 1.18.32"));
+        assert_eq!(wrong.calls.borrow().len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn opencode_rejects_public_or_indirect_auth_files() {
+        let fixture = TempDirectory::new().unwrap();
+        let auth = fixture.path.join("auth.json");
+        create_private_file(&auth, b"{} ").unwrap();
+        fs::set_permissions(&auth, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(OpencodeWorkspace::new_with_auth(&auth).is_err());
+        fs::set_permissions(&auth, fs::Permissions::from_mode(0o600)).unwrap();
+        let link = fixture.path.join("link.json");
+        std::os::unix::fs::symlink(&auth, &link).unwrap();
+        assert!(OpencodeWorkspace::new_with_auth(&link).is_err());
+        assert_eq!(fs::read(&auth).unwrap(), b"{} ");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn native_runner_scrubs_inherited_environment_for_opencode() {
+        let workspace = TempDirectory::new().unwrap();
+        let environment = [(
+            OsString::from("OPERATOR_KEY_MARKER"),
+            OsString::from("isolated"),
+        )];
+        let result = NativeRunner
+            .run(RunSpec {
+                program: "/usr/bin/env",
+                args: &[],
+                stdin: None,
+                cwd: &workspace.path,
+                schema_path: None,
+                output_path: None,
+                environment: Some(&environment),
+                deadline: Instant::now() + Duration::from_secs(2),
+            })
+            .unwrap();
+        assert!(result.success);
+        assert_eq!(result.stdout, "OPERATOR_KEY_MARKER=isolated\n");
     }
 
     #[test]
@@ -1829,6 +2545,11 @@ mod tests {
             config.enabled,
             "enable reasoning in the config before running the live test"
         );
+        if config.provider == ProviderKind::Opencode {
+            let status = spark_intent_status_with(&config, &NativeRunner, &NativeHttp);
+            assert!(status.available && status.logged_in, "{}", status.message);
+            assert_eq!(status.model, config.model);
+        }
         let response = reason_about_intent_with(
             "Check whether Hermes is healthy, then open an interactive session.",
             allowed.clone(),
@@ -1861,6 +2582,7 @@ mod tests {
             cwd: &workspace.path,
             schema_path: None,
             output_path: None,
+            environment: None,
             deadline: Instant::now() + Duration::from_millis(50),
         });
         assert!(matches!(result, Err(RunError::Timeout)));
@@ -1893,6 +2615,7 @@ mod tests {
             cwd: &workspace.path,
             schema_path: None,
             output_path: None,
+            environment: None,
             deadline: Instant::now() + Duration::from_secs(1),
         });
         assert!(result.unwrap().success);
@@ -2362,5 +3085,231 @@ mod tests {
 
         assert!(error.contains(&format!("127.0.0.1:{port}")), "{error}");
         assert!(error.contains("Start it"), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn opencode_status_recognises_an_openai_oauth_line_with_an_ansi_styled_bullet() {
+        // Pinned OpenCode 1.18.32 emits `auth list` output with ANSI colour escapes
+        // around the provider name. The exact ANSI-stripped line looks like
+        // `● OpenAI oauth`. An earlier, broader substring check would mark the
+        // operator signed in whenever any provider line merely mentioned "OpenAI"
+        // or "oauth" — including unrelated help or error text.
+        type OpenCodeCall = (Vec<OsString>, Vec<u8>);
+        struct OpenCodeAuthListRunner {
+            auth_list: &'static str,
+            calls: RefCell<Vec<OpenCodeCall>>,
+        }
+        impl Runner for OpenCodeAuthListRunner {
+            fn run(&self, spec: RunSpec<'_>) -> Result<ProcessResult, RunError> {
+                self.calls
+                    .borrow_mut()
+                    .push((spec.args.to_vec(), spec.stdin.unwrap_or_default().to_vec()));
+                let stdout = if spec.args == [OsString::from("--version")] {
+                    "1.18.32".to_owned()
+                } else if spec.args == [OsString::from("auth"), OsString::from("list")] {
+                    self.auth_list.to_owned()
+                } else {
+                    String::new()
+                };
+                Ok(ProcessResult {
+                    success: true,
+                    stdout,
+                    stderr: String::new(),
+                })
+            }
+        }
+
+        // Use an explicit private auth fixture: do not mutate process-global XDG
+        // variables while the Rust test runner executes other tests in parallel.
+        let fixture = TempDirectory::new().unwrap();
+        let auth = fixture.path.join("auth.json");
+        create_private_file(&auth, b"{} ").unwrap();
+        let workspace = OpencodeWorkspace::new_with_auth(&auth).unwrap();
+
+        let config = ReasoningConfig {
+            enabled: true,
+            provider: ProviderKind::Opencode,
+            model: "openai/gpt-6-luna".into(),
+            opencode_path: Some("/opt/opencode/1.18.32/opencode".into()),
+            opencode_version: Some("1.18.32".into()),
+            ..ReasoningConfig::default()
+        };
+
+        // Positive: the exact ANSI-stripped line shape emitted by 1.18.32.
+        let runner = OpenCodeAuthListRunner {
+            auth_list: "\x1b[90m● OpenAI oauth (sk-secret-token-blob)\x1b[0m\n",
+            calls: RefCell::new(Vec::new()),
+        };
+        let status = opencode_status_in(&config, &runner, &workspace);
+        assert!(status.available, "{:?}", status.message);
+        assert!(status.logged_in, "{:?}", status.message);
+        assert!(status.message.contains("OpenAI"), "{:?}", status.message);
+        // The message never echoes any untrusted stdout verbatim — even when stdout
+        // contains a bearer token, it must not appear in the surfaced diagnostic.
+        assert!(
+            !status.message.contains("sk-secret-token-blob"),
+            "{:?}",
+            status.message
+        );
+
+        // Positive: same line without ANSI colour escapes (older terminals, CI logs).
+        let runner = OpenCodeAuthListRunner {
+            auth_list: "● OpenAI oauth\n",
+            calls: RefCell::new(Vec::new()),
+        };
+        let status = opencode_status_in(&config, &runner, &workspace);
+        assert!(status.available && status.logged_in, "{:?}", status.message);
+
+        // Positive: the bullet sits further down in the list among other providers.
+        let runner = OpenCodeAuthListRunner {
+            auth_list: "\n\x1b[90m● Anthropic oauth\x1b[0m\n● OpenAI oauth\n",
+            calls: RefCell::new(Vec::new()),
+        };
+        let status = opencode_status_in(&config, &runner, &workspace);
+        assert!(status.available && status.logged_in, "{:?}", status.message);
+
+        // Negative: a line merely mentioning OpenAI in help text must not sign us in.
+        let runner = OpenCodeAuthListRunner {
+            auth_list: "Run `opencode auth login` to enable the OpenAI provider.\n",
+            calls: RefCell::new(Vec::new()),
+        };
+        let status = opencode_status_in(&config, &runner, &workspace);
+        assert!(status.available, "{}", status.message);
+        assert!(!status.logged_in, "{:?}", status.message);
+        assert!(
+            status.message.contains("`opencode auth login`"),
+            "{:?}",
+            status.message
+        );
+
+        // Negative: a hint line that mentions both "OpenAI" and "oauth" but is not
+        // a real provider entry (no leading bullet + standalone OpenAI name). The
+        // broad substring check would mark this as signed in; the narrow check must
+        // refuse so an unrelated reminder cannot impersonate the OpenCode account.
+        let runner = OpenCodeAuthListRunner {
+            auth_list: "Tip: switching to OpenAI uses a separate oauth flow.\n",
+            calls: RefCell::new(Vec::new()),
+        };
+        let status = opencode_status_in(&config, &runner, &workspace);
+        assert!(status.available, "{}", status.message);
+        assert!(!status.logged_in, "{:?}", status.message);
+
+        // Negative: a non-zero exit means we cannot trust the listing at all.
+        struct NonZeroAuthListRunner;
+        impl Runner for NonZeroAuthListRunner {
+            fn run(&self, spec: RunSpec<'_>) -> Result<ProcessResult, RunError> {
+                let stdout = if spec.args == [OsString::from("--version")] {
+                    "1.18.32".to_owned()
+                } else {
+                    "● OpenAI oauth\n".to_owned()
+                };
+                let success = spec.args != [OsString::from("auth"), OsString::from("list")];
+                Ok(ProcessResult {
+                    success,
+                    stdout,
+                    stderr: String::new(),
+                })
+            }
+        }
+        let status = opencode_status_in(&config, &NonZeroAuthListRunner, &workspace);
+        assert!(!status.logged_in, "{:?}", status.message);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn opencode_version_gate_matches_exactly_byte_for_byte_no_trim_artefacts() {
+        // Pinned OpenCode 1.18.32 emits exactly `1.18.32\n` on stdout and exits 0.
+        // The version gate must accept the exact byte-for-byte stdout (with or
+        // without a single trailing newline) and reject any drift — a leading or
+        // trailing space, a vendor banner, or a stderr-only success must all fail
+        // closed so a reviewed build cannot be silently swapped for a different one.
+        struct VersionGateRunner(&'static str, bool);
+        impl Runner for VersionGateRunner {
+            fn run(&self, _spec: RunSpec<'_>) -> Result<ProcessResult, RunError> {
+                Ok(ProcessResult {
+                    success: self.1,
+                    stdout: self.0.to_owned(),
+                    stderr: String::new(),
+                })
+            }
+        }
+        let workspace = TempDirectory::new().unwrap();
+        let config = ReasoningConfig {
+            enabled: true,
+            provider: ProviderKind::Opencode,
+            model: "openai/gpt-6-luna".into(),
+            opencode_path: Some("/opt/opencode/1.18.32/opencode".into()),
+            opencode_version: Some("1.18.32".into()),
+            ..ReasoningConfig::default()
+        };
+        // OpencodeWorkspace needs an auth file to be reachable via new_with_auth.
+        let auth = workspace.path.join("auth.json");
+        create_private_file(&auth, b"{} ").unwrap();
+        let oc_workspace = OpencodeWorkspace::new_with_auth(&auth).unwrap();
+
+        // Positive: the exact pinned stdout `1.18.32\n`.
+        verify_opencode_version(
+            &config,
+            &oc_workspace,
+            &VersionGateRunner("1.18.32\n", true),
+            Instant::now() + Duration::from_secs(1),
+        )
+        .expect("the exact pinned stdout must be accepted");
+
+        // Positive: trim-equal match (no trailing newline) is still accepted so a
+        // future CLI change to drop the newline does not silently break the gate.
+        verify_opencode_version(
+            &config,
+            &oc_workspace,
+            &VersionGateRunner("1.18.32", true),
+            Instant::now() + Duration::from_secs(1),
+        )
+        .expect("the exact pinned stdout without a trailing newline must be accepted");
+
+        // Negative: a leading space is not the pinned value and must be refused.
+        let error = verify_opencode_version(
+            &config,
+            &oc_workspace,
+            &VersionGateRunner(" 1.18.32\n", true),
+            Instant::now() + Duration::from_secs(1),
+        )
+        .unwrap_err()
+        .to_string();
+        // The diagnostic names the pinned version and tells the operator what to do,
+        // but never echoes the untrusted stdout verbatim — the whole point of the
+        // diagnostic is to name the pinned value without confirming any leaked bytes.
+        assert_eq!(
+            error,
+            "OpenCode must be exactly 1.18.32; install the reviewed build or update the version pin after review."
+        );
+
+        // Negative: a vendor banner wrapping the version must be refused.
+        let error = verify_opencode_version(
+            &config,
+            &oc_workspace,
+            &VersionGateRunner("opencode 1.18.32 (release build)\n", true),
+            Instant::now() + Duration::from_secs(1),
+        )
+        .unwrap_err()
+        .to_string();
+        assert_eq!(
+            error,
+            "OpenCode must be exactly 1.18.32; install the reviewed build or update the version pin after review."
+        );
+
+        // Negative: a successful exit with empty stdout must fail closed.
+        let error = verify_opencode_version(
+            &config,
+            &oc_workspace,
+            &VersionGateRunner("", true),
+            Instant::now() + Duration::from_secs(1),
+        )
+        .unwrap_err()
+        .to_string();
+        assert_eq!(
+            error,
+            "OpenCode must be exactly 1.18.32; install the reviewed build or update the version pin after review."
+        );
     }
 }
