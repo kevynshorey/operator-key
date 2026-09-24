@@ -52,6 +52,7 @@ jobs:
       - run: npm ci
 
       - name: Confirm the tag matches the declared version
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag="${GITHUB_REF_NAME#v}"
           declared=$(node -p "require('./package.json').version")
@@ -74,8 +75,11 @@ jobs:
           # of itself". release-artefacts/ is created empty and holds only packages.
           rm -rf release-artefacts
           mkdir -p release-artefacts
-          find src-tauri/target/release/bundle -type f \( -name '*.deb' -o -name '*.rpm' \) \
-            -exec cp {} release-artefacts/ \;
+          # Rust cache or a reused workspace can retain older bundle versions.
+          version=$(node -p "require('./package.json').version")
+          find src-tauri/target/release/bundle -type f \
+            \( -name "*_${version}_amd64.deb" -o -name "*-${version}-*.x86_64.rpm" \) \
+            -exec cp -- {} release-artefacts/ \;
           cd release-artefacts
           # Spaces in the bundled filenames make shell globbing fragile; rename first.
           for f in *; do mv -- "$f" "$(echo "$f" | tr ' ' '.')"; done
@@ -101,6 +105,18 @@ jobs:
           fi
           echo "ok: no builder home paths or username in the binary"
 
+      - name: Check exact release package compatibility
+        run: |
+          shopt -s nullglob
+          debs=(release-artefacts/*.deb)
+          rpms=(release-artefacts/*.rpm)
+          test "${#debs[@]}" -eq 1
+          test "${#rpms[@]}" -eq 1
+          python3 scripts/ci/check_release_checksums.py release-artefacts/SHA256SUMS "${debs[0]}" "${rpms[0]}"
+          python3 scripts/ci/check_deb_compat.py "${debs[0]}"
+          bash scripts/ci/smoke-deb-in-container.sh "${debs[0]}" ubuntu-24.04
+          bash scripts/ci/smoke-deb-in-container.sh "${debs[0]}" debian-13
+
       - uses: actions/upload-artifact@v7
         with:
           name: packages
@@ -113,7 +129,10 @@ jobs:
           files: release-artefacts/*
           generate_release_notes: true
           body: |
-            Install the `.deb` or `.rpm` for your distribution.
+            The `.deb` targets Ubuntu 24.04 LTS (amd64) and is install/launch
+            checked on Ubuntu 24.04 and Debian 13 before publication. The `.rpm`
+            is provided but no RPM distribution is certified yet. See
+            [Linux compatibility](https://github.com/kevynshorey/operator-key/blob/main/docs/SUPPORTED_LINUX.md).
 
             Verify your download before installing:
 

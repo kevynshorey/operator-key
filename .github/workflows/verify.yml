@@ -1,10 +1,9 @@
 # Verification gate for Operator Key.
 #
-# The seven required jobs here must pass before `main` moves; the Ubuntu 26.04
+# The eight required jobs here must pass before `main` moves; the Ubuntu 26.04
 # compatibility probe below is informational and cannot delay tagged releases.
-# The repository holds 465+ tests across
-# three languages, and before this workflow existed nothing ran them automatically: a
-# commit could reach the default branch entirely unverified. That was the single highest
+# The repository holds 465+ tests across three languages. Before this workflow
+# existed, a commit could reach the default branch entirely unverified. That was the single highest
 # finding of the 2026-09-21 audit.
 #
 # Design notes:
@@ -25,6 +24,11 @@ on:
   schedule:
     - cron: "17 6 * * 1"
   workflow_dispatch:
+    inputs:
+      published_tag:
+        description: "Optional existing vX.Y.Z release to recheck without publishing"
+        required: false
+        type: string
   # Called by release.yml, so a tag cannot publish something the suite has not verified.
   workflow_call:
 
@@ -190,6 +194,70 @@ jobs:
       - uses: actions/checkout@v7
       - name: Refuse host paths, personal identifiers and machine drift data
         run: bash scripts/ci/check-no-machine-state.sh
+
+  # Required compatibility gate for PRs and main. Tagged releases skip this
+  # duplicate build: release.yml gates the exact collected package before upload.
+  package-compat:
+    name: package compatibility (Ubuntu 24.04, Debian 13)
+    runs-on: ubuntu-24.04
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Tauri build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - name: Build candidate packages
+        run: bash scripts/build-release.sh
+      - name: Gate candidate .deb on both target distros
+        run: |
+          shopt -s nullglob
+          version=$(node -p "require('./package.json').version")
+          debs=(src-tauri/target/release/bundle/deb/*_"$version"_amd64.deb)
+          test "${#debs[@]}" -eq 1
+          python3 scripts/ci/check_deb_compat.py "${debs[0]}"
+          bash scripts/ci/smoke-deb-in-container.sh "${debs[0]}" ubuntu-24.04
+          bash scripts/ci/smoke-deb-in-container.sh "${debs[0]}" debian-13
+
+  # On demand, re-check the bytes anyone downloads (including older releases).
+  # This is read-only and cannot publish or modify a release.
+  published-compat:
+    name: published .deb recheck (on demand)
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.published_tag != '' }}
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PUBLISHED_TAG: ${{ inputs.published_tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download and authenticate existing published assets
+        run: |
+          [[ "$PUBLISHED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          mkdir -p "$RUNNER_TEMP/published"
+          gh release download "$PUBLISHED_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.deb' --pattern '*.rpm' --pattern SHA256SUMS \
+            --dir "$RUNNER_TEMP/published"
+          shopt -s nullglob
+          debs=("$RUNNER_TEMP"/published/*.deb)
+          rpms=("$RUNNER_TEMP"/published/*.rpm)
+          test "${#debs[@]}" -eq 1
+          test "${#rpms[@]}" -eq 1
+          python3 scripts/ci/check_release_checksums.py "$RUNNER_TEMP/published/SHA256SUMS" "${debs[0]}" "${rpms[0]}"
+          python3 scripts/ci/check_deb_compat.py "${debs[0]}"
+          bash scripts/ci/smoke-deb-in-container.sh "${debs[0]}" ubuntu-24.04
+          bash scripts/ci/smoke-deb-in-container.sh "${debs[0]}" debian-13
 
   # This probes the next image without changing the minimum system-library floor of
   # published packages. It is deliberately not a required branch-protection check.

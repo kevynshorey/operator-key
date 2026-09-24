@@ -37,6 +37,11 @@
       "deb",
       "rpm"
     ],
+    "linux": {
+      "deb": {
+        "depends": ["libgtk-3-0t64"]
+      }
+    },
     "category": "Utility",
     "shortDescription": "Intent search for local operator commands",
     "icon": [
