@@ -7,7 +7,7 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.2.5] - 2026-09-24
+## [0.2.6] - 2026-09-24
 
 ### Added
 
@@ -18,6 +18,7 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Pin the original seven required verification jobs and release package build to Ubuntu 24.04 rather than the moving `ubuntu-latest` label; keep the Ubuntu 26.04 build as a non-required, non-tag probe.
 - Define Ubuntu 24.04 LTS (amd64) as the `.deb` minimum and add an eighth required PR gate for exact-package GLIBC/dependency checks plus real installation and unprivileged window launch on Ubuntu 24.04 and Debian 13. Apply the same gate to the collected `.deb` before tagged publication; RPMs remain separately unverified.
 - Require each selected `.deb` and `.rpm` exactly once in `SHA256SUMS` with its matching digest before release or published-asset recheck, and declare the GTK 3 t64 package present on both target distributions; exclude stale cached bundle versions from candidate and release selection.
+- Retry the exact-package smoke's dependency install at most once after an uncached apt index refresh if an Ubuntu/Debian mirror returns a missing package; persistent fetch or install failure still blocks publication. A v0.2.5 tag was attempted but published no assets after an upstream Ubuntu mirror returned 404.
 
 ## [0.2.4] - 2026-09-23
 
