@@ -9,7 +9,9 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### CI
 
-- Keep all seven required verification jobs and the release package build on the known-good Ubuntu 24.04 runner instead of the moving `ubuntu-latest` label. Run an informational Ubuntu 26.04 package build on non-tag events to report Tauri package availability, the candidate binary's GLIBC floor and Debian runtime dependencies without changing the public package build environment or delaying tagged releases.
+- Pin the original seven required verification jobs and release package build to Ubuntu 24.04 rather than the moving `ubuntu-latest` label; keep the Ubuntu 26.04 build as a non-required, non-tag probe.
+- Define Ubuntu 24.04 LTS (amd64) as the `.deb` minimum and add an eighth required PR gate for exact-package GLIBC/dependency checks plus real installation and unprivileged window launch on Ubuntu 24.04 and Debian 13. Apply the same gate to the collected `.deb` before tagged publication; RPMs remain separately unverified.
+- Require each selected `.deb` and `.rpm` exactly once in `SHA256SUMS` with its matching digest before release or published-asset recheck, and declare the GTK 3 t64 package present on both target distributions; exclude stale cached bundle versions from candidate and release selection.
 
 ## [0.2.4] - 2026-09-23
 

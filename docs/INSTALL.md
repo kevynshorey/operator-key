@@ -1,5 +1,9 @@
 # Omarchy installation
 
+For official `.deb` package compatibility and the Ubuntu 24.04 LTS amd64
+minimum, see [Linux package compatibility policy](SUPPORTED_LINUX.md). This
+page covers the separate source-build and Omarchy shortcut installer path.
+
 Operator Key ships a preview-first installer that adds one managed Omarchy binding without rewriting any other user configuration.
 
 ## Requirements
