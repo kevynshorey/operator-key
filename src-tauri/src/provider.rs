@@ -12,13 +12,9 @@
 //!    used for exactly one request header, and never logged, never returned to the
 //!    webview, and never included in an error message.
 //!
-//! 3. **HTTP is loopback-only.** `parse_loopback_url` rejects any host that is not the
-//!    local machine, so a misconfigured or hostile config file cannot exfiltrate the
-//!    operator's intent text to a third party. There is deliberately no TLS stack here:
-//!    without one, there is no remote endpoint this module can reach at all.
-//!
-//! The consequence worth stating plainly: whichever provider an operator selects, the
-//! reasoning request never leaves their machine unless they themselves run a proxy.
+//! 3. **Direct HTTP is loopback-only.** `parse_loopback_url` rejects remote hosts. CLI
+//!    providers are distinct: Codex and OpenCode send bounded intent data to their
+//!    signed-in cloud providers. Do not confuse their privacy boundary with local HTTP.
 
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
@@ -47,6 +43,8 @@ pub enum ProviderKind {
     OpenaiCompatible,
     /// The Codex CLI, which authenticates itself from the operator's own machine.
     Codex,
+    /// An isolated OpenCode CLI invocation using its OpenAI OAuth sign-in.
+    Opencode,
 }
 
 impl ProviderKind {
@@ -56,6 +54,7 @@ impl ProviderKind {
             Self::Ollama => "ollama",
             Self::OpenaiCompatible => "openai-compatible",
             Self::Codex => "codex",
+            Self::Opencode => "opencode",
         }
     }
 }
@@ -69,7 +68,7 @@ pub struct ReasoningConfig {
     pub provider: ProviderKind,
     /// Model identifier passed through to the provider. Never hardcoded in the app.
     pub model: String,
-    /// Loopback base URL for HTTP providers. Ignored by the `codex` provider.
+    /// Loopback base URL for HTTP providers. Ignored by CLI providers.
     pub endpoint: String,
     /// NAME of an environment variable holding an API key — never the key itself.
     /// Local servers normally need nothing here.
@@ -80,6 +79,11 @@ pub struct ReasoningConfig {
     /// any installed version, which is the right default once the app no longer pins a
     /// single reviewed build.
     pub codex_version: Option<String>,
+    /// Absolute path to the reviewed OpenCode executable. Do not point this at a
+    /// package-manager shim or a shell wrapper with side effects.
+    pub opencode_path: Option<String>,
+    /// Exact `opencode --version` string. Required for this security-sensitive CLI.
+    pub opencode_version: Option<String>,
     /// Ignored by the parser; lets the shipped example carry human-readable notes.
     #[serde(rename = "_comment", skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
@@ -95,6 +99,8 @@ impl Default for ReasoningConfig {
             api_key_env: None,
             timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
             codex_version: None,
+            opencode_path: None,
+            opencode_version: None,
             comment: None,
         }
     }
@@ -126,6 +132,37 @@ impl ReasoningConfig {
         match self.provider {
             ProviderKind::Ollama | ProviderKind::OpenaiCompatible => {
                 parse_loopback_url(&self.endpoint).map(|_| ())
+            }
+            ProviderKind::Opencode => {
+                if !self.model.starts_with("openai/") || self.model == "openai/" {
+                    return Err("OpenCode reasoning requires an openai/ model identifier.".into());
+                }
+                if self.api_key_env.is_some() || self.codex_version.is_some() {
+                    return Err("OpenCode uses its own sign-in; remove unrelated credential and version fields.".into());
+                }
+                let Some(path) = self.opencode_path.as_deref() else {
+                    return Err(
+                        "Set `opencode_path` to the absolute reviewed OpenCode executable.".into(),
+                    );
+                };
+                if path.len() > 2048
+                    || !std::path::Path::new(path).is_absolute()
+                    || path.chars().any(char::is_control)
+                {
+                    return Err("`opencode_path` must be a plain absolute executable path.".into());
+                }
+                let Some(version) = self.opencode_version.as_deref() else {
+                    return Err("Pin `opencode_version` before enabling OpenCode reasoning.".into());
+                };
+                if version.len() > 32
+                    || version.split('.').count() != 3
+                    || version
+                        .split('.')
+                        .any(|part| part.is_empty() || !part.bytes().all(|b| b.is_ascii_digit()))
+                {
+                    return Err("`opencode_version` must be an exact numeric version.".into());
+                }
+                Ok(())
             }
             ProviderKind::Codex | ProviderKind::Disabled => Ok(()),
         }
@@ -643,6 +680,84 @@ mod tests {
         assert_eq!(config.model, "qwen2.5-coder:7b");
         assert_eq!(config.api_key_env, None);
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn shipped_example_is_valid_disabled_configuration() {
+        let example = include_str!("../../docs/reasoning.example.json");
+        let config: ReasoningConfig = serde_json::from_str(example).unwrap();
+        assert!(!config.enabled);
+        assert_eq!(config.provider, ProviderKind::Disabled);
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn opencode_requires_a_pinned_binary_and_openai_model_without_api_key_env() {
+        let base = ReasoningConfig {
+            enabled: true,
+            provider: ProviderKind::Opencode,
+            model: "openai/gpt-6-luna".into(),
+            opencode_path: Some("/opt/opencode/1.18.32/opencode".into()),
+            opencode_version: Some("1.18.32".into()),
+            ..ReasoningConfig::default()
+        };
+        assert!(base.validate().is_ok());
+        for invalid in [
+            ReasoningConfig {
+                model: "opencode/unknown".into(),
+                ..base.clone()
+            },
+            ReasoningConfig {
+                opencode_path: Some("opencode".into()),
+                ..base.clone()
+            },
+            ReasoningConfig {
+                opencode_path: None,
+                ..base.clone()
+            },
+            ReasoningConfig {
+                opencode_version: None,
+                ..base.clone()
+            },
+            ReasoningConfig {
+                opencode_version: Some("1.18.32\nextra".into()),
+                ..base.clone()
+            },
+            ReasoningConfig {
+                api_key_env: Some("OPENAI_API_KEY".into()),
+                ..base.clone()
+            },
+        ] {
+            assert!(invalid.validate().is_err());
+        }
+        let json = serde_json::to_string(&base).unwrap();
+        assert_eq!(
+            serde_json::from_str::<ReasoningConfig>(&json).unwrap(),
+            base
+        );
+        let serialized: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let fields: std::collections::BTreeSet<_> = serialized
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            fields,
+            [
+                "api_key_env",
+                "codex_version",
+                "enabled",
+                "endpoint",
+                "model",
+                "opencode_path",
+                "opencode_version",
+                "provider",
+                "timeout_seconds",
+            ]
+            .into_iter()
+            .collect()
+        );
     }
 
     #[test]

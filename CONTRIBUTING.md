@@ -14,15 +14,17 @@ These are not style preferences. Each one is enforced by tests.
 
 2. **Command text comes from the catalog, never from a model.** A reasoning provider
    returns catalog IDs, which are validated against the exact candidate set that was sent.
-   The app then renders the command from its own trusted data. This is what makes a small,
-   untrusted, local model safe to use here.
+   The app then renders the command from its own trusted data. An untrusted model
+   cannot supply command text to be inserted.
 
 3. **The app ships no credential, no endpoint and no account.** Nothing about the machine
    that built a release may appear in it. If your change makes the app read, store, or log
-   authentication material, it will be rejected.
+   authentication material in its config, logs or webview, it will be rejected. A
+   CLI provider may use its separately saved sign-in without exposing its contents.
 
-4. **Reasoning talks only to loopback.** Checked after address resolution, not by matching
-   on the hostname.
+4. **Direct HTTP reasoning talks only to loopback.** Checked after address resolution,
+   not by matching the hostname. CLI providers such as Codex and OpenCode are cloud
+   integrations; their bounded outbound data and sign-in must be disclosed separately.
 
 5. **Dangerous commands are copy-only.** Red-classified entries are never inserted.
 

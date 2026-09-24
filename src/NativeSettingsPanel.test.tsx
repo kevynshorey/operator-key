@@ -68,4 +68,21 @@ describe("NativeSettingsPanel", () => {
     await screen.findByLabelText("Loopback endpoint");
     expect(screen.queryByText(/legacy codex/i)).not.toBeInTheDocument();
   });
+  it("discloses OpenCode cloud use and tests a pinned file-managed model without editing it", async () => {
+    const settings = { ...disabled, enabled: true, provider: "opencode", model: "openai/gpt-6-luna" };
+    const invoke = vi.fn(async (command: string): Promise<unknown> => {
+      if (command === "get_reasoning_settings") return settings;
+      if (command === "catalog_health") return { source: "embedded" };
+      if (command === "reason_about_intent") return { summary: "Connection works" };
+      throw new Error("file-managed configuration must not be saved by the webview");
+    });
+    const user = userEvent.setup();
+    render(<NativeSettingsPanel runtime="native" nativeInvoke={invoke} testCandidateId="safe-id" />);
+    expect(await screen.findByText(/intent.*sent to OpenAI/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Local model provider")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Test OpenCode reasoning" }));
+    expect(await screen.findByText(/provider answered the sample request/i)).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("reason_about_intent", { intent: "Explain the selected catalog command without executing anything.", candidateIds: ["safe-id"] });
+    expect(invoke.mock.calls.some(([command]) => command === "save_reasoning_settings")).toBe(false);
+  });
 });

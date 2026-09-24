@@ -1,6 +1,8 @@
 # Luna Intent Reasoning
 
-**Status:** IMPLEMENTED — RELEASE CANDIDATE
+**Status:** Historical Codex/Luna design snapshot. This document does not describe
+the current optional OpenCode integration or its model selection. For current
+setup, privacy boundaries, and costs, see [Optional reasoning](REASONING.md).
 
 ## Goal
 

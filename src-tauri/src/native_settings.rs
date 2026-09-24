@@ -76,6 +76,10 @@ fn read_at(p: &std::path::Path) -> Result<ReasoningConfig, String> {
     }
     let c: ReasoningConfig = serde_json::from_slice(&bytes)
         .map_err(|_| "Settings file is malformed or has an unsupported schema.".to_string())?;
+    if matches!(c.provider, ProviderKind::Codex | ProviderKind::Opencode) {
+        c.validate()?;
+        return Ok(c);
+    }
     validate_editable(&c)?;
     Ok(c)
 }
@@ -98,8 +102,15 @@ fn save_at(p: &std::path::Path, s: ReasoningSettings) -> Result<ReasoningSetting
         Err(e) if e == "Settings read failed." => return Err(e),
         Err(e) => return Err(format!("Existing settings cannot be safely replaced: {e}")),
     };
-    if existing.api_key_env.is_some() || existing.codex_version.is_some() {
-        return Err("Cannot save while legacy api_key_env or codex_version settings are active; remove them explicitly first.".into());
+    if matches!(
+        existing.provider,
+        ProviderKind::Codex | ProviderKind::Opencode
+    ) || existing.api_key_env.is_some()
+        || existing.codex_version.is_some()
+        || existing.opencode_path.is_some()
+        || existing.opencode_version.is_some()
+    {
+        return Err("Cannot overwrite file-managed CLI, credentials, or version-pinned settings in this editor; reset explicitly or edit the config file.".into());
     }
     let c = ReasoningConfig {
         enabled: s.enabled,
@@ -109,6 +120,8 @@ fn save_at(p: &std::path::Path, s: ReasoningSettings) -> Result<ReasoningSetting
         timeout_seconds: s.timeout_seconds,
         api_key_env: None,
         codex_version: None,
+        opencode_path: None,
+        opencode_version: None,
         comment: None,
     };
     validate_editable(&c)?;
@@ -159,8 +172,8 @@ fn validate_editable(c: &ReasoningConfig) -> Result<(), String> {
     {
         return Err("Use a model identifier, not a credential or prompt.".into());
     }
-    if c.provider == ProviderKind::Codex {
-        return Err("Legacy Codex settings are file-managed and cannot be edited here.".into());
+    if matches!(c.provider, ProviderKind::Codex | ProviderKind::Opencode) {
+        return Err("CLI settings are file-managed and cannot be edited here.".into());
     }
     if c.enabled && (c.provider == ProviderKind::Disabled || c.model.is_empty()) {
         return Err("Choose a local provider and model before enabling reasoning.".into());
@@ -231,6 +244,21 @@ mod tests {
         fs::write(&p, raw).unwrap();
         assert!(save_at(&p, valid()).is_err());
         assert_eq!(fs::read(&p).unwrap(), raw);
+        let _ = fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn opencode_config_is_readable_but_cannot_be_silently_overwritten_by_webview() {
+        let (p, dir) = fixture();
+        let raw = br#"{"enabled":true,"provider":"opencode","model":"openai/gpt-6-luna","opencode_path":"/opt/opencode/1.18.32/opencode","opencode_version":"1.18.32","timeout_seconds":90}"#;
+        fs::write(&p, raw).unwrap();
+        let settings = ReasoningSettings::from(read_at(&p).unwrap());
+        assert_eq!(settings.provider, ProviderKind::Opencode);
+        let exposed = serde_json::to_value(&settings).unwrap();
+        assert!(exposed.get("opencode_path").is_none());
+        assert!(exposed.get("opencode_version").is_none());
+        assert!(save_at(&p, valid()).is_err());
+        assert_eq!(fs::read(&p).unwrap(), raw);
+        assert_eq!(reset_at(&p).unwrap(), ReasoningConfig::default());
         let _ = fs::remove_dir_all(dir);
     }
     #[test]

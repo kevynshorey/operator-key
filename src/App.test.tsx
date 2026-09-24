@@ -80,7 +80,7 @@ describe("Operator Key overlay", () => {
     render(<App runtime="native" intentReasoner={reasoner} />);
     const configure = await screen.findByRole("button", { name: /configure reasoning/i });
     await user.click(configure);
-    expect(screen.getByRole("region", { name: /optional local reasoning/i })).toHaveFocus();
+    expect(screen.getByRole("region", { name: /optional reasoning/i })).toHaveFocus();
   });
 
   it("keeps browser reasoning guidance truthful without native configuration IPC", async () => {
@@ -746,5 +746,84 @@ describe("Operator Key overlay", () => {
     await user.click(screen.getByRole("tab", { name: /product guides/i }));
     expect(screen.getByRole("button", { name: /^First 10 minutes: Git$/ })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: /lesson/i })).not.toBeInTheDocument();
+  });
+
+  it("discloses the OpenCode→OpenAI cloud routing in Settings and inline, even when signed out", async () => {
+    const user = userEvent.setup();
+    const reasoner = nativeReasoner({
+      status: vi.fn().mockResolvedValue({
+        available: true,
+        loggedIn: false,
+        model: "openai/gpt-6-luna",
+        provider: "opencode",
+        configPath: "/tmp/reasoning.json",
+        message: "OpenCode has no usable OpenAI sign-in. Run `opencode auth login`.",
+      }),
+    });
+    render(<App runtime="native" intentReasoner={reasoner} />);
+
+    // Inline disclosure appears next to the reasoning button even before the operator
+    // clicks Settings — the disclosure must not be hidden behind a navigation step.
+    expect(
+      await screen.findByText(
+        /sends .* to openai through the signed-in opencode account.*never source paths, provenance, files, secrets, terminal contents, or history/i,
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    // Global Settings surface carries the same disclosure, scoped to OpenCode specifically
+    // — not a generic Codex / local-server line that would let a cloud provider hide.
+    expect(
+      screen.getByText(
+        /opencode sends the entered intent and bounded command fields to openai through your signed-in opencode account/i,
+      ),
+    ).toBeInTheDocument();
+    // No legacy Codex or local-compatible wording may appear when the provider is OpenCode.
+    expect(screen.queryByText(/codex may contact its configured remote provider/i)).toBeNull();
+    expect(
+      screen.queryByText(/the configured local-compatible service may itself forward requests/i),
+    ).toBeNull();
+  });
+
+  it("keeps the Codex and local-compatible disclosures intact for their own providers", async () => {
+    const user = userEvent.setup();
+    const codexReasoner = nativeReasoner({
+      status: vi.fn().mockResolvedValue({
+        available: true,
+        loggedIn: false,
+        model: "test-model:7b",
+        provider: "codex",
+        configPath: "/tmp/reasoning.json",
+        message: "Codex is signed out. Run `codex login` to sign in before using reasoning.",
+      }),
+    });
+    const codexView = render(<App runtime="native" intentReasoner={codexReasoner} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(
+      screen.getByText(/codex may contact its configured remote provider; review that provider's privacy terms/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/opencode sends .* to openai/i)).toBeNull();
+    expect(
+      screen.queryByText(/the configured local-compatible service may itself forward requests/i),
+    ).toBeNull();
+    codexView.unmount();
+
+    const ollamaReasoner = nativeReasoner({
+      status: vi.fn().mockResolvedValue({
+        available: true,
+        loggedIn: true,
+        model: "qwen2.5-coder:7b",
+        provider: "ollama",
+        configPath: "/tmp/reasoning.json",
+        message: "Local model server reachable. Reasoning uses qwen2.5-coder:7b.",
+      }),
+    });
+    render(<App runtime="native" intentReasoner={ollamaReasoner} />);
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(
+      screen.getByText(/the configured local-compatible service may itself forward requests. use a service you trust/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/codex may contact its configured remote provider/i)).toBeNull();
+    expect(screen.queryByText(/opencode sends .* to openai/i)).toBeNull();
   });
 });

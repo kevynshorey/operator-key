@@ -113,9 +113,9 @@ test("empty Find offers task starters that only narrow search", async ({ page })
   expect(await operatorActionCalls(page)).toHaveLength(0);
 });
 
-test("[native-disabled] native configuration handoff focuses Optional local reasoning", async ({ page }) => {
+test("[native-disabled] native configuration handoff focuses Optional reasoning", async ({ page }) => {
   await page.getByRole("button", { name: "Configure reasoning" }).click();
-  const settings = page.getByRole("region", { name: "Optional local reasoning" });
+  const settings = page.getByRole("region", { name: "Optional reasoning" });
   await expect(settings).toBeFocused();
   await expect(settings).toBeInViewport();
 });

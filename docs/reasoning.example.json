@@ -1,69 +1,8 @@
 {
-  "$schema": "https://operator-key.invalid/reasoning.schema.json",
-
-  "_comment": [
-    "Operator Key reasoning configuration.",
-    "",
-    "Copy this file to the path the app prints in its own status line and edit it there.",
-    "On Linux that is normally ~/.config/operator-key/reasoning.json.",
-    "",
-    "Operator Key ships NO model, NO API key and NO account. Reasoning is OFF until you",
-    "point this file at a model you run yourself. Nothing here is required to search,",
-    "copy or insert commands: those work offline, forever, with reasoning disabled.",
-    "",
-    "The app only ever talks to 127.0.0.1 or ::1. A non-loopback endpoint is refused",
-    "before a connection is attempted, so this file cannot be used to exfiltrate your",
-    "catalog to a remote service.",
-    "",
-    "PROVIDERS",
-    "  disabled            Default. No model is contacted.",
-    "  ollama              A local Ollama daemon (https://ollama.com). Start with:",
-    "                        ollama serve && ollama pull qwen2.5-coder:7b",
-    "  openai-compatible   Any local server exposing /v1/chat/completions, such as",
-    "                      llama.cpp's llama-server, LM Studio, or vLLM.",
-    "  codex               The Codex CLI, using ITS OWN sign-in. Operator Key never",
-    "                      reads, stores or transmits your Codex credentials.",
-    "",
-    "MODEL SIZE",
-    "  This task is ranking and explaining commands the app already selected, not",
-    "  writing code. A 7B local model is sufficient. The app never runs model-authored",
-    "  text: it can only reorder and explain catalog entries it supplied itself.",
-    "",
-    "API KEYS",
-    "  api_key_env names an ENVIRONMENT VARIABLE, never a key. The value is read at",
-    "  request time and never written to disk or logged. Leave it null for local",
-    "  servers, which normally need no authentication."
-  ],
-
+  "_comment": "Operator Key ships no model, account, or credential. Reasoning is disabled until you explicitly configure a provider; see docs/REASONING.md for local and OpenCode examples.",
   "enabled": false,
   "provider": "disabled",
   "model": "",
   "endpoint": "http://127.0.0.1:11434",
-  "timeout_seconds": 60,
-  "api_key_env": null,
-  "codex_version": null,
-
-  "_examples": {
-    "ollama": {
-      "enabled": true,
-      "provider": "ollama",
-      "model": "qwen2.5-coder:7b",
-      "endpoint": "http://127.0.0.1:11434",
-      "timeout_seconds": 60
-    },
-    "llama_server": {
-      "enabled": true,
-      "provider": "openai-compatible",
-      "model": "qwen2.5-coder-7b-instruct",
-      "endpoint": "http://127.0.0.1:8080",
-      "timeout_seconds": 90
-    },
-    "codex_cli": {
-      "enabled": true,
-      "provider": "codex",
-      "model": "gpt-5.1-codex-max",
-      "codex_version": null,
-      "timeout_seconds": 120
-    }
-  }
+  "timeout_seconds": 90
 }
