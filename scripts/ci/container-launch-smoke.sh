@@ -3,9 +3,7 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update -qq
-apt-get install -y -qq --no-install-recommends \
-  /opt/operator-key.deb xvfb xauth x11-utils util-linux
+bash /opt/install-smoke-deps.sh
 
 test -x /usr/bin/operator-key
 # ldd normally exits successfully even when it prints "not found"; reject that output.

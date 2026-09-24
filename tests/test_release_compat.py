@@ -3,6 +3,7 @@
 import io
 import hashlib
 import json
+import os
 import subprocess
 import tarfile
 import tempfile
@@ -196,9 +197,13 @@ class WorkflowCompatibilityTests(unittest.TestCase):
     def test_container_smoke_requires_real_install_link_and_window(self):
         outer = (ROOT / "scripts" / "ci" / "smoke-deb-in-container.sh").read_text()
         inner = (ROOT / "scripts" / "ci" / "container-launch-smoke.sh").read_text()
+        installer = (ROOT / "scripts" / "ci" / "install-smoke-deps.sh").read_text()
         self.assertIn("docker run --rm", outer)
         self.assertIn("readonly", outer)
-        for expected in ("apt-get install", "ldd", "runuser", "xvfb-run", "xwininfo", "timeout"):
+        self.assertIn("install-smoke-deps.sh", outer)
+        self.assertIn("bash /opt/install-smoke-deps.sh", inner)
+        self.assertIn(" install -y -qq --no-install-recommends /opt/operator-key.deb", installer)
+        for expected in ("ldd", "runuser", "xvfb-run", "xwininfo", "timeout"):
             with self.subTest(expected=expected):
                 self.assertIn(expected, inner)
 
@@ -221,6 +226,60 @@ class WorkflowCompatibilityTests(unittest.TestCase):
         self.assertIn("RPM", policy)
         self.assertIn("Hyprland", policy)
         self.assertIn("SUPPORTED_LINUX.md", (ROOT / "docs" / "INSTALL.md").read_text())
+
+
+class ContainerAptRetryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(self.temp.name)
+        fake = self.path / "apt-get"
+        fake.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os, sys\n"
+            "from pathlib import Path\n"
+            "log = Path(os.environ['APT_TEST_LOG'])\n"
+            "args = sys.argv[1:]\n"
+            "prior = log.read_text().splitlines() if log.exists() else []\n"
+            "log.write_text('\\n'.join(prior + [' '.join(args)]) + '\\n')\n"
+            "mode = os.environ['APT_TEST_MODE']\n"
+            "if 'update' in args and mode == 'bad-update': sys.exit(100)\n"
+            "if 'install' in args and (mode == 'always-fail' or "
+            "(mode == 'transient' and not any(' install ' in ' ' + s + ' ' for s in prior))):\n"
+            "    print('404 Not Found: stale package index', file=sys.stderr)\n"
+            "    sys.exit(100)\n"
+        )
+        fake.chmod(0o755)
+
+    def run_installer(self, mode):
+        log = self.path / "apt.log"
+        env = dict(os.environ, PATH=str(self.path) + os.pathsep + os.environ["PATH"])
+        env.update(APT_TEST_LOG=str(log), APT_TEST_MODE=mode)
+        result = subprocess.run(
+            ["bash", str(ROOT / "scripts" / "ci" / "install-smoke-deps.sh")],
+            capture_output=True, text=True, env=env, timeout=10,
+        )
+        calls = log.read_text().splitlines() if log.exists() else []
+        return result, calls
+
+    def test_stale_index_install_gets_one_fresh_update_and_second_install(self):
+        result, calls = self.run_installer("transient")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(" update " in " " + c + " " for c in calls), 2)
+        installs = [c for c in calls if " install " in " " + c + " "]
+        self.assertEqual(len(installs), 2)
+        self.assertTrue(all("Acquire::http::No-Cache=true" in c for c in calls))
+        self.assertTrue(all("/opt/operator-key.deb" in c for c in installs))
+
+    def test_persistent_mirror_failure_still_blocks_the_smoke(self):
+        result, calls = self.run_installer("always-fail")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(sum(" install " in " " + c + " " for c in calls), 2)
+
+    def test_failed_metadata_refresh_never_attempts_install(self):
+        result, calls = self.run_installer("bad-update")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any(" install " in " " + c + " " for c in calls))
 
 
 class ExactReleaseChecksumTests(unittest.TestCase):

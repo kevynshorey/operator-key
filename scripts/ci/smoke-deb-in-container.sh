@@ -15,12 +15,13 @@ esac
 
 package=$(realpath -e -- "$1")
 script=$(realpath -e -- "$(dirname "${BASH_SOURCE[0]}")/container-launch-smoke.sh")
+installer=$(realpath -e -- "$(dirname "${BASH_SOURCE[0]}")/install-smoke-deps.sh")
 if [[ ! -f "$package" || "$package" != *.deb ]]; then
   printf 'expected one regular .deb package\n' >&2
   exit 1
 fi
 # Docker --mount is comma-delimited; a surprising path must not change mount options.
-if [[ "$package" == *,* || "$script" == *,* ]]; then
+if [[ "$package" == *,* || "$script" == *,* || "$installer" == *,* ]]; then
   printf 'commas in bind-mount paths are not supported\n' >&2
   exit 1
 fi
@@ -30,6 +31,7 @@ printf 'Install/launch smoke: %s on %s\n' "$(basename "$package")" "$image"
 docker run --rm --pull=always \
   --mount "type=bind,source=${package},target=/opt/operator-key.deb,readonly" \
   --mount "type=bind,source=${script},target=/opt/container-launch-smoke.sh,readonly" \
+  --mount "type=bind,source=${installer},target=/opt/install-smoke-deps.sh,readonly" \
   "$image" bash /opt/container-launch-smoke.sh
 if [[ "$before" != "$(sha256sum "$package")" ]]; then
   printf 'package bytes changed during compatibility smoke\n' >&2
