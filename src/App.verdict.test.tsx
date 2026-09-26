@@ -37,6 +37,22 @@ const UNAVAILABLE_ENVIRONMENT: ShortcutEnvironmentReport = {
   keyboard: { layouts: [], activeKeymap: null },
 };
 
+/**
+ * Real multi-keyboard Hyprland sessions routinely report a layouts list that
+ * disagrees with the active keymap (e.g. an internal us keyboard beside an
+ * external gb one). The verdict must state the OBSERVED active keymap and
+ * must not invent a hint from the layouts list.
+ */
+const MULTI_KEYBOARD_ENVIRONMENT: ShortcutEnvironmentReport = {
+  status: "ok",
+  unavailableReason: null,
+  bindings: [
+    { chord: "shift+super+a", description: "ChatGPT", dispatcher: "exec" },
+  ],
+  truncated: false,
+  keyboard: { layouts: ["us", "gb"], activeKeymap: "English (UK)" },
+};
+
 describe("chord verdict strip", () => {
   it("names the local binding when the chord is active on this machine", async () => {
     const user = userEvent.setup();
@@ -60,6 +76,19 @@ describe("chord verdict strip", () => {
     expect(verdict.textContent).not.toMatch(/impossible|never|cannot be bound/i);
     // The verdict must not silence the history ledger next to it.
     expect(await screen.findByRole("note", { name: /shortcut history/i })).toBeInTheDocument();
+  });
+
+  it("states the observed active keymap when it disagrees with the layouts list", async () => {
+    const user = userEvent.setup();
+    render(<App shortcutEnvironment={MULTI_KEYBOARD_ENVIRONMENT} />);
+    await user.type(screen.getByRole("searchbox", { name: /operator intent/i }), "SUPER + SHIFT + A");
+
+    const verdict = await screen.findByRole("note", { name: /local binding check/i });
+    expect(verdict).toHaveTextContent(/active on this machine/i);
+    // The verdict reports the OBSERVED keymap, exactly as probed…
+    expect(verdict).toHaveTextContent(/English \(UK\)/);
+    // …and never surfaces raw layout codes as if they were the active keymap.
+    expect(verdict.textContent).not.toMatch(/\bus\b|\bgb\b/);
   });
 
   it("admits it cannot verify when the probe is unavailable, with the fixed reason", async () => {
