@@ -28,6 +28,18 @@ function clean(value: string): string {
 }
 
 /**
+ * Modifier GLYPHS (not words) may arrive glyph-packed with no separators — ⌘⇧A is how
+ * macOS renders a chord. Pad only single-character glyph aliases with spaces so the
+ * ordinary tokenizer sees them as separate tokens. ASCII words are never split:
+ * "shifta" and "command centre" must stay whole and read as prose.
+ */
+const MODIFIER_GLYPHS = /([⌘⇧⌥⌃⊞])/g;
+
+function expandModifierGlyphs(value: string): string {
+  return value.replace(MODIFIER_GLYPHS, " $1 ");
+}
+
+/**
  * Pure function words. They carry no discriminating power in a command catalog, so they
  * are allowed to contribute score but are never allowed to veto a match. Verbs and nouns
  * are deliberately excluded — "make", "get" and "use" are real commands.
@@ -57,7 +69,8 @@ function words(value: string): string[] {
 }
 
 export function normalizeChord(value: string): string {
-  const parts = clean(value)
+  if (typeof value !== "string") return "";
+  const parts = clean(expandModifierGlyphs(value))
     .replace(/\s+plus\s+/g, " + ")
     .replace(/\s*\+\s*/g, " ")
     .split(/\s+/)
@@ -75,7 +88,7 @@ const NAMED_KEYS = new Set([
 ]);
 
 function looksLikeChord(query: string): boolean {
-  const normalized = clean(query).replace(/\s+plus\s+/g, " + ");
+  const normalized = clean(expandModifierGlyphs(query)).replace(/\s+plus\s+/g, " + ");
   const parts = normalized.replace(/\s*\+\s*/g, " ").split(/\s+/).filter(Boolean);
   if (!parts.some((part) => part in MODIFIER_ALIASES)) return false;
   const keys = parts.filter((part) => !(part in MODIFIER_ALIASES));
@@ -88,6 +101,7 @@ function looksLikeChord(query: string): boolean {
 
 /** Return a canonical chord only when the query has recognizable shortcut syntax. */
 export function parseChordQuery(query: string): string | null {
+  if (typeof query !== "string") return null;
   return looksLikeChord(query) ? normalizeChord(query) : null;
 }
 

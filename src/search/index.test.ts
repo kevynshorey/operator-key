@@ -81,6 +81,31 @@ describe("intent search", () => {
     expect(parseChordQuery("review my code")).toBeNull();
   });
 
+  it("parses compact modifier-glyph chords pasted without separators", () => {
+    // macOS-style shortcut strings often arrive glyph-packed: ⌘⇧A, ⌃⌥T, ⌘K.
+    expect(parseChordQuery("⌘⇧a")).toBe("shift+super+a");
+    expect(parseChordQuery("⌘⇧A")).toBe("shift+super+a");
+    expect(parseChordQuery("⌃⌥t")).toBe("ctrl+alt+t");
+    expect(parseChordQuery("⌘k")).toBe("super+k");
+    expect(normalizeChord("⌘⇧A")).toBe("shift+super+a");
+    // Glyph expansion must not loosen prose detection: ASCII words stay whole.
+    expect(parseChordQuery("command centre")).toBeNull();
+    expect(parseChordQuery("shifta")).toBeNull();
+    // A compact glyph chord is an exact reverse lookup, same as the spaced form.
+    expect(searchCatalog(index, "⌘⇧A", { product: "omarchy", interface: "hotkey" })
+      .map(({ entry }) => entry.description)).toContain("ChatGPT");
+  });
+
+  it("refuses non-string chord input instead of throwing", () => {
+    // JS callers can defeat the type system; the parser must fail closed, not crash.
+    expect(parseChordQuery(null as never)).toBeNull();
+    expect(parseChordQuery(undefined as never)).toBeNull();
+    expect(parseChordQuery(42 as never)).toBeNull();
+    expect(normalizeChord(null as never)).toBe("");
+    expect(normalizeChord(undefined as never)).toBe("");
+    expect(normalizeChord({} as never)).toBe("");
+  });
+
   it("falls back to indexed text matching when modifier words are not a known chord", () => {
     const fixture = [{
       ...entries[0],
