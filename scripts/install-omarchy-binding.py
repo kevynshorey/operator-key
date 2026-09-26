@@ -26,6 +26,32 @@ DEFAULT_CANDIDATES = (
     "SUPER + CTRL + Y",
     "SUPER + CTRL + U",
 )
+# Task 5: closed allowlist of named alias actions. Each maps a NAME the user may
+# select to a fixed human description and a fixed command string. There is no
+# flag that accepts a command: anything not in this table cannot be installed.
+# Commands must contain no double quotes or newlines (they sit inside one
+# double-quoted Lua string) — enforced by tests and by parse-time validation.
+@dataclass(frozen=True)
+class AliasAction:
+    description: str
+    command: str
+
+
+ALIAS_ACTIONS: dict[str, AliasAction] = {
+    # Restore the pre-3.1.0 Omarchy ChatGPT chord for muscle memory: same
+    # webapp launch Omarchy itself uses for its ChatGPT binding.
+    "chatgpt-classic": AliasAction(
+        description="ChatGPT (Operator Key alias)",
+        command="omarchy-launch-webapp https://chatgpt.com",
+    ),
+    # Region screenshot via Omarchy's own capture helper.
+    "screenshot": AliasAction(
+        description="Screenshot (Operator Key alias)",
+        command="omarchy-capture-screenshot",
+    ),
+}
+
+
 MODMASK = (
     (1, "SHIFT"),
     (4, "CTRL"),
@@ -89,6 +115,7 @@ class InstallPlan:
     destination: Path
     source_hash: str
     chord: str
+    aliases: tuple[tuple[str, str], ...]
     decisions: tuple[str, ...]
     block: bytes
     proposed: bytes
@@ -149,6 +176,37 @@ def display_chord(physical: str) -> str:
     names = {"ctrl": "CTRL", "shift": "SHIFT", "alt": "ALT", "super": "SUPER"}
     modifiers = sorted(parts[:-1], key=DISPLAY_ORDER.__getitem__)
     return " + ".join(names.get(part, part.upper()) for part in [*modifiers, parts[-1]])
+
+
+def parse_alias_specs(specs: Sequence[str]) -> tuple[tuple[str, str], ...]:
+    """Parse NAME=CHORD alias requests against the closed allowlist.
+
+    Returns (name, display_chord) pairs. Every failure is an InstallError so the
+    CLI reports it as a safe, user-actionable refusal with nothing proposed.
+    """
+    parsed: list[tuple[str, str]] = []
+    seen_names: set[str] = set()
+    seen_physical: dict[str, str] = {}
+    for spec in specs:
+        name, separator, raw_chord = spec.partition("=")
+        name = name.strip()
+        if not separator or not name or not raw_chord.strip():
+            raise InstallError(f"Alias must look like NAME=CHORD, got {spec!r}")
+        if name not in ALIAS_ACTIONS:
+            allowed = ", ".join(sorted(ALIAS_ACTIONS))
+            raise InstallError(f"Unknown alias {name!r}; the closed allowlist is: {allowed}")
+        if name in seen_names:
+            raise InstallError(f"duplicate alias name {name!r}")
+        physical = canonicalize_chord(raw_chord)
+        if physical in seen_physical:
+            raise InstallError(
+                f"duplicate alias chord {display_chord(physical)!r}: "
+                f"already requested for {seen_physical[physical]!r}"
+            )
+        seen_names.add(name)
+        seen_physical[physical] = name
+        parsed.append((name, display_chord(physical)))
+    return tuple(parsed)
 
 
 def _trigger(row: dict) -> str:
@@ -365,8 +423,8 @@ def _managed_block(content: bytes) -> tuple[int, int, str, Path] | None:
     if not begins:
         return None
     begin_index, end_index = begins[0], ends[0]
-    if end_index != begin_index + 2:
-        raise InstallError("managed Operator Key block must contain exactly one binding line")
+    if end_index < begin_index + 2:
+        raise InstallError("managed Operator Key block must contain a binding line")
     block_lines = lines[begin_index:end_index + 1]
     parts = [_line_parts(line) for line in block_lines]
     endings = [ending for _, ending in parts]
@@ -387,6 +445,30 @@ def _managed_block(content: bytes) -> tuple[int, int, str, Path] | None:
         raise InstallError("Managed Operator Key chord is not canonical")
     destination = Path(raw_destination)
     validate_command_path(destination)
+    # Any further interior lines must each be one exact allowlisted alias
+    # binding. Anything else — including a formerly allowlisted command that
+    # was edited by hand — is not a managed block this tool will touch.
+    for body, _ in parts[2:-1]:
+        try:
+            alias_line = body.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise InstallError("Managed Operator Key alias line is not valid UTF-8") from error
+        alias_match = re.fullmatch(
+            r'o\.bind\("([^"\r\n]+)", "([^"\r\n]+)", "([^"\r\n]+)"\)',
+            alias_line,
+        )
+        recognized = False
+        if alias_match:
+            alias_chord, description, command = alias_match.groups()
+            for action in ALIAS_ACTIONS.values():
+                if description == action.description and command == action.command:
+                    recognized = display_chord(canonicalize_chord(alias_chord)) == alias_chord
+                    break
+        if not recognized:
+            raise InstallError(
+                "managed Operator Key block contains a line that is not an "
+                "exact generated allowlisted alias binding"
+            )
     start = offsets[begin_index]
     stop = offsets[end_index] + len(lines[end_index])
     return start, stop, chord, destination
@@ -401,17 +483,20 @@ def newline_for(content: bytes) -> bytes:
     return b"\r\n" if b"\r\n" in content else b"\n"
 
 
-def make_block(chord: str, destination: Path, newline: bytes) -> bytes:
+def make_block(
+    chord: str,
+    destination: Path,
+    newline: bytes,
+    aliases: Sequence[tuple[str, str]] = (),
+) -> bytes:
     validate_command_path(destination)
-    text = (
-        BEGIN_MARKER
-        + newline.decode()
-        + f'o.bind("{chord}", "Operator Key", o.launch("{destination}"))'
-        + newline.decode()
-        + END_MARKER
-        + newline.decode()
-    )
-    return text.encode()
+    lines = [BEGIN_MARKER, f'o.bind("{chord}", "Operator Key", o.launch("{destination}"))']
+    for name, alias_chord in aliases:
+        action = ALIAS_ACTIONS[name]
+        lines.append(f'o.bind("{alias_chord}", "{action.description}", "{action.command}")')
+    lines.append(END_MARKER)
+    ending = newline.decode()
+    return (ending.join(lines) + ending).encode()
 
 
 def replace_managed_block(content: bytes, block: bytes) -> bytes:
@@ -435,6 +520,28 @@ def managed_chord(content: bytes) -> str | None:
     return None if block is None else block[2]
 
 
+def managed_alias_bindings(content: bytes) -> tuple[tuple[str, str], ...]:
+    """Return (physical_chord, description) for each alias line in the managed block.
+
+    _managed_block has already proven every interior line is exactly generated,
+    so this re-parse cannot meet an unexpected shape.
+    """
+    block = _managed_block(content)
+    if block is None:
+        return ()
+    start, stop = block[0], block[1]
+    pairs: list[tuple[str, str]] = []
+    for raw in content[start:stop].splitlines()[2:-1]:
+        match = re.fullmatch(
+            r'o\.bind\("([^"\r\n]+)", "([^"\r\n]+)", "([^"\r\n]+)"\)',
+            raw.decode("utf-8"),
+        )
+        if match:
+            alias_chord, description, _ = match.groups()
+            pairs.append((canonicalize_chord(alias_chord), description))
+    return tuple(pairs)
+
+
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -446,6 +553,7 @@ def create_plan(
     destination: Path,
     runner,
     candidates: Sequence[str] = DEFAULT_CANDIDATES,
+    aliases: Sequence[tuple[str, str]] = (),
 ) -> InstallPlan:
     target = Path(target)
     source = Path(source)
@@ -468,8 +576,35 @@ def create_plan(
             if binding.physical == previous_physical and binding.description == "Operator Key":
                 del active[index]
                 break
+    # A rerun must also ignore its OWN previously installed alias bindings.
+    # Same standard as the launcher line above: exclude exactly one active
+    # binding per previous alias, matched on BOTH physical chord and exact
+    # description — anything else on those chords stays and conflicts.
+    for previous_physical, description in managed_alias_bindings(original):
+        for index, binding in enumerate(active):
+            if binding.physical == previous_physical and binding.description == description:
+                del active[index]
+                break
     chord, decisions = choose_candidate(active, candidates)
-    block = make_block(chord, destination, newline_for(original))
+    launcher_physical = canonicalize_chord(chord)
+    by_physical: dict[str, list[Binding]] = {}
+    for binding in active:
+        by_physical.setdefault(binding.physical, []).append(binding)
+    for name, alias_chord in aliases:
+        physical = canonicalize_chord(alias_chord)
+        if physical == launcher_physical:
+            raise InstallError(
+                f"Alias {name!r} chord {alias_chord} conflicts with the launcher chord {chord}"
+            )
+        conflicts = by_physical.get(physical, [])
+        if conflicts:
+            details = "; ".join(
+                f"{item.description} [{item.trigger}] via {item.source}" for item in conflicts
+            )
+            raise InstallError(
+                f"Alias {name!r} chord {alias_chord} conflicts with {details}; no change was proposed"
+            )
+    block = make_block(chord, destination, newline_for(original), aliases)
     return InstallPlan(
         target=target,
         backup=Path(str(target) + ".operator-key.bak"),
@@ -477,6 +612,7 @@ def create_plan(
         destination=destination,
         source_hash=sha256(source_bytes),
         chord=chord,
+        aliases=tuple(aliases),
         decisions=decisions,
         block=block,
         proposed=replace_managed_block(original, block),
@@ -488,11 +624,20 @@ def create_plan(
 def render_preview(plan: InstallPlan) -> str:
     diff_action = "replace the existing uniquely marked block" if _managed_block(plan.original) is not None else "append one uniquely marked block"
     decisions = "\n".join(f"  - {item}" for item in plan.decisions)
+    if plan.aliases:
+        alias_lines = "\n".join(
+            f"  - {alias_chord} -> {ALIAS_ACTIONS[name].description}: exact command {ALIAS_ACTIONS[name].command!r}"
+            for name, alias_chord in plan.aliases
+        )
+        aliases_section = f"Aliases: {len(plan.aliases)} from the closed allowlist\n{alias_lines}\n"
+    else:
+        aliases_section = "Aliases: none requested\n"
     return (
         "Operator Key Omarchy install preview (no files changed)\n"
         f"Target: {plan.target}\n"
         f"Backup: {plan.backup}\n"
         f"Binding: {plan.chord}\n"
+        + aliases_section +
         f"Change: {diff_action}; all other bytes remain unchanged\n"
         f"Source binary: {plan.source}\n"
         f"Destination: {plan.destination}\n"
@@ -584,11 +729,26 @@ def _verify_binding(plan: InstallPlan, runner) -> Binding:
             f"{item.description} ({item.dispatcher or 'unknown dispatcher'})" for item in on_chord
         )
         raise InstallError(f"Post-reload verification found a conflicting active binding: {details}")
+    for name, alias_chord in plan.aliases:
+        alias_physical = canonicalize_chord(alias_chord)
+        expected = ALIAS_ACTIONS[name].description
+        on_alias = [item for item in bindings if item.physical == alias_physical]
+        if not any(item.description == expected for item in on_alias):
+            raise InstallError(
+                f"Active binding verification did not find alias {name!r} on {alias_chord}"
+            )
+        if len(on_alias) != 1:
+            details = "; ".join(
+                f"{item.description} ({item.dispatcher or 'unknown dispatcher'})" for item in on_alias
+            )
+            raise InstallError(
+                f"Post-reload verification found a conflicting active binding on {alias_chord}: {details}"
+            )
     return managed[0]
 
 
 def _validate_plan_integrity(plan: InstallPlan, source_bytes: bytes) -> None:
-    expected_block = make_block(plan.chord, plan.destination, newline_for(plan.original))
+    expected_block = make_block(plan.chord, plan.destination, newline_for(plan.original), plan.aliases)
     expected_proposed = replace_managed_block(plan.original, expected_block)
     if plan.block != expected_block or plan.proposed != expected_proposed:
         raise InstallError("Install plan bytes are not the exact generated config; preview again")
@@ -915,6 +1075,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--binary", type=Path, default=_default_source(repo), help="prebuilt executable source")
     parser.add_argument("--destination", type=Path, default=Path.home() / ".local/bin/operator-key")
     parser.add_argument("--candidate", action="append", dest="candidates", help="candidate chord, in preference order")
+    parser.add_argument(
+        "--alias", action="append", dest="aliases", default=[], metavar="NAME=CHORD",
+        help="optional named alias from the closed allowlist (%s); repeatable"
+        % ", ".join(sorted(ALIAS_ACTIONS)),
+    )
     parser.add_argument("--apply", action="store_true", help="apply only after preview and confirmation")
 
     parser.add_argument("--uninstall", action="store_true", help="preview/remove the managed block and installed launcher")
@@ -942,6 +1107,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             destination=args.destination.expanduser(),
             runner=runner,
             candidates=args.candidates or DEFAULT_CANDIDATES,
+            aliases=parse_alias_specs(args.aliases),
         )
         print(render_preview(plan), end="")
         if args.apply:
