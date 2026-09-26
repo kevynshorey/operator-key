@@ -18,11 +18,17 @@ import historyJson from "../data/shortcut-history.json";
 import { lookupChordHistory, parseShortcutHistory, type ShortcutMove } from "./shortcutHistory";
 import { hideOverlay, type HideOverlay } from "./overlay";
 import {
+  lookupActiveBindings,
+  UNPROBED_SHORTCUT_ENVIRONMENT,
+  type ShortcutEnvironmentReport,
+} from "./shortcutEnvironment";
+import {
   getActionAvailability,
   readCatalogSnapshot,
   readDesktopCapabilities,
   readBuildIdentity,
   readDesktopCompatibility,
+  readShortcutEnvironment,
   UNKNOWN_BUILD_IDENTITY,
   UNKNOWN_DESKTOP_CAPABILITIES,
   UNKNOWN_DESKTOP_COMPATIBILITY,
@@ -116,6 +122,12 @@ interface AppProps {
    * rather than reporting whatever machine happens to run the suite.
    */
   buildIdentity?: BuildIdentity;
+  /**
+   * Advisory snapshot of the live shortcut environment. Injected in tests so each case
+   * states the machine it describes; in the native app it is probed once on mount.
+   * Never gates anything — an unavailable probe only changes wording, never behavior.
+   */
+  shortcutEnvironment?: ShortcutEnvironmentReport;
 }
 
 interface ActiveIntentPlan {
@@ -839,6 +851,60 @@ function ShortcutHistoryPanel({ moves }: { moves: readonly ShortcutMove[] }) {
   );
 }
 
+/** What the verdict strip may say about one chord on this machine. */
+interface ChordVerdict {
+  state: "active" | "absent" | "unverifiable";
+  chord: string;
+  reason: string;
+  bindings: readonly { chord: string; description: string; dispatcher: string }[];
+}
+
+/**
+ * Local-machine verdict for a chord query. Advisory `role="note"` like every other
+ * standing panel — never a live region, never a gate. The three states carry three
+ * grades of certainty and the wording must not blur them:
+ *   active       — the probe SAW this chord bound here; name what it does.
+ *   absent       — the probe answered and this chord was not in the DETECTED set.
+ *                  Detected, not universal: submaps and per-device layers exist,
+ *                  so "not active in the detected binding set", never "impossible".
+ *   unverifiable — no probe answer at all; say only that, plus the fixed reason.
+ */
+function ChordVerdictStrip({ verdict, keyboard }: {
+  verdict: ChordVerdict;
+  keyboard: { layouts: readonly string[]; activeKeymap: string | null };
+}) {
+  return (
+    <aside className="verdict-strip" role="note" aria-label="Local binding check" data-verdict={verdict.state}>
+      <span className="state-code">LOCAL BINDING CHECK / ADVISORY</span>
+      {verdict.state === "active" && (
+        <p>
+          <code>{displayChord(verdict.chord)}</code> is active on this machine
+          {verdict.bindings.length === 1
+            ? <> as <strong>{verdict.bindings[0].description || verdict.bindings[0].dispatcher}</strong></>
+            : <> with {verdict.bindings.length} bindings: {verdict.bindings.map((binding, index) => (
+                <span key={`${binding.description}:${binding.dispatcher}:${index}`}>
+                  {index > 0 ? ", " : ""}<strong>{binding.description || binding.dispatcher}</strong>
+                </span>
+              ))}</>}
+          {keyboard.activeKeymap ? <> · keyboard: {keyboard.activeKeymap}</> : null}
+        </p>
+      )}
+      {verdict.state === "absent" && (
+        <p>
+          <code>{displayChord(verdict.chord)}</code> is not active in the detected binding set on this machine.
+          The probe reads top-level Hyprland binds only — submap or per-device layers are not checked.
+        </p>
+      )}
+      {verdict.state === "unverifiable" && (
+        <p>
+          Can&apos;t verify local bindings for <code>{displayChord(verdict.chord)}</code>.
+          {verdict.reason ? <> {verdict.reason}.</> : null} The catalog answer is unaffected.
+        </p>
+      )}
+    </aside>
+  );
+}
+
 /**
  * Tells the operator how far the catalog can be trusted right now.
  *
@@ -999,7 +1065,7 @@ function BuildIdentityPanel({ identity }: { identity: BuildIdentity }) {
   );
 }
 
-export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities, desktopCompatibility: injectedDesktopCompatibility, buildIdentity: injectedBuildIdentity }: AppProps) {
+export default function App({ loading = false, catalogData: injectedCatalogData, hideOverlay: injectedHideOverlay, actions: injectedActions, runtime: injectedRuntime, intentReasoner: injectedIntentReasoner, freshness: injectedFreshness = freshnessData, desktopCapabilities: injectedDesktopCapabilities, desktopCompatibility: injectedDesktopCompatibility, buildIdentity: injectedBuildIdentity, shortcutEnvironment: injectedShortcutEnvironment }: AppProps) {
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences());
   useEffect(() => { savePreferences(preferences); }, [preferences]);
   // The native side may have applied an operator's sidecar catalog. Until it answers, the
@@ -1103,6 +1169,21 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
     injectedBuildIdentity ?? UNKNOWN_BUILD_IDENTITY,
   );
 
+  // Live shortcut environment: probed once on native mount, injected in tests, and
+  // honestly UNPROBED everywhere else (web builds, older native companions).
+  const [shortcutEnvironment, setShortcutEnvironment] = useState<ShortcutEnvironmentReport>(
+    injectedShortcutEnvironment ?? UNPROBED_SHORTCUT_ENVIRONMENT,
+  );
+
+  useEffect(() => {
+    if (runtime !== "native" || injectedShortcutEnvironment) return;
+    let current = true;
+    void readShortcutEnvironment().then((report) => {
+      if (current) setShortcutEnvironment(report);
+    });
+    return () => { current = false; };
+  }, [runtime, injectedShortcutEnvironment]);
+
   useEffect(() => {
     if (runtime !== "native" || injectedBuildIdentity) return;
     let current = true;
@@ -1179,6 +1260,30 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
     if (!chord) return [];
     return lookupChordHistory(shortcutHistory, chord, product);
   }, [activePlan, results, settledQuery, product]);
+
+  /**
+   * Keyboard-aware verdict for a chord-shaped query: what THIS machine says about
+   * the chord, independent of what the catalog ships. Three honest states —
+   * active-here (with the local binding names), absent-from-detected-set, or
+   * cannot-verify (probe unavailable). Advisory only; null for non-chord queries.
+   */
+  const chordVerdict = useMemo(() => {
+    if (activePlan) return null;
+    const chord = parseChordQuery(settledQuery);
+    if (!chord) return null;
+    if (shortcutEnvironment.status !== "ok") {
+      return {
+        state: "unverifiable" as const,
+        chord,
+        reason: shortcutEnvironment.unavailableReason ?? "",
+        bindings: [] as readonly { chord: string; description: string; dispatcher: string }[],
+      };
+    }
+    const bindings = lookupActiveBindings(shortcutEnvironment, chord);
+    return bindings.length > 0
+      ? { state: "active" as const, chord, reason: "", bindings }
+      : { state: "absent" as const, chord, reason: "", bindings };
+  }, [activePlan, settledQuery, shortcutEnvironment]);
 
   const predictions = useMemo(
     () => predictionIndex && !activePlan ? predictIntent(predictionIndex, query, 5) : [],
@@ -1625,12 +1730,13 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
 
       {displayedResults.length === 0 ? (
         <>
-          {/* The advisory leads: for a retired chord it is the actual answer, and the
-              app's minimum window (820x560) would push it below the fold after the
-              full-height empty panel. OUTSIDE the role="status" live region — a
-              standing advisory read from inside it would be announced as transient
-              status and hijack that channel. */}
+          {/* The advisory stack leads: for a retired chord the ledger IS the answer, so
+              it stays first and above the fold at the 820x560 minimum; the local
+              verdict is glanceable confirmation beneath it. Both sit OUTSIDE the
+              role="status" live region — a standing advisory read from inside it
+              would be announced as transient status and hijack that channel. */}
           <ShortcutHistoryPanel moves={historyMoves} />
+          {chordVerdict && <ChordVerdictStrip verdict={chordVerdict} keyboard={shortcutEnvironment.keyboard} />}
           <section className="empty-panel" role="status">
             <span className="state-code">SEARCH / 000</span>
             <h2>No matching command</h2>
@@ -1639,6 +1745,8 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
           </section>
         </>
       ) : (
+        <>
+        {chordVerdict && <ChordVerdictStrip verdict={chordVerdict} keyboard={shortcutEnvironment.keyboard} />}
         <section className="workspace-grid">
           <section className="command-stage">
             <div className="command-scroll">
@@ -1692,6 +1800,7 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
             </ul>
           </aside>
         </section>
+        </>
       )}
 
       {actionStatus && <div className={`action-status action-${actionStatus.kind}`} role={actionStatus.kind}>{actionStatus.message}</div>}
