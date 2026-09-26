@@ -1,7 +1,7 @@
 import catalogJson from "../../data/catalog.json";
 import { describe, expect, it } from "vitest";
 import { parseCatalog } from "../catalog";
-import { createSearchIndex, normalizeChord, searchCatalog } from ".";
+import { createSearchIndex, normalizeChord, parseChordQuery, searchCatalog } from ".";
 
 const catalogResult = parseCatalog(catalogJson);
 if (!catalogResult.ok) throw new Error(catalogResult.error);
@@ -59,6 +59,26 @@ describe("intent search", () => {
     const results = searchCatalog(index, "Ctrl+B");
     expect(results.slice(0, 2).map(({ entry }) => entry.product)).toEqual(["hermes", "claude-code"]);
     expect(results.slice(0, 2).every(({ entry }) => entry.conflict_ids.length > 0)).toBe(true);
+  });
+
+  it("does not turn an unbound chord into fuzzy text matches", () => {
+    expect(searchCatalog(index, "SUPER + A")).toEqual([]);
+    expect(searchCatalog(index, "SUPER + SHIFT + A", { product: "omarchy", interface: "hotkey" })
+      .map(({ entry }) => entry.description)).toContain("ChatGPT");
+  });
+
+  it("normalizes platform-specific modifier glyphs to the canonical chord", () => {
+    expect(normalizeChord("⌘ + ⇧ + A")).toBe("shift+super+a");
+    expect(normalizeChord("WIN SHIFT A")).toBe("shift+super+a");
+    expect(searchCatalog(index, "⌘ + ⇧ + A", { product: "omarchy", interface: "hotkey" })
+      .map(({ entry }) => entry.description)).toContain("ChatGPT");
+  });
+
+  it("parses chord queries without mistaking ordinary phrases for shortcuts", () => {
+    expect(parseChordQuery("SUPER plus A")).toBe("super+a");
+    expect(parseChordQuery("⌘ ⇧ A")).toBe("shift+super+a");
+    expect(parseChordQuery("control panel")).toBeNull();
+    expect(parseChordQuery("review my code")).toBeNull();
   });
 
   it("falls back to indexed text matching when modifier words are not a known chord", () => {

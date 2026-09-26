@@ -16,10 +16,11 @@ export interface SearchResult {
 
 const MODIFIER_ORDER = ["ctrl", "alt", "shift", "super"] as const;
 const MODIFIER_ALIASES: Record<string, string> = {
-  control: "ctrl", ctl: "ctrl", ctrl: "ctrl",
-  option: "alt", alt: "alt",
-  shift: "shift",
-  cmd: "super", command: "super", meta: "super", win: "super", super: "super",
+  control: "ctrl", ctl: "ctrl", ctrl: "ctrl", "⌃": "ctrl",
+  option: "alt", alt: "alt", "⌥": "alt",
+  shift: "shift", "⇧": "shift",
+  cmd: "super", command: "super", meta: "super", win: "super", windows: "super", super: "super",
+  "⌘": "super", "⊞": "super",
 };
 
 function clean(value: string): string {
@@ -56,16 +57,38 @@ function words(value: string): string[] {
 }
 
 export function normalizeChord(value: string): string {
-  const parts = clean(value).replace(/\s*\+\s*/g, " ").split(/\s+/).filter(Boolean);
+  const parts = clean(value)
+    .replace(/\s+plus\s+/g, " + ")
+    .replace(/\s*\+\s*/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
   const normalized = parts.map((part) => MODIFIER_ALIASES[part] ?? part);
   const modifiers = MODIFIER_ORDER.filter((modifier) => normalized.includes(modifier));
   const keys = normalized.filter((part) => !MODIFIER_ORDER.includes(part as (typeof MODIFIER_ORDER)[number]));
   return [...modifiers, ...keys].join("+");
 }
 
+const NAMED_KEYS = new Set([
+  "backspace", "delete", "del", "down", "end", "enter", "escape", "esc", "home",
+  "insert", "left", "pageup", "pagedown", "pgup", "pgdn", "print", "return",
+  "right", "space", "tab", "up", "comma", "period", "minus", "equal",
+]);
+
 function looksLikeChord(query: string): boolean {
-  const parts = clean(query).replace(/\s*\+\s*/g, " ").split(/\s+/);
-  return parts.length > 1 && parts.some((part) => part in MODIFIER_ALIASES);
+  const normalized = clean(query).replace(/\s+plus\s+/g, " + ");
+  const parts = normalized.replace(/\s*\+\s*/g, " ").split(/\s+/).filter(Boolean);
+  if (!parts.some((part) => part in MODIFIER_ALIASES)) return false;
+  const keys = parts.filter((part) => !(part in MODIFIER_ALIASES));
+  // Require a plausible key token unless the operator explicitly wrote a chord
+  // separator. This keeps ordinary language such as "control panel" in text search.
+  return normalized.includes("+") || keys.some((part) => (
+    part.length === 1 || NAMED_KEYS.has(part) || /^f(?:[1-9]|1[0-2])$/.test(part) || part.startsWith("xf86")
+  ));
+}
+
+/** Return a canonical chord only when the query has recognizable shortcut syntax. */
+export function parseChordQuery(query: string): string | null {
+  return looksLikeChord(query) ? normalizeChord(query) : null;
 }
 
 interface SearchRecord {
@@ -251,7 +274,12 @@ export function searchCatalog(
   limit = 50,
 ): SearchResult[] {
   const normalizedQuery = clean(query);
-  const chordQuery = looksLikeChord(query) ? normalizeChord(query) : "";
+  const chordQuery = parseChordQuery(query) ?? "";
+  // A chord-looking query is a reverse lookup, not an intent sentence. If no catalog
+  // entry owns that exact normalized chord, token-level matching would turn the modifier
+  // (usually "super") into dozens of unrelated, false-positive results.
+  if (chordQuery && !index.chordPostings.get(chordQuery)?.length) return [];
+
   // A learner types "how do I review my code" — strip the preamble, then treat pure
   // function words as optional so the real intent words drive the match.
   const allTerms = words(stripIntentPreamble(query));
