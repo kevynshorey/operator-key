@@ -7,6 +7,11 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Treat a chord-shaped search (`SUPER + A`, `⌘ ⇧ A`, "super plus a") as an exact reverse lookup: a chord no catalog entry owns now returns no results instead of fuzzy text matches on the modifier word. Plain-language queries such as "control panel" keep their existing ranking.
+- Add a validated, source-backed moved-shortcut ledger (`data/shortcut-history.json`). When a chord search finds nothing, the empty-result view now explains a known upstream move — ChatGPT left `SUPER + A` for `SUPER + SHIFT + A` between Omarchy 3.0.2 and 3.1.0 — as a clearly historical advisory with exact upstream commit and release-tag links. Malformed ledger data fails closed and renders nothing.
+
 ## [0.2.6] - 2026-09-24
 
 ### Added

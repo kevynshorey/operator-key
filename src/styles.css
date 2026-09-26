@@ -601,6 +601,25 @@ body:has(.runtime-web) { background: #0b0e10; }
 /* Catalog freshness: how far to trust what is on screen. Advisory, never blocking. */
 .freshness-banner { margin-top: 10px; padding: 9px 11px; border: 1px solid var(--graphite-600); border-radius: 2px; background: #10181b; }
 .freshness-banner.freshness-attention { border-color: var(--amber); background: #17110c; }
+
+/* Shortcut history advisory: standing note above the empty-result headline — for a
+   retired chord it IS the answer, so it must be visible without scrolling at the
+   820x560 minimum window. Amber-etched so it reads as advisory, never as a live
+   result row. */
+.history-panel { margin: 18px 8vw 0; padding: 11px 13px; border: 1px solid var(--graphite-600); border-left: 2px solid var(--amber); border-radius: 2px; background: #14110c; max-width: 640px; }
+/* With the advisory leading, the empty panel stops centering in the leftover column
+   so the pair reads as one stacked answer instead of two distant islands. */
+.history-panel + .empty-panel { flex: 0 0 auto; place-content: start; padding-top: 20px; }
+.history-panel .state-code { color: var(--amber); }
+.history-move p { margin: 7px 0 5px; color: var(--muted); font-size: 12px; line-height: 1.6; max-width: 560px; }
+.history-move p strong { color: var(--white); }
+/* nowrap: a chord broken across lines reads as two fragments, not one binding. */
+.history-move p code { padding: 1px 5px; border: 1px solid var(--graphite-600); background: var(--graphite-800); color: var(--cyan); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+.history-sources { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.history-sources a { color: var(--cyan); font-family: var(--mono); font-size: 10px; overflow-wrap: anywhere; text-decoration: none; border-bottom: 1px dotted var(--cyan); }
+.history-sources a:focus-visible { outline: 1px solid var(--cyan); outline-offset: 2px; }
+.large-text .history-move p { font-size: 15px; }
+.large-text .history-sources a { font-size: 13px; }
 .freshness-head { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
 .freshness-tag { padding: 2px 6px; border: 1px solid var(--graphite-600); border-radius: 1px; color: var(--muted); font-family: var(--mono); font-size: 9px; letter-spacing: .07em; }
 .freshness-attention .freshness-tag { border-color: var(--amber); color: var(--amber); }
@@ -702,7 +721,7 @@ body:has(.runtime-web) { background: #0b0e10; }
 .shortcut-setup code { color:var(--white); font:11px var(--mono); word-break:break-all; }
 .shortcut-command { padding:8px; border:1px solid var(--border); background:rgba(0,0,0,.25); }
 .native-settings:focus { outline:2px solid var(--cyan); outline-offset:5px; }
-.view-settings > .search-deck,.view-settings > .workspace-grid,.view-settings > .empty-panel,.view-settings > .explain-panel,.view-settings > .onboarding-panel,.view-settings > .status-footer,.view-learn > .search-deck,.view-learn > .workspace-grid,.view-learn > .empty-panel,.view-learn > .explain-panel,.view-learn > .status-footer { display:none!important; }
+.view-settings > .search-deck,.view-settings > .workspace-grid,.view-settings > .empty-panel,.view-settings > .history-panel,.view-settings > .explain-panel,.view-settings > .onboarding-panel,.view-settings > .status-footer,.view-learn > .search-deck,.view-learn > .workspace-grid,.view-learn > .empty-panel,.view-learn > .history-panel,.view-learn > .explain-panel,.view-learn > .status-footer { display:none!important; }
 .view-learn > .onboarding-panel { flex:1; overflow:auto; margin:0; }
 @media(max-height:720px) and (min-width:621px) {
   .operator-shell .search-field { height:50px; }

@@ -13,7 +13,9 @@ import {
   type SafetyLevel,
   type TaskGroup,
 } from "./catalog";
-import { createSearchIndex, searchCatalog } from "./search";
+import { createSearchIndex, parseChordQuery, searchCatalog } from "./search";
+import historyJson from "../data/shortcut-history.json";
+import { lookupChordHistory, parseShortcutHistory, type ShortcutMove } from "./shortcutHistory";
 import { hideOverlay, type HideOverlay } from "./overlay";
 import {
   getActionAvailability,
@@ -784,6 +786,60 @@ const freshnessModules = import.meta.glob<{ default: unknown }>("../data/freshne
 const freshnessData = Object.values(freshnessModules)[0]?.default;
 
 /**
+ * The shipped moved-shortcut ledger, validated once at module load. Fail-closed: a
+ * malformed ledger renders NO history rather than fabricated citations. Unlike
+ * freshness.json this file is tracked — it states upstream release facts, not
+ * machine state — so the eager import is unconditional.
+ */
+const shortcutHistory = parseShortcutHistory(historyJson);
+
+/** Display form of a canonical chord: "shift+super+a" → "SUPER + SHIFT + A". */
+function displayChord(canonical: string): string {
+  const rank: Record<string, number> = { super: 0, ctrl: 1, alt: 2, shift: 3 };
+  const parts = canonical.split("+").filter(Boolean);
+  const modifiers = parts.filter((part) => part in rank).sort((a, b) => rank[a] - rank[b]);
+  const keys = parts.filter((part) => !(part in rank));
+  return [...modifiers, ...keys].map((part) => part.toUpperCase()).join(" + ");
+}
+
+/**
+ * Where a retired binding went. Rendered ONLY in the empty-result view: if the live
+ * catalog answered, history is noise. Speaks strictly in the past tense with bounded
+ * version ranges — the ledger is upstream release history, never a claim about what is
+ * bound on THIS machine (that is the runtime probe's job, and until it exists the
+ * catalog's).
+ *
+ * role="note", never status/alert (those are the transient-feedback channels), and the
+ * heading is a static landmark name per the house rule: content changes, the region's
+ * name does not.
+ */
+function ShortcutHistoryPanel({ moves }: { moves: readonly ShortcutMove[] }) {
+  if (moves.length === 0) return null;
+  return (
+    <aside className="history-panel" role="note" aria-label="Shortcut history">
+      <span className="state-code">SHORTCUT HISTORY / ADVISORY</span>
+      {moves.map((move) => (
+        <div className="history-move" key={`${move.product}:${move.old_chord}:${move.current_chord}`}>
+          <p>
+            <strong>{move.description}</strong> is no longer on <code>{displayChord(move.old_chord)}</code>.
+            Upstream {PRODUCT_LABELS[move.product]} moved it to <code>{displayChord(move.current_chord)}</code> —
+            last shipped on the old chord in {move.last_version_with_old}, moved as of {move.first_version_with_new}.
+            Historical record from the catalog ledger, not a probe of this machine.
+          </p>
+          <ul className="history-sources">
+            {move.sources.map((url) => (
+              <li key={url}>
+                <a href={url} target="_blank" rel="noopener noreferrer">{url.replace("https://github.com/", "")}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </aside>
+  );
+}
+
+/**
  * Tells the operator how far the catalog can be trusted right now.
  *
  * Deliberately not dismissible for the "attention" tier: a catalog that no longer matches
@@ -1111,6 +1167,18 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
   const boundedIndex = Math.min(selectedIndex, Math.max(0, displayedResults.length - 1));
   const selected = displayedResults[boundedIndex]?.entry;
   const actionSelection = activePlan ? selected : query === settledQuery ? selected : liveResults[0]?.entry;
+
+  // Forwarding address for a retired chord. The EMPTY-RESULT render branch is the
+  // boundary that keeps history away from live results; this memo's results/plan
+  // guards just skip ledger work while the operator is typing toward a real match.
+  // Prose queries have no chord to look up, and the product filter narrows the
+  // ledger the same way it narrows search.
+  const historyMoves = useMemo(() => {
+    if (!shortcutHistory || activePlan || results.length > 0) return [];
+    const chord = parseChordQuery(settledQuery);
+    if (!chord) return [];
+    return lookupChordHistory(shortcutHistory, chord, product);
+  }, [activePlan, results, settledQuery, product]);
 
   const predictions = useMemo(
     () => predictionIndex && !activePlan ? predictIntent(predictionIndex, query, 5) : [],
@@ -1556,12 +1624,20 @@ export default function App({ loading = false, catalogData: injectedCatalogData,
       )}
 
       {displayedResults.length === 0 ? (
-        <section className="empty-panel" role="status">
-          <span className="state-code">SEARCH / 000</span>
-          <h2>No matching command</h2>
-          <p>Every term must map to a command, alias, task, description, or product. Clear a filter or try fewer words.</p>
-          <button type="button" disabled={controlsLocked} onClick={() => { if (!controlsLocked) { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); clearReasoning(); } }}>Reset search plane</button>
-        </section>
+        <>
+          {/* The advisory leads: for a retired chord it is the actual answer, and the
+              app's minimum window (820x560) would push it below the fold after the
+              full-height empty panel. OUTSIDE the role="status" live region — a
+              standing advisory read from inside it would be announced as transient
+              status and hijack that channel. */}
+          <ShortcutHistoryPanel moves={historyMoves} />
+          <section className="empty-panel" role="status">
+            <span className="state-code">SEARCH / 000</span>
+            <h2>No matching command</h2>
+            <p>Every term must map to a command, alias, task, description, or product. Clear a filter or try fewer words.</p>
+            <button type="button" disabled={controlsLocked} onClick={() => { if (!controlsLocked) { setQuery(""); setProduct(undefined); setInterfaceType(undefined); setTask(undefined); setSafety(undefined); clearReasoning(); } }}>Reset search plane</button>
+          </section>
+        </>
       ) : (
         <section className="workspace-grid">
           <section className="command-stage">
