@@ -2,6 +2,7 @@ mod actions;
 mod intent;
 mod native_settings;
 mod provider;
+mod shortcut_env;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -13,6 +14,7 @@ pub fn run() {
             native_settings::save_reasoning_settings,
             native_settings::reset_reasoning_settings,
             actions::desktop_capabilities,
+            shortcut_env::shortcut_environment,
             actions::desktop_compatibility,
             actions::build_identity,
             actions::copy_catalog_command,

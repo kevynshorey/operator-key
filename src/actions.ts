@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { CatalogEntry, InterfaceType } from "./catalog";
 import type { OperatorRuntime } from "./runtime";
+import {
+  parseShortcutEnvironment,
+  UNPROBED_SHORTCUT_ENVIRONMENT,
+  type ShortcutEnvironmentReport,
+} from "./shortcutEnvironment";
 
 const TERMINAL_INTERFACES: ReadonlySet<InterfaceType> = new Set(["shell-command", "cli-flag"]);
 
@@ -258,6 +263,23 @@ export async function readDesktopCapabilities(
     // An older native build without this command must not break the UI: fall back to
     // "unknown", which disables the affected controls rather than promising them.
     return UNKNOWN_DESKTOP_CAPABILITIES;
+  }
+}
+
+/**
+ * Advisory snapshot of the live shortcut environment (Hyprland binds + keyboard
+ * hints). Validation lives in parseShortcutEnvironment and fails closed; a missing
+ * command on an older native build degrades to "unavailable", never an error. This
+ * report gates NOTHING — search, copy, and insert never consult it.
+ */
+export async function readShortcutEnvironment(
+  nativeInvoke: Invoke = invoke,
+): Promise<ShortcutEnvironmentReport> {
+  try {
+    const value = await nativeInvoke<unknown>("shortcut_environment");
+    return parseShortcutEnvironment(value);
+  } catch {
+    return UNPROBED_SHORTCUT_ENVIRONMENT;
   }
 }
 
