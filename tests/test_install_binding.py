@@ -1027,5 +1027,183 @@ class InstallBindingTests(unittest.TestCase):
         self.assertEqual(plan.proposed, comment)
 
 
+class AliasBundleTests(unittest.TestCase):
+    """Task 5: named alias bundles — closed allowlist, no arbitrary commands."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.target = self.root / "bindings.lua"
+        self.target.write_bytes(b"-- personal\n")
+        self.target.chmod(0o640)
+        self.source = self.root / "release" / "operator-key"
+        self.source.parent.mkdir()
+        self.source.write_bytes(b"verified executable")
+        self.source.chmod(0o755)
+        self.destination = self.root / "bin" / "operator-key"
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def plan(self, runner=None, aliases=(), candidates=("SUPER + SHIFT + K",)):
+        return installer.create_plan(
+            target=self.target,
+            source=self.source,
+            destination=self.destination,
+            runner=runner or FakeRunner(),
+            candidates=candidates,
+            aliases=aliases,
+        )
+
+    def test_alias_allowlist_is_closed_and_commands_are_fixed_strings(self):
+        # The allowlist maps a name to a human description and an exact command
+        # string. No entry accepts user-supplied commands or arguments.
+        self.assertIn("chatgpt-classic", installer.ALIAS_ACTIONS)
+        self.assertIn("screenshot", installer.ALIAS_ACTIONS)
+        for name, action in installer.ALIAS_ACTIONS.items():
+            with self.subTest(name=name):
+                self.assertTrue(action.description)
+                self.assertTrue(action.command)
+                # Fixed commands must survive the same safety regex the launcher
+                # path uses for its own quoting context (no quotes/newlines).
+                self.assertNotRegex(action.command, r'["\r\n]')
+
+    def test_parse_alias_specs_maps_names_to_canonical_display_chords(self):
+        parsed = installer.parse_alias_specs(["chatgpt-classic=SUPER + A"])
+        self.assertEqual(parsed, (("chatgpt-classic", "SUPER + A"),))
+        # Chord normalization: messy input canonicalizes to display form.
+        parsed = installer.parse_alias_specs(["screenshot=super+ctrl+shift+s"])
+        self.assertEqual(parsed, (("screenshot", "SUPER + SHIFT + CTRL + S"),))
+
+    def test_parse_alias_specs_rejects_unknown_names_and_malformed_specs(self):
+        for spec in ["run-anything=SUPER + A", "chatgpt-classic", "=SUPER + A",
+                     "chatgpt-classic=", "chatgpt-classic=not a chord +"]:
+            with self.subTest(spec=spec):
+                with self.assertRaises(installer.InstallError):
+                    installer.parse_alias_specs([spec])
+
+    def test_parse_alias_specs_rejects_duplicate_names_and_duplicate_chords(self):
+        with self.assertRaisesRegex(installer.InstallError, "duplicate"):
+            installer.parse_alias_specs(["chatgpt-classic=SUPER + A", "chatgpt-classic=SUPER + B"])
+        with self.assertRaisesRegex(installer.InstallError, "duplicate"):
+            installer.parse_alias_specs(["chatgpt-classic=SUPER + A", "screenshot=super+a"])
+
+    def test_alias_conflicts_with_live_bindings_fail_the_whole_plan(self):
+        runner = FakeRunner(binds=[bind(64, "A", "ChatGPT")])
+        with self.assertRaisesRegex(installer.InstallError, "SUPER \\+ A"):
+            self.plan(runner=runner, aliases=(("chatgpt-classic", "SUPER + A"),))
+
+    def test_alias_conflicts_with_the_launcher_chord_fail_the_whole_plan(self):
+        with self.assertRaisesRegex(installer.InstallError, "launcher"):
+            self.plan(aliases=(("chatgpt-classic", "SUPER + SHIFT + K"),))
+
+    def test_plan_block_contains_launcher_first_then_each_alias_line(self):
+        plan = self.plan(aliases=(("chatgpt-classic", "SUPER + A"),))
+        text = plan.block.decode()
+        lines = text.splitlines()
+        self.assertEqual(lines[0], installer.BEGIN_MARKER)
+        self.assertIn('"Operator Key"', lines[1])
+        chatgpt = installer.ALIAS_ACTIONS["chatgpt-classic"]
+        self.assertEqual(
+            lines[2],
+            f'o.bind("SUPER + A", "{chatgpt.description}", "{chatgpt.command}")',
+        )
+        self.assertEqual(lines[3], installer.END_MARKER)
+        # Byte-exactness: replace/uninstall still round-trip the whole block.
+        content = b"-- personal\n" + plan.block
+        self.assertEqual(installer.remove_managed_block(content), b"-- personal\n")
+
+    def test_preview_lists_each_alias_with_its_exact_command(self):
+        plan = self.plan(aliases=(("chatgpt-classic", "SUPER + A"),))
+        preview = installer.render_preview(plan)
+        self.assertIn("Aliases:", preview)
+        self.assertIn("SUPER + A", preview)
+        self.assertIn(installer.ALIAS_ACTIONS["chatgpt-classic"].command, preview)
+        self.assertIn(plan.block.decode().rstrip(), preview)
+
+    def test_plan_without_aliases_is_byte_identical_to_before(self):
+        with_default = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=FakeRunner(), candidates=("SUPER + SHIFT + K",),
+        )
+        explicit_empty = self.plan(aliases=())
+        self.assertEqual(with_default.block, explicit_empty.block)
+        self.assertEqual(with_default.proposed, explicit_empty.proposed)
+
+    def test_rerun_ignores_its_own_managed_alias_bindings(self):
+        first = self.plan(aliases=(("chatgpt-classic", "SUPER + A"),))
+        self.target.write_bytes(installer.replace_managed_block(self.target.read_bytes(), first.block))
+        # The live set now reports both managed bindings (as Hyprland would).
+        runner = FakeRunner(binds=[
+            bind(64 | 1, "K", "Operator Key"),
+            bind(64, "A", installer.ALIAS_ACTIONS["chatgpt-classic"].description),
+        ])
+        rerun = installer.create_plan(
+            target=self.target, source=self.source, destination=self.destination,
+            runner=runner, candidates=("SUPER + SHIFT + K",),
+            aliases=(("chatgpt-classic", "SUPER + A"),),
+        )
+        self.assertEqual(rerun.chord, "SUPER + SHIFT + K")
+
+    def test_rerun_exclusion_requires_chord_and_description_not_description_alone(self):
+        # Our previous block bound the alias on SUPER + A. An unrelated binding
+        # elsewhere reuses the same description (imposter). Only the exact
+        # (chord, description) pair may be excluded: moving the alias onto the
+        # imposter's chord must still conflict.
+        first = self.plan(aliases=(("chatgpt-classic", "SUPER + A"),))
+        self.target.write_bytes(installer.replace_managed_block(self.target.read_bytes(), first.block))
+        description = installer.ALIAS_ACTIONS["chatgpt-classic"].description
+        runner = FakeRunner(binds=[
+            bind(64, "B", description),  # imposter first: description-only match would eat it
+            bind(64 | 1, "K", "Operator Key"),
+            bind(64, "A", description),
+        ])
+        with self.assertRaisesRegex(installer.InstallError, "SUPER \\+ B"):
+            installer.create_plan(
+                target=self.target, source=self.source, destination=self.destination,
+                runner=runner, candidates=("SUPER + SHIFT + K",),
+                aliases=(("chatgpt-classic", "SUPER + B"),),
+            )
+
+    def test_managed_block_with_alias_lines_parses_and_uninstalls(self):
+        plan = self.plan(aliases=(("chatgpt-classic", "SUPER + A"),))
+        content = b"-- personal\n" + plan.block + b"-- after\n"
+        self.target.write_bytes(content)
+        uninstall = installer.create_uninstall_plan(target=self.target)
+        self.assertEqual(uninstall.destination, self.destination)
+        self.assertEqual(uninstall.proposed, b"-- personal\n-- after\n")
+
+    def test_managed_alias_line_tampering_is_rejected(self):
+        plan = self.plan(aliases=(("chatgpt-classic", "SUPER + A"),))
+        chatgpt = installer.ALIAS_ACTIONS["chatgpt-classic"]
+        good = f'o.bind("SUPER + A", "{chatgpt.description}", "{chatgpt.command}")'
+        evil = f'o.bind("SUPER + A", "{chatgpt.description}", "rm -rf /")'
+        tampered = plan.block.decode().replace(good, evil).encode()
+        self.assertNotEqual(tampered, plan.block)
+        with self.assertRaisesRegex(installer.InstallError, "exact generated"):
+            installer.remove_managed_block(b"-- x\n" + tampered)
+
+    def test_verify_binding_checks_every_managed_chord_after_reload(self):
+        plan = self.plan(aliases=(("chatgpt-classic", "SUPER + A"),))
+        # Launcher bound, alias missing: verification must fail loudly.
+        runner = FakeRunner(binds=[bind(64 | 1, "K", "Operator Key")])
+        with self.assertRaisesRegex(installer.InstallError, "SUPER \\+ A"):
+            installer._verify_binding(plan, runner)
+        # Both present: verification passes.
+        runner = FakeRunner(binds=[
+            bind(64 | 1, "K", "Operator Key"),
+            bind(64, "A", installer.ALIAS_ACTIONS["chatgpt-classic"].description),
+        ])
+        installer._verify_binding(plan, runner)
+
+    def test_cli_exposes_alias_flag_but_no_command_flag(self):
+        args = installer.parse_args(["--alias", "chatgpt-classic=SUPER + A"])
+        self.assertEqual(args.aliases, ["chatgpt-classic=SUPER + A"])
+        for forbidden in (["--alias-command", "x=y"], ["--command", "foo"], ["--exec", "foo"]):
+            with self.subTest(flag=forbidden[0]):
+                with self.assertRaises(SystemExit):
+                    installer.parse_args(forbidden)
+
+
 if __name__ == "__main__":
     unittest.main()

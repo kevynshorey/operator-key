@@ -389,6 +389,18 @@ fn ensure_before_deadline(deadline: Instant, now: Instant, program: &str) -> Res
     }
 }
 
+/// Read-only subprocess query for sibling modules (e.g. the shortcut environment
+/// probe): stdout of a successful run, bounded by the same capture limits and
+/// deadline machinery as every other native subprocess.
+pub(crate) fn read_only_query(
+    program: &str,
+    args: &[&str],
+    deadline: Instant,
+) -> Result<String, String> {
+    let output = process_output(program, args, deadline)?;
+    successful_output(output, program).map(|output| output.stdout)
+}
+
 fn process_output(
     program: &str,
     args: &[&str],
@@ -816,7 +828,7 @@ fn required_program(product: &str) -> Option<&'static str> {
 /// the runtime half of that check: `available` stays an advisory hint for ranking and
 /// display, while this decides whether keystrokes are allowed.
 #[cfg(unix)]
-fn program_on_path(program: &str) -> bool {
+pub(crate) fn program_on_path(program: &str) -> bool {
     use std::os::unix::fs::PermissionsExt;
 
     // A catalog product name is a fixed identifier from `required_program`, never
@@ -840,7 +852,7 @@ fn program_on_path(program: &str) -> bool {
 }
 
 #[cfg(not(unix))]
-fn program_on_path(program: &str) -> bool {
+pub(crate) fn program_on_path(program: &str) -> bool {
     if program.is_empty() {
         return false;
     }

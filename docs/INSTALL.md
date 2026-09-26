@@ -60,6 +60,23 @@ Candidates are checked in this order:
 
 The installer queries `hyprctl -j binds`, with `omarchy menu keybindings --print` as a fallback. Modifier order, aliases, and physical keys are normalized, so an existing press, release, locked, repeat, or long-press binding rejects that physical chord. The first unused candidate wins. Supply repeated `--candidate` options to review a different ordered list. If all candidates conflict, nothing is proposed.
 
+## Optional named aliases
+
+The managed block can also carry additional bindings chosen from a **closed allowlist** of named actions. There is no flag that accepts a command string: each name maps to one fixed description and one fixed command baked into the installer, currently:
+
+- `chatgpt-classic` — launches ChatGPT via `omarchy-launch-webapp https://chatgpt.com` (restores the pre-Omarchy-3.1.0 muscle-memory chord, e.g. `SUPER + A`)
+- `screenshot` — runs `omarchy-capture-screenshot`
+
+Request one or more with repeated `--alias NAME=CHORD` options:
+
+```sh
+python3 scripts/install-omarchy-binding.py \
+  --binary "$PWD/src-tauri/target/release/operator-key" \
+  --alias 'chatgpt-classic=SUPER + A'
+```
+
+Every alias chord is canonicalized and checked against the live binding set the same way the launcher chord is (excluding only this installer's own previously managed bindings, matched on exact chord and description). Any conflict, unknown name, malformed spec, duplicate name, or duplicate chord rejects the whole plan; nothing is proposed. The preview lists each alias with its exact fixed command and the exact managed-block bytes. Aliases live inside the same single marked block, so uninstall removes them together with the launcher binding, and apply verifies after reload that every managed chord — launcher and aliases — is active exactly once.
+
 ## Apply
 
 Review the complete preview, then run the same command with `--apply`:
@@ -107,7 +124,7 @@ Apply after reviewing the preview:
 python3 scripts/install-omarchy-binding.py --uninstall --apply
 ```
 
-The typed phrase is `UNINSTALL OPERATOR KEY`, and a TTY is mandatory. Uninstall recognizes only a strict three-line generated block: an exact unindented begin marker, one canonical generated `o.bind(...)` line, and an exact unindented end marker, all with one newline style. Marker text inside strings/long strings, comments, indented lines, or larger lines is not managed state. Extra content, malformed exact markers, or multiple exact blocks are rejected without mutation. The destination is taken only from that validated block. After reload, uninstall re-reads `hyprctl -j binds` and requires the managed chord/description to be absent; failure runs the same best-effort complete rollback.
+The typed phrase is `UNINSTALL OPERATOR KEY`, and a TTY is mandatory. Uninstall recognizes only a strict generated block: an exact unindented begin marker, one canonical generated launcher `o.bind(...)` line, zero or more exact generated allowlisted alias lines, and an exact unindented end marker, all with one newline style. Marker text inside strings/long strings, comments, indented lines, or larger lines is not managed state. Extra content — including a hand-edited alias command — malformed exact markers, or multiple exact blocks are rejected without mutation. The destination is taken only from that validated block. After reload, uninstall re-reads `hyprctl -j binds` and requires the managed chord/description to be absent; failure runs the same best-effort complete rollback.
 
 ## Manual recovery
 

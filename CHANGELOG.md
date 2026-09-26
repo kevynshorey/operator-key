@@ -7,6 +7,14 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Treat a chord-shaped search (`SUPER + A`, `⌘ ⇧ A`, "super plus a") as an exact reverse lookup: a chord no catalog entry owns now returns no results instead of fuzzy text matches on the modifier word. Plain-language queries such as "control panel" keep their existing ranking.
+- Add a validated, source-backed moved-shortcut ledger (`data/shortcut-history.json`). When a chord search finds nothing, the empty-result view now explains a known upstream move — ChatGPT left `SUPER + A` for `SUPER + SHIFT + A` between Omarchy 3.0.2 and 3.1.0 — as a clearly historical advisory with exact upstream commit and release-tag links. Malformed ledger data fails closed and renders nothing.
+- Probe the live shortcut environment through a new advisory native command (`shortcut_environment`): read-only `hyprctl` binds and keyboard-layout queries on Hyprland, an explicit unavailable state everywhere else. Dispatcher arguments never cross the bridge (exec lines can carry usernames and paths), unrepresentable modifier masks are skipped rather than misnamed, and nothing in the report gates search, copy, or insert.
+- Render a keyboard-aware local-binding verdict for chord searches: active on this machine (naming the live binding and detected keymap), not active in the detected binding set (never "impossible" — submap and per-device layers are not checked), or an honest cannot-verify when the probe is unavailable. Advisory `role="note"` strip, outside every live region.
+- Extend the Omarchy installer with optional named alias bundles from a closed allowlist (`--alias NAME=CHORD`, currently `chatgpt-classic` and `screenshot`). Each name maps to one fixed description and one fixed command — no flag accepts arbitrary command input. Alias chords are canonicalized, conflict-checked against the live binding set (excluding only this installer's own managed bindings, matched on exact chord AND description), previewed byte-exactly inside the single managed block, verified active after reload, and removed together on uninstall. A managed block containing any hand-edited or unrecognized line is rejected without mutation.
+
 ## [0.2.6] - 2026-09-24
 
 ### Added

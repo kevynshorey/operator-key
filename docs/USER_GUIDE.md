@@ -41,7 +41,7 @@ sudo dnf install wl-clipboard
 
 Replace `VERSION` with the exact downloaded filename. These are package-manager instructions, not a claim that every distribution/version has been certified. Use a Wayland session. Install `wtype` only if you use the optional supported Hyprland integration.
 
-Launch **Operator Key** from the application menu or run `operator-key`. For an optional Omarchy global shortcut, follow [INSTALL.md](INSTALL.md); the installer first previews changes and requires explicit confirmation. It does not silently rewrite your bindings.
+Launch **Operator Key** from the application menu or run `operator-key`. For an optional Omarchy global shortcut, follow [INSTALL.md](INSTALL.md); the installer first previews changes and requires explicit confirmation. It does not silently rewrite your bindings. The same installer can optionally add named alias bindings (for example, restoring the classic `SUPER + A` ChatGPT chord) from a closed allowlist of fixed actions — it never accepts arbitrary command input.
 
 ### Omarchy / Arch
 

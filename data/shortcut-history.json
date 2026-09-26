@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "entries": [
+    {
+      "product": "omarchy",
+      "description": "ChatGPT web app",
+      "old_chord": "super+a",
+      "current_chord": "shift+super+a",
+      "last_version_with_old": "3.0.2",
+      "first_version_with_new": "3.1.0",
+      "sources": [
+        "https://github.com/omacom/omarchy/commit/fcae2e9809a83cafa5e267934ca9cea28a3686b8",
+        "https://github.com/omacom/omarchy/releases/tag/v3.1.0",
+        "https://github.com/omacom/omarchy/releases/tag/v3.0.2"
+      ]
+    }
+  ]
+}
