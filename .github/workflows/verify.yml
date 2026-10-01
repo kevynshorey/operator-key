@@ -135,7 +135,7 @@ jobs:
       - name: Cache cargo-audit
         # Building cargo-audit from source takes about 3.5 minutes on a clean runner.
         # Cache the installed binary so only the advisory scan itself runs each time.
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/cargo-audit
           key: cargo-audit-${{ runner.os }}-v0.22.2
